@@ -674,12 +674,9 @@ void door_init_shared(entity this)
         {
                  this.wait = -1;
         }
-        else
+        else if (!this.wait)
         {
-                 if (!this.wait)
-                 {
-                 	this.wait = 3;
-                 }
+              	this.wait = 3;
         }
 
 	if (!this.lip)
@@ -736,14 +733,11 @@ spawnfunc(func_door)
 
         if(autocvar_sv_doors_always_open)
         {
-                this.speed = 750;
+                this.speed = max(750, this.speed);
         }
-        else
+        else if (!this.speed)
         {
-                if (!this.speed)
-                {
-                        this.speed = 100;
-                }
+                this.speed = 100;
         }
 
 	settouch(this, door_touch);
