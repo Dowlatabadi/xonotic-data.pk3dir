@@ -8,17 +8,17 @@
 #include <lib/csqcmodel/cl_player.qh>
 
 // StrafeHUD cvars, should be handled in a different file
-AUTOCVAR_SAVE(hud_panel_physics_strafehud, bool, true, "displays a hud intended for strafing");
+AUTOCVAR_SAVE(hud_panel_physics_strafehud, bool, false, "displays a hud intended for strafing");
 AUTOCVAR_SAVE(hud_strafehud_bar_alpha, float, 0.4, "opacity of the strafe meter");
-AUTOCVAR_SAVE(hud_strafehud_bar_color, vector, '255 255 255', "color of the strafe meter");
-AUTOCVAR_SAVE(hud_strafehud_indicator_color, vector, '0 255 0', "color of the strafe angle indicator");
-AUTOCVAR_SAVE(hud_strafehud_indicator_switch_color, vector, '255 127 0', "color of the strafe angle indicator on the opposite side");
+AUTOCVAR_SAVE(hud_strafehud_bar_color, vector, '1 1 1', "color of the strafe meter");
+AUTOCVAR_SAVE(hud_strafehud_indicator_color, vector, '0 1 0', "color of the strafe angle indicator");
+AUTOCVAR_SAVE(hud_strafehud_indicator_switch_color, vector, '1 .5 0', "color of the strafe angle indicator on the opposite side");
 AUTOCVAR_SAVE(hud_strafehud_angle, float, 0, "the maximum angle displayed on the hud, \"0\" = dynamic (please stick with dynamic mode for now)");
-AUTOCVAR_SAVE(hud_strafehud_good_color, vector, '0 255 255', "indicator color of the actual strafe angle if the angle matches the ideal angle");
-AUTOCVAR_SAVE(hud_strafehud_warning_color, vector, '255 127 0', "indicator color of the actual strafe angle if the angle doesn't match the ideal angle"); // 127 counts as 255?
-AUTOCVAR_SAVE(hud_strafehud_alert_color, vector, '255 0 255', "indicator color of the actual strafe angle if the angle has a critical value");
+AUTOCVAR_SAVE(hud_strafehud_good_color, vector, '0 1 1', "indicator color of the actual strafe angle if the angle matches the ideal angle");
+AUTOCVAR_SAVE(hud_strafehud_warning_color, vector, '1 .5 0', "indicator color of the actual strafe angle if the angle doesn't match the ideal angle");
+AUTOCVAR_SAVE(hud_strafehud_alert_color, vector, '1 0 1', "indicator color of the actual strafe angle if the angle has a critical value");
 AUTOCVAR_SAVE(hud_strafehud_angle_alpha, float, .8, "indicator transparency of the actual strafe angle");
-AUTOCVAR_SAVE(hud_strafehud_direction_color, vector, '0 0 255', "direction indicator color");
+AUTOCVAR_SAVE(hud_strafehud_direction_color, vector, '0 0 1', "direction indicator color");
 
 bool strafe_fwd = true; // to be removed (see TODO)
 float strafe_onground_time = 0;
@@ -293,13 +293,10 @@ void HUD_Physics()
 		drawstring_aspect(panel_pos + acceleration_offset + tmp_offset, strcat(ftos_decimals(discrete_acceleration, acc_decimals), "g"), tmp_size, '1 1 1', panel_fg_alpha, DRAWFLAG_NORMAL);
 	}
 
-    // TODO: make the angle indicator transparent so that the strafe indicator is still visible even if they overlap
-    //       mby useful checks (change HUD mode accordingly): IS_ONSLICK(csqcplayer), IS_JUMP_HELD(csqcplayer), PHYS_TRACK_CANJUMP(csqcplayer), IS_DEAD(csqcplayer), csqcplayer.player_blocked,
-    //       !intermission, STAT(FROZEN, this), this.viewloc && !(this.viewloc.spawnflags & VIEWLOC_FREEMOVE), game_stopped, and (csqcplayer.flags & FL_INWATER)
-    //       make HUD use pressed keys only in spectating mode while there is no other solution (csqcplayer entity of spectated player?)
-    //       make use of KEY_JUMP and KEY_CROUCH
+    // TODO: make HUD use pressed keys only in spectating mode while there is no other solution (csqcplayer entity of spectated player?)
     //       remove strafe_fwd global var and check instead whether the players movement relative to their viewing angle is "backwards"
     //       mark overturn areas when in non-dynamic maxangle mode
+    //       flip hud on v_flipped
 
     // draw StrafeHUD
     if(autocvar_hud_panel_physics_strafehud == true && csqcplayer)
@@ -329,7 +326,7 @@ void HUD_Physics()
 
         //strafe_fwd = strafe_movement_x < 0 ? false : strafe_movement_x > 0 ? true : strafe_fwd;
         strafe_fwd = strafe_keys & KEY_FORWARD ? true : strafe_keys & KEY_BACKWARD ? false : strafe_fwd;
-        
+
         if(IS_ONGROUND(csqcplayer) != strafe_onground)
         {
             strafe_onground_time = time;
