@@ -8,8 +8,8 @@
 #include <lib/csqcmodel/cl_player.qh>
 
 // StrafeHUD cvars, should be handled in a different file
-AUTOCVAR_SAVE(hud_panel_physics_strafehud, bool, false, "displays a hud intended for strafing");
-AUTOCVAR_SAVE(hud_strafehud_bar_alpha, float, 0.4, "opacity of the strafe meter");
+AUTOCVAR_SAVE(hud_panel_physics_strafehud, bool, true, "displays a hud intended for strafing");
+AUTOCVAR_SAVE(hud_strafehud_bar_alpha, float, 0.1, "opacity of the strafe meter");
 AUTOCVAR_SAVE(hud_strafehud_bar_color, vector, '1 1 1', "color of the strafe meter");
 AUTOCVAR_SAVE(hud_strafehud_indicator_color, vector, '0 1 0', "color of the strafe angle indicator");
 AUTOCVAR_SAVE(hud_strafehud_indicator_switch_color, vector, '1 .5 0', "color of the strafe angle indicator on the opposite side");
@@ -17,7 +17,7 @@ AUTOCVAR_SAVE(hud_strafehud_angle, float, 0, "the maximum angle displayed on the
 AUTOCVAR_SAVE(hud_strafehud_good_color, vector, '0 1 1', "indicator color of the actual strafe angle if the angle matches the ideal angle");
 AUTOCVAR_SAVE(hud_strafehud_warning_color, vector, '1 .5 0', "indicator color of the actual strafe angle if the angle doesn't match the ideal angle");
 AUTOCVAR_SAVE(hud_strafehud_alert_color, vector, '1 0 1', "indicator color of the actual strafe angle if the angle has a critical value");
-AUTOCVAR_SAVE(hud_strafehud_angle_alpha, float, .8, "indicator transparency of the actual strafe angle");
+AUTOCVAR_SAVE(hud_strafehud_angle_alpha, float, .5, "indicator transparency of the actual strafe angle");
 AUTOCVAR_SAVE(hud_strafehud_direction_color, vector, '0 0 1', "direction indicator color");
 
 bool strafe_fwd = true; // to be removed (see TODO)
