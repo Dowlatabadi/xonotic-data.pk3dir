@@ -7,6 +7,27 @@
 #include <common/mapinfo.qh>
 #include <lib/csqcmodel/cl_player.qh>
 
+// StrafeHUD cvars, should be handled in a different file
+AUTOCVAR_SAVE(hud_panel_physics_strafehud, bool, false, "displays a hud intended for strafing");
+AUTOCVAR_SAVE(hud_strafehud_bar_alpha, float, 0.4, "opacity of the strafe meter");
+AUTOCVAR_SAVE(hud_strafehud_bar_color, vector, '255 255 255', "color of the strafe meter");
+AUTOCVAR_SAVE(hud_strafehud_indicator_color, vector, '0 255 0', "color of the strafe angle indicator");
+AUTOCVAR_SAVE(hud_strafehud_indicator_switch_color, vector, '255 127 0', "color of the strafe angle indicator on the opposite side");
+AUTOCVAR_SAVE(hud_strafehud_angle, float, 0, "the maximum angle displayed on the hud, \"0\" = dynamic (please stick with dynamic mode for now)");
+AUTOCVAR_SAVE(hud_strafehud_good_color, vector, '0 255 255', "indicator color of the actual strafe angle if the angle matches the ideal angle");
+AUTOCVAR_SAVE(hud_strafehud_warning_color, vector, '255 127 0', "indicator color of the actual strafe angle if the angle doesn't match the ideal angle"); // 127 counts as 255?
+AUTOCVAR_SAVE(hud_strafehud_alert_color, vector, '255 0 255', "indicator color of the actual strafe angle if the angle has a critical value");
+AUTOCVAR_SAVE(hud_strafehud_angle_alpha, float, .8, "indicator transparency of the actual strafe angle");
+AUTOCVAR_SAVE(hud_strafehud_direction_color, vector, '0 0 255', "direction indicator color");
+
+bool strafe_fwd = true; // to be removed (see TODO)
+float strafe_onground_time = 0;
+float strafe_strafekeys_time = 0;
+bool strafe_onground = true;
+bool strafe_strafekeys = false;
+bool strafe_turn = false;
+float strafe_turnangle;
+
 // Physics (#15)
 
 vector acc_prevspeed;
@@ -272,5 +293,242 @@ void HUD_Physics()
 		drawstring_aspect(panel_pos + acceleration_offset + tmp_offset, strcat(ftos_decimals(discrete_acceleration, acc_decimals), "g"), tmp_size, '1 1 1', panel_fg_alpha, DRAWFLAG_NORMAL);
 	}
 
+    // TODO: make the angle indicator transparent so that the strafe indicator is still visible even if they overlap
+    //       mby useful checks (change HUD mode accordingly): IS_ONSLICK(csqcplayer), IS_JUMP_HELD(csqcplayer), PHYS_TRACK_CANJUMP(csqcplayer), IS_DEAD(csqcplayer), csqcplayer.player_blocked,
+    //       !intermission, STAT(FROZEN, this), this.viewloc && !(this.viewloc.spawnflags & VIEWLOC_FREEMOVE), game_stopped, and (csqcplayer.flags & FL_INWATER)
+    //       make HUD use pressed keys only in spectating mode while there is no other solution (csqcplayer entity of spectated player?)
+    //       make use of KEY_JUMP and KEY_CROUCH
+    //       remove strafe_fwd global var and check instead whether the players movement relative to their viewing angle is "backwards"
+    //       mark overturn areas when in non-dynamic maxangle mode
+
+    // draw StrafeHUD
+    if(autocvar_hud_panel_physics_strafehud == true && csqcplayer)
+    {
+        vector strafe_indicator_color;
+        vector strafe_indicator_size = '0 0 0';
+        bool   strafe_indicator_visible = true;
+        float  strafe_ups_factor = GetSpeedUnitFactor(1);
+        float  strafe_speed = !autocvar__hud_configure ? vlen(vec2(csqcplayer.velocity)) * strafe_ups_factor : 0;
+        float  strafe_maxspeed = (IS_ONGROUND(csqcplayer) ? PHYS_MAXSPEED(csqcplayer) : PHYS_MAXAIRSPEED(csqcplayer)) * (IS_DUCKED(csqcplayer) ? .5 : 1); // does IS_DUCKED(csqcplayer) work in spectate? else → KEY_CROUCH
+        float  strafe_maxaccel = 0; //IS_ONGROUND(csqcplayer) || PHYS_AIRACCELERATE(csqcplayer) < 0 ? PHYS_ACCELERATE(csqcplayer) : PHYS_AIRACCELERATE(csqcplayer);
+        float  strafehud_vel_angle = vectoangles(csqcplayer.velocity).y;
+        float  strafehud_view_angle = view_angles.y + 180;
+        float  strafe_angle;
+        float  strafe_direction;
+        //vector strafe_movement = PHYS_CS(csqcplayer).movement;
+        //float  strafe_moveangle = strafe_movement_x == 0 ? (strafe_movement_y < 0 ? -90 : strafe_movement_y > 0 ? 90 : 0) : strafe_movement_y == 0 ? 0 : RAD2DEG * atan2(strafe_movement_y, strafe_movement_x);
+        int    strafe_keys = STAT(PRESSED_KEYS);
+        float  strafe_moveangle = (strafe_keys & KEY_LEFT ? (strafe_keys & KEY_FORWARD ? -45 : (strafe_keys & KEY_BACKWARD ? -135 : -90)) : 0) + (strafe_keys & KEY_RIGHT ? (strafe_keys & KEY_FORWARD ? 45 : (strafe_keys & KEY_BACKWARD ? 135 : 90)) : 0);
+        float  strafe_maxangle = autocvar_hud_strafehud_angle == 0 ? 90 - fabs(remainder(strafe_moveangle, 90)) : bound(45, fabs(autocvar_hud_strafehud_angle), 180); //why does fabs() inside remainder() not work?
+        float  strafe_indicator_angle = 0;
+        float  strafe_indicator_offset;
+        float  strafe_good_zone_offset;
+        vector strafe_good_zone_size = '0 0 0';
+        vector strafe_direction_size_1 = '0 0 0';
+        vector strafe_direction_size_2 = '0 0 0';
+
+        //strafe_fwd = strafe_movement_x < 0 ? false : strafe_movement_x > 0 ? true : strafe_fwd;
+        strafe_fwd = strafe_keys & KEY_FORWARD ? true : strafe_keys & KEY_BACKWARD ? false : strafe_fwd;
+        
+        if(IS_ONGROUND(csqcplayer) != strafe_onground)
+        {
+            strafe_onground_time = time;
+        }
+        if((fabs(strafe_moveangle) == 90) != strafe_strafekeys)
+        {
+            strafe_strafekeys_time = time;
+        }
+        if (!IS_ONGROUND(csqcplayer)) // does this work in spectate? would be nice if IS_ONSLICK(csqcplayer) works too
+        {
+            if(fabs(strafe_moveangle) == 90)
+            {
+                strafe_turn = true; // CPM turning
+                strafe_turnangle = strafe_moveangle;
+            }
+            else if((time - strafe_strafekeys_time) > .1)
+            {
+                strafe_turn = false;
+            }
+            else if((strafe_keys & KEY_FORWARD) || (strafe_keys & KEY_BACKWARD))
+            {
+                strafe_turn = false;
+            }
+        }
+        else
+        {
+            if((time - strafe_onground_time) > .033333)
+            {
+                strafe_turn = false;
+            }
+        }
+        strafe_strafekeys = fabs(strafe_moveangle) == 90;
+        strafe_onground = IS_ONGROUND(csqcplayer);
+        if(strafe_turn)
+        {
+            strafe_maxspeed = PHYS_MAXAIRSTRAFESPEED(csqcplayer) * (IS_DUCKED(csqcplayer) ? .5 : 1);
+            strafe_moveangle = strafe_turnangle;
+            //strafe_maxaccel = PHYS_AIRSTRAFEACCELERATE(csqcplayer);
+        }
+
+        // initialize autovars, should be handled in a seperate file
+        if (!autocvar_hud_strafehud_bar_alpha)
+            autocvar_hud_strafehud_bar_alpha = 0.4;
+
+        if (!autocvar_hud_strafehud_bar_color)
+            autocvar_hud_strafehud_bar_color = '255 255 255';
+
+        if (!autocvar_hud_strafehud_indicator_color)
+            autocvar_hud_strafehud_indicator_color = '0 255 0';
+
+        if (!autocvar_hud_strafehud_good_color)
+            autocvar_hud_strafehud_good_color = '0 255 255';
+
+        if (!autocvar_hud_strafehud_warning_color)
+            autocvar_hud_strafehud_warning_color = strafe_indicator_color = '255 127 0';
+        else
+            strafe_indicator_color = autocvar_hud_strafehud_warning_color;
+
+        if (!autocvar_hud_strafehud_alert_color)
+            autocvar_hud_strafehud_alert_color = '255 0 255';
+
+        // scale the bar of the strafe-o-meter
+        panel_pos.x += panel_size.x / 2;
+        panel_size.x *= 3;
+        panel_pos.x -= panel_size.x / 2;
+        panel_pos.y -= panel_size.y * 1.75;
+
+        // add a background to the strafe-o-meter
+        HUD_Panel_DrawProgressBar(panel_pos, panel_size, "progressbar", 1, 0, 0, autocvar_hud_strafehud_bar_color, .5 * autocvar_hud_strafehud_bar_alpha * panel_fg_alpha, DRAWFLAG_NORMAL);
+
+        // get current strafing angle ranging from -180° to +180°
+        if (strafe_speed > 0)
+        {
+            if (!strafe_fwd)
+            {
+                strafehud_view_angle += strafehud_view_angle < 0 ? 180 : strafehud_view_angle > 0 ? -180 : 0;
+                strafe_moveangle += strafe_moveangle < 0 ? 180 : strafe_moveangle > 0 ? -180 : 0;
+            }
+            strafe_angle = strafehud_view_angle - strafehud_vel_angle;
+
+            if (strafe_angle > 180)
+                strafe_angle = -360 + strafe_angle;
+            else if (strafe_angle < -180)
+                strafe_angle =  360 + strafe_angle;
+
+            strafe_angle = 180 - strafe_angle;
+            if (strafe_angle > 180)
+                strafe_angle = -fabs(360 - strafe_angle);
+
+            // making the hud less affected by rounding errors
+            if (strafe_angle > 179.9 || strafe_angle < -179.9)
+            {
+                strafe_indicator_color = autocvar_hud_strafehud_alert_color;
+                strafe_angle = 0;
+            }
+            if (strafe_angle < .1 && strafe_angle > -.1)
+            {
+                strafe_angle = 0;
+            }
+        }
+        else
+            strafe_angle = 0;
+
+        strafe_direction = (strafe_angle + strafe_moveangle) > 0 ? 1 : (strafe_angle + strafe_moveangle) < 0 ? -1 : 0;
+        if((strafe_direction == 0) && (strafe_moveangle != 0))
+        {
+            strafe_direction = 1; // noone will notice
+        }
+
+        // draw ideal strafe angle indicator
+        if(strafe_speed > (strafe_maxspeed + .1)) // do not make it appear unless you move strafe-y
+        {
+            strafe_indicator_size.x = floor(panel_size.x * .01 + .5);
+            strafe_indicator_size.y = floor(panel_size.y + .5);
+            if (strafe_direction != 0)
+            {
+                if(!strafe_turn)
+                {
+                    strafe_indicator_angle = acos((strafe_maxspeed - strafe_maxaccel) / strafe_speed) * RAD2DEG * strafe_direction - strafe_moveangle;
+                }
+                else
+                {
+                    strafe_indicator_angle = acos((strafe_maxspeed - strafe_maxaccel) / strafe_speed) * RAD2DEG * strafe_direction - strafe_moveangle;
+                }
+                if (fabs(strafe_indicator_angle) <= strafe_maxangle)
+                {
+                    strafe_indicator_offset = floor(strafe_indicator_angle/strafe_maxangle * panel_size.x/2 + panel_size.x/2 + .5);
+                    strafe_good_zone_size.y = panel_size.y;
+                    if(fabs(strafe_moveangle) < 89.9)
+                    {
+                        strafe_good_zone_offset = strafe_direction < 0 ? 0 : strafe_indicator_offset + strafe_indicator_size.x;
+                        strafe_good_zone_size.x = strafe_direction < 0 ? strafe_indicator_offset : panel_size.x - strafe_good_zone_offset;
+                    }
+                    else
+                    {
+                        vector strafe_overturn_area = panel_size;
+                        strafe_overturn_area.x = floor(strafe_overturn_area.x / 2 + .5);
+                        strafe_good_zone_offset = strafe_direction < 0 ? panel_size.x / 2 : strafe_indicator_offset + strafe_indicator_size.x;
+                        strafe_good_zone_size.x = strafe_direction < 0 ? strafe_indicator_offset - panel_size.x / 2 : panel_size.x / 2 - strafe_good_zone_offset;
+                        HUD_Panel_DrawProgressBar(panel_pos + eX * (strafe_direction < 0 ? 0 : strafe_overturn_area.x), strafe_overturn_area, "progressbar", 1, 0, 0, autocvar_hud_strafehud_alert_color, .5 * autocvar_hud_strafehud_bar_alpha * panel_fg_alpha, DRAWFLAG_NORMAL);
+                    }
+                    HUD_Panel_DrawProgressBar(panel_pos + eX * strafe_good_zone_offset, strafe_good_zone_size, "progressbar", 1, 0, 0, autocvar_hud_strafehud_indicator_color, .5 * autocvar_hud_strafehud_bar_alpha * panel_fg_alpha, DRAWFLAG_NORMAL);
+                    strafe_indicator_offset = floor(-strafe_indicator_angle/strafe_maxangle * panel_size.x/2 + panel_size.x/2 + .5);
+                    drawfill(panel_pos + eX * (strafe_indicator_offset - (-strafe_direction < 0 ? strafe_indicator_size.x : 0)), strafe_indicator_size, autocvar_hud_strafehud_indicator_switch_color, panel_fg_alpha, DRAWFLAG_NORMAL);
+                    strafe_indicator_offset = floor(strafe_indicator_angle/strafe_maxangle * panel_size.x/2 + panel_size.x/2 + .5);
+                    drawfill(panel_pos + eX * (strafe_indicator_offset - (strafe_direction < 0 ? strafe_indicator_size.x : 0)), strafe_indicator_size, autocvar_hud_strafehud_indicator_color, panel_fg_alpha, DRAWFLAG_NORMAL);
+                }
+                strafe_direction_size_1.x = floor(panel_size.x * .0075 + .5);
+                strafe_direction_size_1.y = panel_size.y;
+                strafe_direction_size_2.x = floor(strafe_direction_size_1.x * 3 + .5);
+                strafe_direction_size_2.y = strafe_direction_size_1.x;
+                drawfill(panel_pos + eX * (strafe_direction < 0 ? -strafe_direction_size_1.x : panel_size.x), strafe_direction_size_1, autocvar_hud_strafehud_direction_color, panel_fg_alpha, DRAWFLAG_NORMAL);
+                drawfill(panel_pos + eX * (strafe_direction < 0 ? -strafe_direction_size_1.x : panel_size.x - strafe_direction_size_2.x + strafe_direction_size_1.x) - eY * strafe_direction_size_2.y, strafe_direction_size_2, autocvar_hud_strafehud_direction_color, panel_fg_alpha, DRAWFLAG_NORMAL);
+                drawfill(panel_pos + eX * (strafe_direction < 0 ? -strafe_direction_size_1.x : panel_size.x - strafe_direction_size_2.x + strafe_direction_size_1.x) + eY * panel_size.y, strafe_direction_size_2, autocvar_hud_strafehud_direction_color, panel_fg_alpha, DRAWFLAG_NORMAL);
+            }
+            else
+            {
+                strafe_indicator_angle = acos((strafe_maxspeed - strafe_maxaccel) / strafe_speed) * RAD2DEG;
+                if (fabs(strafe_indicator_angle) <= strafe_maxangle)
+                {
+                    strafe_indicator_offset = floor(-strafe_indicator_angle/strafe_maxangle * panel_size.x/2 + panel_size.x/2 + .5);
+                    drawfill(panel_pos + eX * (strafe_indicator_offset - strafe_indicator_size.x), strafe_indicator_size, autocvar_hud_strafehud_indicator_switch_color, panel_fg_alpha, DRAWFLAG_NORMAL);
+                    strafe_indicator_offset = floor(strafe_indicator_angle/strafe_maxangle * panel_size.x/2 + panel_size.x/2 + .5);
+                    drawfill(panel_pos + eX * (strafe_indicator_offset), strafe_indicator_size, autocvar_hud_strafehud_indicator_switch_color, panel_fg_alpha, DRAWFLAG_NORMAL);
+                }
+            }
+        }
+        else
+        {
+            strafe_indicator_visible = false;
+        }
+
+        // draw actual strafe angle
+        if (strafe_indicator_visible)
+        {
+            if ((strafe_direction > 0 && strafe_angle >= strafe_indicator_angle) ||
+                (strafe_direction < 0 && strafe_angle <= strafe_indicator_angle))
+            strafe_indicator_color = autocvar_hud_strafehud_good_color;
+        }
+
+        if (fabs(strafe_angle + strafe_moveangle) > 89.9) // avoid inconsistencies due to rounding errors (while walking only, may remove later)
+        {
+            strafe_indicator_color = autocvar_hud_strafehud_alert_color;
+        }
+
+        if (strafe_speed <= (strafe_maxspeed + .1) && strafe_indicator_color != autocvar_hud_strafehud_alert_color)
+            strafe_indicator_color = autocvar_hud_strafehud_good_color;
+
+        strafe_indicator_offset = floor(bound(-strafe_maxangle, strafe_angle, strafe_maxangle)/strafe_maxangle * panel_size.x/2 + panel_size.x/2 + .5);
+
+        strafe_indicator_size.x = floor(panel_size.x * .005 + .5);
+        strafe_indicator_size.y = floor(panel_size.y * 1.5 + .5);
+        drawfill(panel_pos - '0 1 0'*floor(panel_size.y * .25 + .5) + eX * (strafe_indicator_offset - strafe_indicator_size.x/2), strafe_indicator_size, strafe_indicator_color, autocvar_hud_strafehud_angle_alpha * panel_fg_alpha, DRAWFLAG_NORMAL);
+
+        // cleanup, only needed if other hud items follow which do not break the size limitation
+        /*panel_pos.y += panel_size.y * 1.75;
+        panel_pos.x += panel_size.x / 2;
+        panel_size.x /= 3;
+        panel_pos.x -= panel_size.x / 2;*/
+    }
 	draw_endBoldFont();
 }
