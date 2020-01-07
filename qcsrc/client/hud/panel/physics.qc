@@ -8,7 +8,7 @@
 #include <lib/csqcmodel/cl_player.qh>
 
 // StrafeHUD cvars, should be handled in a different file
-AUTOCVAR_SAVE(hud_panel_physics_strafehud, bool, false, "displays a hud intended for strafing");
+AUTOCVAR_SAVE(hud_panel_physics_strafehud, bool, true, "displays a hud intended for strafing");
 AUTOCVAR_SAVE(hud_strafehud_bar_alpha, float, 0.4, "opacity of the strafe meter");
 AUTOCVAR_SAVE(hud_strafehud_bar_color, vector, '255 255 255', "color of the strafe meter");
 AUTOCVAR_SAVE(hud_strafehud_indicator_color, vector, '0 255 0', "color of the strafe angle indicator");
