@@ -11,6 +11,8 @@
 AUTOCVAR_SAVE(hud_panel_physics_strafehud, bool, true, "displays a hud intended for strafing");
 AUTOCVAR_SAVE(hud_strafehud_bar_alpha, float, 0.1, "opacity of the strafe meter");
 AUTOCVAR_SAVE(hud_strafehud_bar_color, vector, '1 1 1', "color of the strafe meter");
+AUTOCVAR_SAVE(hud_strafehud_bar_size_horizontal, float, 3, "horizontal size of the strafe meter");
+AUTOCVAR_SAVE(hud_strafehud_bar_size_vertical, float, 0.5, "vertical size of the strafe meter");
 AUTOCVAR_SAVE(hud_strafehud_indicator_color, vector, '0 1 0', "color of the strafe angle indicator");
 AUTOCVAR_SAVE(hud_strafehud_indicator_switch_color, vector, '1 .5 0', "color of the strafe angle indicator on the opposite side");
 AUTOCVAR_SAVE(hud_strafehud_angle, float, 0, "the maximum angle displayed on the hud, \"0\" = dynamic (please stick with dynamic mode for now)");
@@ -369,30 +371,31 @@ void HUD_Physics()
 
         // initialize autovars, should be handled in a seperate file
         if (!autocvar_hud_strafehud_bar_alpha)
-            autocvar_hud_strafehud_bar_alpha = 0.4;
+            autocvar_hud_strafehud_bar_alpha = .4;
 
         if (!autocvar_hud_strafehud_bar_color)
-            autocvar_hud_strafehud_bar_color = '255 255 255';
+            autocvar_hud_strafehud_bar_color = '1 1 1';
 
         if (!autocvar_hud_strafehud_indicator_color)
-            autocvar_hud_strafehud_indicator_color = '0 255 0';
+            autocvar_hud_strafehud_indicator_color = '0 1 0';
 
         if (!autocvar_hud_strafehud_good_color)
-            autocvar_hud_strafehud_good_color = '0 255 255';
+            autocvar_hud_strafehud_good_color = '0 1 1';
 
         if (!autocvar_hud_strafehud_warning_color)
-            autocvar_hud_strafehud_warning_color = strafe_indicator_color = '255 127 0';
+            autocvar_hud_strafehud_warning_color = strafe_indicator_color = '1 .5 0';
         else
             strafe_indicator_color = autocvar_hud_strafehud_warning_color;
 
         if (!autocvar_hud_strafehud_alert_color)
-            autocvar_hud_strafehud_alert_color = '255 0 255';
+            autocvar_hud_strafehud_alert_color = '1 0 1';
 
         // scale the bar of the strafe-o-meter
         panel_pos.x += panel_size.x / 2;
-        panel_size.x *= 3;
+        panel_pos.y -= panel_size.y * 1.75 + panel_size.y * autocvar_hud_strafehud_bar_size_vertical - panel_size.y;
+        panel_size.x *= autocvar_hud_strafehud_bar_size_horizontal;
+        panel_size.y *= autocvar_hud_strafehud_bar_size_vertical;
         panel_pos.x -= panel_size.x / 2;
-        panel_pos.y -= panel_size.y * 1.75;
 
         // add a background to the strafe-o-meter
         HUD_Panel_DrawProgressBar(panel_pos, panel_size, "progressbar", 1, 0, 0, autocvar_hud_strafehud_bar_color, .5 * autocvar_hud_strafehud_bar_alpha * panel_fg_alpha, DRAWFLAG_NORMAL);
@@ -522,9 +525,10 @@ void HUD_Physics()
         drawfill(panel_pos - '0 1 0'*floor(panel_size.y * .25 + .5) + eX * (strafe_indicator_offset - strafe_indicator_size.x/2), strafe_indicator_size, strafe_indicator_color, autocvar_hud_strafehud_angle_alpha * panel_fg_alpha, DRAWFLAG_NORMAL);
 
         // cleanup, only needed if other hud items follow which do not break the size limitation
-        /*panel_pos.y += panel_size.y * 1.75;
-        panel_pos.x += panel_size.x / 2;
-        panel_size.x /= 3;
+        /*panel_pos.x += panel_size.x / 2;
+        panel_size.y /= autocvar_hud_strafehud_bar_size_vertical;
+        panel_size.x /= autocvar_hud_strafehud_bar_size_horizontal;
+        panel_pos.y += panel_size.y * 1.75 + panel_size.y * autocvar_hud_strafehud_bar_size_vertical - panel_size.y;
         panel_pos.x -= panel_size.x / 2;*/
     }
 	draw_endBoldFont();
