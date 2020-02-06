@@ -611,7 +611,8 @@ void PutPlayerInServer(entity this)
 	this.respawn_flags = 0;
 	this.respawn_time = 0;
 	STAT(RESPAWN_TIME, this) = 0;
-	this.scale = autocvar_sv_player_scale;
+	bool q3dfcompat = autocvar_sv_q3defragcompat && autocvar_sv_q3defragcompat_changehitbox;
+	this.scale = ((q3dfcompat) ? 0.9 : autocvar_sv_player_scale);
 	this.fade_time = 0;
 	this.pain_frame = 0;
 	this.pain_finished = 0;
@@ -1068,7 +1069,7 @@ string getwelcomemessage(entity this)
 	return s;
 }
 
-bool autocvar_sv_qcphysics = false; // TODO this is for testing - remove when qcphysics work
+bool autocvar_sv_qcphysics = true; // TODO this is for testing - remove when qcphysics work
 
 /**
 =============
@@ -1107,7 +1108,7 @@ void ClientConnect(entity this)
 		CS(this).allowed_timeouts = autocvar_sv_timeout_number;
 
 	if (autocvar_sv_eventlog)
-		GameLogEcho(strcat(":join:", ftos(this.playerid), ":", ftos(etof(this)), ":", ((IS_REAL_CLIENT(this)) ? this.netaddress : "bot"), ":", playername(this, false)));
+		GameLogEcho(strcat(":join:", ftos(this.playerid), ":", ftos(etof(this)), ":", ((IS_REAL_CLIENT(this)) ? GameLog_ProcessIP(this.netaddress) : "bot"), ":", playername(this, false)));
 
 	CS(this).just_joined = true;  // stop spamming the eventlog with additional lines when the client connects
 
