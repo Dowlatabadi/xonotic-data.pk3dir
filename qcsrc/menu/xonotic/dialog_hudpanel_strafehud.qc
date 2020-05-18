@@ -1,10 +1,22 @@
 #include "dialog_hudpanel_strafehud.qh"
 
-#include "textlabel.qh"
-#include "textslider.qh"
 #include "checkbox_string.qh"
 #include "colorpicker_string.qh"
+#include "button.qh"
 #include "slider.qh"
+#include "textlabel.qh"
+#include "textslider.qh"
+
+void StrafeHUD_ColorReset(entity btn, entity me)
+{
+    cvar_set("hud_panel_strafehud_bar_color", cvar_defstring("hud_panel_strafehud_bar_color"));
+    cvar_set("hud_panel_strafehud_good_color", cvar_defstring("hud_panel_strafehud_good_color"));
+    cvar_set("hud_panel_strafehud_warning_color", cvar_defstring("hud_panel_strafehud_warning_color"));
+    cvar_set("hud_panel_strafehud_alert_color", cvar_defstring("hud_panel_strafehud_alert_color"));
+    cvar_set("hud_panel_strafehud_direction_color", cvar_defstring("hud_panel_strafehud_direction_color"));
+    cvar_set("hud_panel_strafehud_indicator_color", cvar_defstring("hud_panel_strafehud_indicator_color"));
+    cvar_set("hud_panel_strafehud_indicator_switch_color", cvar_defstring("hud_panel_strafehud_indicator_switch_color"));
+}
 
 void XonoticHUDStrafeHUDDialog_fill(entity me)
 {
@@ -28,13 +40,20 @@ void XonoticHUDStrafeHUDDialog_fill(entity me)
             e.addValue(e, _("View centered"), "0");
             e.addValue(e, _("Angle centered"), "1");
             e.configureXonoticTextSliderValues(e);
-            setDependentStringNotEqual(e, "hud_panel_strafehud_mode", "0"); // until multiple modes are actually supported
     me.TR(me);
         me.TD(me, 1, 1.2, e = makeXonoticCheckBoxString("1", "0", "_hud_panel_strafehud_demo", _("Demo mode")));
-        me.TDempty(me, 0.4);
+            setDependentStringNotEqual(e, "_hud_panel_strafehud_center", "1");
 
+        me.TDempty(me, 0.4);
         me.TD(me, 1, 0.6, e = makeXonoticTextLabel(0, _("Range:")));
         me.TD(me, 1, 1.8, e = makeXonoticSlider(0, 360, 5, "hud_panel_strafehud_angle"));
+    me.TR(me);
+        me.TD(me, 1, 1.2, e = makeXonoticCheckBoxString("1", "0", "_hud_panel_strafehud_center", _("Center angle")));
+
+        me.TDempty(me, 0.4);
+        me.TD(me, 1, 2.4, e = makeXonoticButton(_("Reset colors"), '0 0 0'));
+            e.onClick = StrafeHUD_ColorReset;
+            e.onClickEntity = me;
     me.TR(me);
         me.TD(me, 1, 2, e = makeXonoticTextLabel(0, _("Strafe bar:")));
 
@@ -54,29 +73,16 @@ void XonoticHUDStrafeHUDDialog_fill(entity me)
     me.TR(me);
         me.TDempty(me, 0.1);
         me.TD(me, 2, 0.9, e = makeXonoticColorpickerString("hud_panel_strafehud_bar_color", "hud_panel_strafehud_bar_color"));
-            setDependentStringNotEqual(e, "hud_panel_strafehud_bar_color_default", "1");
         me.TDempty(me, 0.1);
         me.TD(me, 1, 0.9, e = makeXonoticSlider(0, 1, 0.1, "hud_panel_strafehud_bar_alpha"));
-            setDependentStringNotEqual(e, "hud_panel_strafehud_bar_alpha_default", "1");
 
         me.TDempty(me, 0.1);
         me.TD(me, 2, 0.56666666, e = makeXonoticColorpickerString("hud_panel_strafehud_good_color", "hud_panel_strafehud_good_color"));
-            setDependentStringNotEqual(e, "hud_panel_strafehud_angle_color_default", "1");
         me.TDempty(me, 0.1);
         me.TD(me, 2, 0.56666666, e = makeXonoticColorpickerString("hud_panel_strafehud_warning_color", "hud_panel_strafehud_warning_color"));
-            setDependentStringNotEqual(e, "hud_panel_strafehud_angle_color_default", "1");
         me.TDempty(me, 0.1);
         me.TD(me, 2, 0.56666666, e = makeXonoticColorpickerString("hud_panel_strafehud_alert_color", "hud_panel_strafehud_alert_color"));
-            setDependentStringNotEqual(e, "hud_panel_strafehud_angle_color_default", "1");
     me.TR(me);
-    me.TR(me);
-        me.TDempty(me, 0.1);
-        me.TD(me, 1, 0.9, e = makeXonoticCheckBoxString("1", "0", "hud_panel_strafehud_bar_color_default", _("Use default")));
-        me.TDempty(me, 0.1);
-        me.TD(me, 1, 0.9, e = makeXonoticCheckBoxString("1", "0", "hud_panel_strafehud_bar_alpha_default", _("Use default")));
-
-        me.TDempty(me, 0.1);
-        me.TD(me, 1, 1.9, e = makeXonoticCheckBoxString("1", "0", "hud_panel_strafehud_angle_color_default", _("Use default")));
     me.TR(me);
         me.TD(me, 1, 2, e = makeXonoticTextLabel(0, _("Ideal angle:")));
 
@@ -86,21 +92,12 @@ void XonoticHUDStrafeHUDDialog_fill(entity me)
         me.TD(me, 1, 0.9, e = makeXonoticTextLabel(0, _("Active:")));
         me.TDempty(me, 0.1);
         me.TD(me, 1, 0.9, e = makeXonoticTextLabel(0, _("Inactive:")));
-
-        me.TDempty(me, 0.1);
-        me.TD(me, 2, 1.9, e = makeXonoticColorpickerString("hud_panel_strafehud_direction_color", "hud_panel_strafehud_direction_color"));
-            setDependentStringNotEqual(e, "hud_panel_strafehud_direction_color_default", "1");
     me.TR(me);
         me.TDempty(me, 0.1);
         me.TD(me, 2, 0.9, e = makeXonoticColorpickerString("hud_panel_strafehud_indicator_color", "hud_panel_strafehud_indicator_color"));
-            setDependentStringNotEqual(e, "hud_panel_strafehud_indicator_color_default", "1");
         me.TDempty(me, 0.1);
         me.TD(me, 2, 0.9, e = makeXonoticColorpickerString("hud_panel_strafehud_indicator_switch_color", "hud_panel_strafehud_indicator_switch_color"));
-            setDependentStringNotEqual(e, "hud_panel_strafehud_indicator_color_default", "1");
-    me.TR(me);
-        me.TDempty(me, 2.1);
-        me.TD(me, 1, 1.9, e = makeXonoticCheckBoxString("1", "0", "hud_panel_strafehud_direction_color_default", _("Use default")));
-    me.TR(me);
+
         me.TDempty(me, 0.1);
-        me.TD(me, 1, 1.9, e = makeXonoticCheckBoxString("1", "0", "hud_panel_strafehud_indicator_color_default", _("Use default")));
+        me.TD(me, 2, 1.9, e = makeXonoticColorpickerString("hud_panel_strafehud_direction_color", "hud_panel_strafehud_direction_color"));
 }
