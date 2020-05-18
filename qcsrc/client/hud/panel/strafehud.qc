@@ -13,6 +13,35 @@
 #include <common/physics/player.qh>
 #include <lib/csqcmodel/cl_player.qh>
 
+AUTOCVAR_SAVE(hud_panel_strafehud, bool, 3, "enable this panel, 1 = show if not observing, 2 = show always, 3 = show only in race/cts if not observing");
+AUTOCVAR_SAVE(hud_panel_strafehud_dynamichud, bool, 1, "apply the dynamic hud effects to this panel");
+AUTOCVAR_SAVE(_hud_panel_strafehud_demo, bool, 0, "HUD changes angle during configure");
+AUTOCVAR_SAVE(_hud_panel_strafehud_center, bool, 0, "puts the angle indicator in the center during HUD configure");
+AUTOCVAR_SAVE(hud_panel_strafehud_mode, bool, 0, "strafehud mode: \"0\" = movement centered, \"1\" = angle centered");
+AUTOCVAR_SAVE(hud_panel_strafehud_bar_alpha, float, 0.3, "opacity of the strafe meter");
+AUTOCVAR_SAVE(hud_panel_strafehud_bar_color, vector, '1 1 1', "color of the strafe meter");
+AUTOCVAR_SAVE(hud_panel_strafehud_indicator_color, vector, '0 1 0', "color of the strafe angle indicator");
+AUTOCVAR_SAVE(hud_panel_strafehud_indicator_switch_color, vector, '1 1 0', "color of the strafe angle indicator on the opposite side");
+AUTOCVAR_SAVE(hud_panel_strafehud_angle, float, 0, "the maximum angle displayed on the HUD, \"0\" = dynamic");
+AUTOCVAR_SAVE(hud_panel_strafehud_good_color, vector, '0 1 1', "indicator color of the actual strafe angle if the angle matches the ideal angle");
+AUTOCVAR_SAVE(hud_panel_strafehud_warning_color, vector, '1 1 0', "indicator color of the actual strafe angle if the angle doesn't match the ideal angle");
+AUTOCVAR_SAVE(hud_panel_strafehud_alert_color, vector, '1 0 1', "indicator color of the actual strafe angle if the angle has a critical value");
+AUTOCVAR_SAVE(hud_panel_strafehud_angle_alpha, float, 0.8, "indicator transparency of the actual strafe angle");
+AUTOCVAR_SAVE(hud_panel_strafehud_direction_color, vector, '0 0.5 1', "direction indicator color");
+AUTOCVAR_SAVE(hud_panel_strafehud_timeout_air, float, 0, "time after take off before changing HUD mode (prevents flickering on slick ramps)");
+AUTOCVAR_SAVE(hud_panel_strafehud_timeout_ground, float, 0.03333333, "time after landing before changing HUD mode (prevents flickering on regular strafe turns)");
+AUTOCVAR_SAVE(hud_panel_strafehud_timeout_strafe, float, 0.1, "time after releasing the strafe keys before changing mode (prevents flickering when switching between left/right strafe turning)");
+AUTOCVAR_SAVE(hud_panel_strafehud_indicator_minspeed, float, -1, "speed at which HUD indicators will be shown, uses maxspeed if negative");
+
+AUTOCVAR_SAVE(hud_panel_strafehud_pos, string, "0.320000 0.570000", "position of this base of the panel");
+AUTOCVAR_SAVE(hud_panel_strafehud_size, string, "0.360000 0.020000", "size of this panel");
+AUTOCVAR_SAVE(hud_panel_strafehud_bg, string, "0", "if set to something else than \"\" = override default background");
+AUTOCVAR_SAVE(hud_panel_strafehud_bg_color, string, "", "if set to something else than \"\" = override default panel background color");
+AUTOCVAR_SAVE(hud_panel_strafehud_bg_color_team, string, "", "override panel color with team color in team based games");
+AUTOCVAR_SAVE(hud_panel_strafehud_bg_alpha, string, "0.7", "if set to something else than \"\" = override default panel background alpha");
+AUTOCVAR_SAVE(hud_panel_strafehud_bg_border, string, "", "if set to something else than \"\" = override default size of border around the background");
+AUTOCVAR_SAVE(hud_panel_strafehud_bg_padding, string, "", "if set to something else than \"\" = override default padding of contents from border");
+
 bool strafehud_fwd = true;
 float strafehud_demo_angle = -37;
 float strafehud_demo_direction = 1;
@@ -27,6 +56,18 @@ float strafehud_turnangle;
 void HUD_StrafeHUD()
 {
     entity strafeplayer;
+
+    if(false)
+    {
+        autocvar_hud_panel_strafehud_pos = autocvar_hud_panel_strafehud_pos;
+        autocvar_hud_panel_strafehud_size = autocvar_hud_panel_strafehud_size;
+        autocvar_hud_panel_strafehud_bg = autocvar_hud_panel_strafehud_bg;
+        autocvar_hud_panel_strafehud_bg_color = autocvar_hud_panel_strafehud_bg_color;
+        autocvar_hud_panel_strafehud_bg_color_team = autocvar_hud_panel_strafehud_bg_color_team;
+        autocvar_hud_panel_strafehud_bg_alpha = autocvar_hud_panel_strafehud_bg_alpha;
+        autocvar_hud_panel_strafehud_bg_border = autocvar_hud_panel_strafehud_bg_border;
+        autocvar_hud_panel_strafehud_bg_padding = autocvar_hud_panel_strafehud_bg_padding;
+    }
 
     if(!autocvar__hud_configure)
     {
