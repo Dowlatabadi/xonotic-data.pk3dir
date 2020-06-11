@@ -2030,6 +2030,11 @@ int nJoinAllowed(entity this, entity ignore)
 		Send_Notification(NOTIF_ONE_ONLY, this, MSG_CENTER, CENTER_JOIN_PREVENT);
 		msg_time = time + 0.5;
 	}
+	else if (this && ignore && teamplay && lockteams && time > msg_time)
+	{
+		Send_Notification(NOTIF_ONE_ONLY, this, MSG_CENTER, CENTER_JOIN_PREVENT_LOCKTEAMS);
+		msg_time = time + 0.5;
+	}
 
 	return free_slots;
 }

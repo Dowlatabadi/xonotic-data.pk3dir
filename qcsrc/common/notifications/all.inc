@@ -693,6 +693,7 @@ string multiteam_info_sprintf(string input, string teamname) { return ((input !=
 
     MSG_CENTER_NOTIF(JOIN_NOSPAWNS,                     N_ENABLE,    0, 0, "",               CPID_PREVENT_JOIN,      "0 0",  _("^K1No spawnpoints available!\nHope your team can fix it..."), "")
     MSG_CENTER_NOTIF(JOIN_PREVENT,                      N_ENABLE,    0, 0, "",               CPID_PREVENT_JOIN,      "0 0",  _("^K1You may not join the game at this time.\nThe player limit reached maximum capacity."), "")
+    MSG_CENTER_NOTIF(JOIN_PREVENT_LOCKTEAMS,            N_ENABLE,    0, 0, "",               CPID_PREVENT_JOIN,      "0 0",  _("^K1You may not join the game at this time.\nThe teams are locked."), "")
 
     MSG_CENTER_NOTIF(KEEPAWAY_DROPPED,                  N_ENABLE,    1, 0, "s1",             CPID_KEEPAWAY,          "0 0",  _("^BG%s^BG has dropped the ball!"), "")
     MSG_CENTER_NOTIF(KEEPAWAY_PICKUP,                   N_ENABLE,    1, 0, "s1",             CPID_KEEPAWAY,          "0 0",  _("^BG%s^BG has picked up the ball!"), "")
