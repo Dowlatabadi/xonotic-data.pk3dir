@@ -491,11 +491,7 @@ void ClientCommand_selectteam(entity caller, int request, int argc)
 				sprint(caller, "^7selectteam can not be used as your team is forced\n");
 				return;
 			}
-			if (lockteams)
-			{
-				sprint(caller, "^7The game has already begun, you must wait until the next map to be able to join a team.\n");
-				return;
-			}
+			if (!joinAllowed(caller)) return;
 			float selection;
 			switch (argv(1))
 			{
