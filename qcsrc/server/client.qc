@@ -2025,14 +2025,13 @@ int nJoinAllowed(entity this, entity ignore)
 		free_slots = min(maxclients - totalClients, player_limit - currentlyPlaying);
 
 	static float msg_time = 0;
-	if(this && !this.caplayer && ignore && !free_slots && time > msg_time)
+	if(this && !this.caplayer && ignore && time > msg_time)
 	{
-		Send_Notification(NOTIF_ONE_ONLY, this, MSG_CENTER, CENTER_JOIN_PREVENT);
-		msg_time = time + 0.5;
-	}
-	else if (this && ignore && teamplay && lockteams && time > msg_time)
-	{
-		Send_Notification(NOTIF_ONE_ONLY, this, MSG_CENTER, CENTER_JOIN_PREVENT_LOCKTEAMS);
+		if(!free_slots)
+			Send_Notification(NOTIF_ONE_ONLY, this, MSG_CENTER, CENTER_JOIN_PREVENT);
+		else if(teamplay && lockteams)
+			Send_Notification(NOTIF_ONE_ONLY, this, MSG_CENTER, CENTER_JOIN_PREVENT_LOCKTEAMS);
+
 		msg_time = time + 0.5;
 	}
 
