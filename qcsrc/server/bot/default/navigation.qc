@@ -1,19 +1,22 @@
 #include "navigation.qh"
 
-#include <server/defs.qh>
+#include <server/bot/api.qh>
+#include <common/weapons/_all.qh>
+#include <common/stats.qh>
 #include <server/miscfunctions.qh>
 #include "cvars.qh"
 
 #include "bot.qh"
 #include "waypoints.qh"
 
-#include <common/t_items.qh>
+#include <server/items/items.qh>
 
 #include <common/items/_mod.qh>
 
 #include <common/constants.qh>
 #include <common/net_linked.qh>
 #include <common/mapobjects/func/ladder.qh>
+#include <common/mapobjects/trigger/hurt.qh>
 #include <common/mapobjects/trigger/jumppads.qh>
 
 .float speed;
@@ -1654,7 +1657,7 @@ int navigation_poptouchedgoals(entity this)
 		if(this.lastteleporttime > 0 && TELEPORT_USED(this, this.goalcurrent))
 		{
 			if(this.aistatus & AI_STATUS_WAYPOINT_PERSONAL_GOING)
-			if(this.goalcurrent.wpflags & WAYPOINTFLAG_PERSONAL && this.goalcurrent.owner==this)
+			if((this.goalcurrent.wpflags & WAYPOINTFLAG_PERSONAL) && this.goalcurrent.owner==this)
 			{
 				this.aistatus &= ~AI_STATUS_WAYPOINT_PERSONAL_GOING;
 				this.aistatus |= AI_STATUS_WAYPOINT_PERSONAL_REACHED;
@@ -1696,7 +1699,7 @@ int navigation_poptouchedgoals(entity this)
 		if (tele_ent && TELEPORT_USED(this, tele_ent))
 		{
 			if (this.aistatus & AI_STATUS_WAYPOINT_PERSONAL_GOING)
-			if (tele_ent.wpflags & WAYPOINTFLAG_PERSONAL && tele_ent.owner == this)
+			if ((tele_ent.wpflags & WAYPOINTFLAG_PERSONAL) && tele_ent.owner == this)
 			{
 				this.aistatus &= ~AI_STATUS_WAYPOINT_PERSONAL_GOING;
 				this.aistatus |= AI_STATUS_WAYPOINT_PERSONAL_REACHED;
@@ -1718,7 +1721,7 @@ int navigation_poptouchedgoals(entity this)
 
 	// Loose goal touching check when running
 	// check goalstack01 to make sure waypoint isn't the final goal
-	if(this.aistatus & AI_STATUS_RUNNING && this.goalcurrent.classname == "waypoint" && !(this.goalcurrent.wpflags & WAYPOINTFLAG_JUMP)
+	if((this.aistatus & AI_STATUS_RUNNING) && this.goalcurrent.classname == "waypoint" && !(this.goalcurrent.wpflags & WAYPOINTFLAG_JUMP)
 		&& this.goalstack01 && !wasfreed(this.goalstack01) && vdist(vec2(this.velocity), >=, autocvar_sv_maxspeed))
 	{
 		vector gco = this.goalcurrent.origin;
@@ -1733,7 +1736,7 @@ int navigation_poptouchedgoals(entity this)
 			{
 				// Detect personal waypoints
 				if(this.aistatus & AI_STATUS_WAYPOINT_PERSONAL_GOING)
-				if(this.goalcurrent.wpflags & WAYPOINTFLAG_PERSONAL && this.goalcurrent.owner==this)
+				if((this.goalcurrent.wpflags & WAYPOINTFLAG_PERSONAL) && this.goalcurrent.owner==this)
 				{
 					this.aistatus &= ~AI_STATUS_WAYPOINT_PERSONAL_GOING;
 					this.aistatus |= AI_STATUS_WAYPOINT_PERSONAL_REACHED;
@@ -1756,7 +1759,7 @@ int navigation_poptouchedgoals(entity this)
 			gc_min = this.goalcurrent.origin - '1 1 1' * 12;
 			gc_max = this.goalcurrent.origin + '1 1 1' * 12 + eZ * (jumpheight_vec.z + STAT(PL_MIN, this).z);
 		}
-		if (time < this.ladder_time)
+		if (this.ladder_entity)
 		{
 			if (!boxesoverlap(this.absmin, this.absmax - eZ * STAT(PL_MAX, this).z, gc_min, gc_max))
 				break;
@@ -1769,7 +1772,7 @@ int navigation_poptouchedgoals(entity this)
 
 		// Detect personal waypoints
 		if(this.aistatus & AI_STATUS_WAYPOINT_PERSONAL_GOING)
-		if(this.goalcurrent.wpflags & WAYPOINTFLAG_PERSONAL && this.goalcurrent.owner==this)
+		if((this.goalcurrent.wpflags & WAYPOINTFLAG_PERSONAL) && this.goalcurrent.owner==this)
 		{
 			this.aistatus &= ~AI_STATUS_WAYPOINT_PERSONAL_GOING;
 			this.aistatus |= AI_STATUS_WAYPOINT_PERSONAL_REACHED;

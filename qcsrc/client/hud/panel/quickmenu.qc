@@ -1,7 +1,7 @@
 #include "quickmenu.qh"
 
 #include <client/autocvars.qh>
-#include <client/defs.qh>
+#include <client/main.qh>
 #include <client/miscfunctions.qh>
 #include <common/ent_cs.qh>
 #include <common/minigames/cl_minigames.qh>
@@ -9,6 +9,12 @@
 #include <client/mapvoting.qh>
 
 // QuickMenu (#23)
+
+void HUD_QuickMenu_Export(int fh)
+{
+	// allow saving cvars that aesthetically change the panel into hud skin files
+	HUD_Write_Cvar("hud_panel_quickmenu_align");
+}
 
 // QUICKMENU_MAXLINES must be <= 10
 const int QUICKMENU_MAXLINES = 10;
@@ -863,7 +869,7 @@ void QuickMenu_Default(string target_submenu)
 	{
 		LOG_INFOF("Couldn't find submenu \"%s\"", target_submenu);
 		if(prvm_language != "en")
-			LOG_INFOF("^3Warning: submenu title must be in English", target_submenu);
+			LOG_INFO("^3Warning: submenu title must be in English");
 		QuickMenu_Buffer_Size = 0;
 	}
 }

@@ -1,10 +1,17 @@
 #include "pressedkeys.qh"
 
 #include <client/autocvars.qh>
-#include <client/defs.qh>
+#include <client/main.qh>
 #include <client/miscfunctions.qh>
 
 // Pressed keys (#11)
+
+void HUD_PressedKeys_Export(int fh)
+{
+	// allow saving cvars that aesthetically change the panel into hud skin files
+	HUD_Write_Cvar("hud_panel_pressedkeys_aspect");
+	HUD_Write_Cvar("hud_panel_pressedkeys_attack");
+}
 
 void HUD_PressedKeys()
 {

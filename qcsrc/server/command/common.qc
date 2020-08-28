@@ -1,6 +1,9 @@
 #include "common.qh"
 
-#include <server/defs.qh>
+#include <server/client.qh>
+#include <common/weapons/_all.qh>
+#include <common/stats.qh>
+#include <server/world.qh>
 #include <server/miscfunctions.qh>
 
 #include <common/command/_mod.qh>
@@ -395,7 +398,7 @@ void CommonCommand_editmob(int request, entity caller, int argc)
 
 					totalspawned += 1;
 					WarpZone_TraceBox(CENTER_OR_VIEWOFS(caller), caller.mins, caller.maxs, CENTER_OR_VIEWOFS(caller) + v_forward * 150, true, caller);
-					mon = spawnmonster(spawn(), arg_lower, 0, caller, caller, trace_endpos, false, false, moveflag);
+					mon = spawnmonster(spawn(), arg_lower, MON_Null, caller, caller, trace_endpos, false, false, moveflag);
 					print_to(caller, strcat("Spawned ", mon.monster_name));
 					return;
 				}
@@ -416,7 +419,7 @@ void CommonCommand_editmob(int request, entity caller, int argc)
 					if (!autocvar_g_monsters_edit) { print_to(caller, "Monster editing is disabled"); return; }
 					if (!is_visible) { print_to(caller, "You must look at your monster to edit it"); return; }
 					if (mon.realowner != caller && autocvar_g_monsters_edit < 2) { print_to(caller, "This monster does not belong to you"); return; }
-					if (mon.monsterid == MON_MAGE.monsterid) { print_to(caller, "Mage skins can't be changed"); return; }  // TODO
+					if (mon.monsterdef == MON_MAGE) { print_to(caller, "Mage skins can't be changed"); return; }  // TODO
 
 					mon.skin = stof(argument);
 					print_to(caller, strcat("Monster skin successfully changed to ", ftos(mon.skin)));
@@ -475,7 +478,7 @@ void CommonCommand_info(int request, entity caller, int argc)
 	{
 		case CMD_REQUEST_COMMAND:
 		{
-			string command = builtin_cvar_string(strcat("sv_info_", argv(1)));
+			string command = cvar_string(strcat("sv_info_", argv(1)));
 
 			if (command) wordwrap_sprint(caller, command, 1000);
 			else print_to(caller, "ERROR: unsupported info command");

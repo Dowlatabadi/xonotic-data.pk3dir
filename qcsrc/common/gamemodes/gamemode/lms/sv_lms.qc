@@ -3,6 +3,8 @@
 #include <common/mutators/mutator/instagib/items.qh>
 #include <server/campaign.qh>
 #include <server/command/_mod.qh>
+#include <server/world.qh>
+#include <server/items/items.qh>
 
 int autocvar_g_lms_extra_lives;
 bool autocvar_g_lms_join_anytime;
@@ -160,9 +162,7 @@ MUTATOR_HOOKFUNCTION(lms, ForbidSpawn)
 
 	if(warmup_stage)
 		return false;
-	if(player.frags == FRAGS_SPECTATOR)
-		return true;
-	if(GameRules_scoring_add(player, LMS_LIVES, 0) <= 0)
+	if(player.frags == FRAGS_SPECTATOR || GameRules_scoring_add(player, LMS_LIVES, 0) <= 0)
 	{
 		Send_Notification(NOTIF_ONE, player, MSG_CENTER, CENTER_LMS_NOLIVES);
 		return true;

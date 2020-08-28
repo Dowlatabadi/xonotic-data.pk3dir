@@ -1,13 +1,21 @@
 #include "mapvoting.qh"
 
 #include "autocvars.qh"
+#include "main.qh"
 #include "miscfunctions.qh"
-#include "defs.qh"
 #include "hud/_mod.qh"
 #include "hud/panel/scoreboard.qh"
 
 #include <common/mapinfo.qh>
+#include <common/util.qh>
 
+// MapVote (#21)
+
+void MapVote_Draw_Export(int fh)
+{
+	// allow saving cvars that aesthetically change the panel into hud skin files
+	HUD_Write_Cvar("hud_panel_mapvote_highlight_border");
+}
 
 int mv_num_maps;
 
@@ -629,7 +637,7 @@ void GameTypeVote_ReadOption(int i)
 	}
 	else
 	{
-		Gametype type = MapInfo_Type_FromString(gt);
+		Gametype type = MapInfo_Type_FromString(gt, false);
 		mv_pk3[i] = strzone(MapInfo_Type_ToText(type));
 		mv_desc[i] = MapInfo_Type_Description(type);
 	}

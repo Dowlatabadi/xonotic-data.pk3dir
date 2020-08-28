@@ -7,12 +7,14 @@
     #include "notifications/all.qh"
 	#include "scores.qh"
     #include <common/deathtypes/all.qh>
+	#include <common/gamemodes/_mod.qh>
 #elif defined(MENUQC)
 #elif defined(SVQC)
     #include "constants.qh"
 	#include <server/mutators/_mod.qh>
     #include "notifications/all.qh"
     #include <common/deathtypes/all.qh>
+	#include <common/gamemodes/_mod.qh>
 	#include "scores.qh"
     #include "mapinfo.qh"
 #endif
@@ -508,7 +510,7 @@ string fixPriorityList(string order, float from, float to, float subtract, float
 		n = tokenize_console(neworder);
 		for(w = to; w >= from; --w)
 		{
-			int wflags = Weapons_from(w).spawnflags;
+			int wflags = REGISTRY_GET(Weapons, w).spawnflags;
 			if(wflags & WEP_FLAG_SPECIALATTACK)
 				continue;
 			for(i = 0; i < n; ++i)

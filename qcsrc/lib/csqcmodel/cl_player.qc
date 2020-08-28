@@ -129,7 +129,7 @@ void CSQCPlayer_Physics(entity this)
 {
 	if(!autocvar_cl_movement) { return; }
 
-	_Movetype_CheckWater(this); // we apparently need to check water *before* physics so it can use this for water jump
+	//_Movetype_CheckWater(this); // we apparently need to check water *before* physics so it can use this for water jump
 
 	vector oldv_angle = this.v_angle;
 	vector oldangles = this.angles; // we need to save these, as they're abused by other code
@@ -219,7 +219,7 @@ vector CSQCPlayer_ApplySmoothing(entity this, vector v)
 	float smoothtime = bound(0, time - smooth_prevtime, 0.1);
 	smooth_prevtime = max(smooth_prevtime, drawtime); // drawtime is the previous frame's time at this point
 
-	if(this.csqcmodel_teleported || !(this.pmove_flags & PMF_ONGROUND) || autocvar_cl_stairsmoothspeed <= 0)
+	if(this.csqcmodel_teleported || !(this.pmove_flags & PMF_ONGROUND) || autocvar_cl_stairsmoothspeed <= 0 || this.ground_networkentity)
 		stairsmoothz = v.z;
 	else
 	{
