@@ -1,6 +1,6 @@
 #include "strafe.qh"
 
-#include <server/miscfunctions.qh>
+// #include <server/miscfunctions.qh>
 
 .float race_checkpoint;
 
