@@ -4,7 +4,6 @@
 
 #include <client/autocvars.qh>
 #include <client/hud/panel/racetimer.qh>
-#include <client/miscfunctions.qh>
 #include <client/resources.qh>
 #include <common/animdecide.qh>
 #include <common/ent_cs.qh>
