@@ -53,7 +53,7 @@ string uid2name(string myuid)
 
 void write_recordmarker(entity pl, float newpos, float tstart, float dt)
 {
-    GameLogEcho(strcat(":recordset:", ":", ftos(newpos), ":", ftos(pl.playerid), ":", ftos(dt)));
+    GameLogEcho(strcat(":recordset:", ftos(newpos), ":", ftos(pl.playerid), ":", ftos(dt)));
 
     // also write a marker into demo files for demotc-race-record-extractor to find
     if (pl.crypto_idfp != "") {
@@ -357,6 +357,8 @@ void race_setTime(string map, float t, string myuid, string mynetname, entity e,
 		return;
 	}
 
+        write_recordmarker(e, newpos, time - TIME_DECODE(t), TIME_DECODE(t));
+
 	// if we didn't hit a return yet, we have a new record!
 
 	// if the player does not have a UID we can unfortunately not store the record, as the rankings system relies on UIDs
@@ -382,7 +384,6 @@ void race_setTime(string map, float t, string myuid, string mynetname, entity e,
 
 	if (showmessage)
 	{
-                write_recordmarker(e, newpos, time - TIME_DECODE(t), TIME_DECODE(t));
 		race_send_recordtime(MSG_ALL);
 	}
 
