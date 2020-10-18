@@ -18,6 +18,7 @@
 bool CSQC_InputEvent(int eventtype, int x, int y);
 
 void CSQC_UpdateView(int width, int height);
+// catch commands registered with registercommand
 bool CSQC_ConsoleCommand(string cmd);
 bool CSQC_Parse_TempEntity();
 bool CSQC_Parse_StuffCmd(string msg);
@@ -43,12 +44,31 @@ void CSQC_Shutdown();
 //   v_forward: forward
 //   v_right: right
 //   v_up: up
-//   trace_endpos: visorigin 
+//   trace_endpos: visorigin
 .vector camera_transform(vector pos, vector ang);
+
+// control start position of sound()
+// calculated as ofs = time - sound_starttime
+float sound_starttime;
 
 ```
 
 # SVQC
+
+Main loop:
+* SV_Physics()
+    * StartFrame()
+    * if (force_retouch)
+        * foreach entity:
+            * .touch()
+    * foreach client:
+        * PlayerPreThink()
+        * .think()
+        * PlayerPostThink()
+    * foreach nonclient:
+        * .think()
+    * EndFrame()
+
 
 ```
 
@@ -82,12 +102,14 @@ void ClientKill();
 //   self
 void RestoreGame();
 
+// Called when a client connects to the server
 // input:
 //   time
 //   self
 //   parm1..n
 void ClientConnect();
 
+// Called when a client spawns in the server
 // input:
 //   time
 //   self
@@ -118,8 +140,9 @@ void SV_OnEntityPostSpawnFunction();
 //   parm1..n
 void SetNewParms();
 
+// Runs every frame
 // input:
-//   
+//
 .bool customizeentityforclient();
 
 // input:
@@ -191,6 +214,10 @@ void SV_PlayerPhysics();
 //   self
 void SV_ParseClientCommand(string cmd);
 
+// qcstatus server field
+string worldstatus;
+.string clientstatus;
+
 ```
 
 # MENUQC
@@ -222,3 +249,85 @@ void URI_Get_Callback(int id, int status, string data);
 void GameCommand(string cmd);
 
 ```
+
+# Misc
+
+## Trace
+
+### tracebox
+
+    void tracebox(vector v1, vector min, vector max, vector v2, int tryents, entity ignoreentity);
+
+attempt to move an object from v1 to v2 of given size
+
+tryents:
+ * MOVE_NORMAL (0)
+ * MOVE_NOMONSTERS (1): ignore monsters
+ * MOVE_MISSILE (2): +15 to every extent
+ * MOVE_WORLDONLY (3): ignore everything except bsp
+ * MOVE_HITMODEL (4): hit model, not bbox
+
+### traceline
+
+    void traceline(vector v1, vector v2, int tryents, entity ignoreentity);
+
+degenerate case of tracebox when min and max are equal
+
+### result globals
+
+    bool trace_allsolid;
+
+trace never left solid
+
+    bool trace_startsolid;
+
+trace started inside solid
+
+    float trace_fraction;
+
+distance before collision: 0..1, 1 if no collision
+
+    vector trace_endpos;
+
+v1 + (v2 - v1) * trace_fraction
+
+    vector trace_plane_normal;
+
+normalized plane normal, '0 0 0' if no collision.
+May be present if edges touch without clipping, use `trace_fraction < 1` as a determinant instead
+
+    float trace_plane_dist;
+
+
+
+    entity trace_ent;
+
+entity hit, if any
+
+    bool trace_inopen;
+
+
+
+    bool trace_inwater;
+
+
+
+    int trace_dpstartcontents;
+
+DPCONTENTS_ value at start position of trace
+
+    int trace_dphitcontents;
+
+DPCONTENTS_ value of impacted surface (not contents at impact point, just contents of the surface that was hit)
+
+    int trace_dphitq3surfaceflags;
+
+Q3SURFACEFLAG_ value of impacted surface
+
+    string trace_dphittexturename;
+
+texture name of impacted surface
+
+    int trace_networkentity;
+
+

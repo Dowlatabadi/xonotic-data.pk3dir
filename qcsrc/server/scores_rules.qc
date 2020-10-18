@@ -1,19 +1,32 @@
 #include "scores_rules.qh"
 
-#include "cl_client.qh"
-#include "scores.qh"
+#include <common/gamemodes/rules.qh>
+#include <common/stats.qh>
+#include <common/weapons/_all.qh>
+#include <server/client.qh>
+#include <server/scores.qh>
+#include <server/teamplay.qh>
 
-void CheckAllowedTeams (entity for_whom);
+int ScoreRules_teams;
 
-// NOTE: SP_ constants may not be >= MAX_SCORE; ST_constants may not be >= MAX_TEAMSCORE
-// scores that should be in all modes:
-float ScoreRules_teams;
-void ScoreRules_basics(float teams, float sprio, float stprio, float score_enabled)
+int NumTeams(int teams)
 {
-	float i;
-	for(i = 0; i < MAX_SCORE; ++i)
-		ScoreInfo_SetLabel_PlayerScore(i, "", 0);
-	for(i = 0; i < MAX_TEAMSCORE; ++i)
+	return boolean(teams & BIT(0)) + boolean(teams & BIT(1)) + boolean(teams & BIT(2)) + boolean(teams & BIT(3));
+}
+
+int AvailableTeams()
+{
+	return NumTeams(ScoreRules_teams);
+}
+
+// NOTE: ST_constants may not be >= MAX_TEAMSCORE
+// scores that should be in all modes:
+void ScoreRules_basics(int teams, float sprio, float stprio, float score_enabled)
+{
+	FOREACH(Scores, true, {
+		ScoreInfo_SetLabel_PlayerScore(it, "", 0);
+    });
+	for(int i = 0; i < MAX_TEAMSCORE; ++i)
 		ScoreInfo_SetLabel_TeamScore(i, "", 0);
 
 	ScoreRules_teams = teams;
@@ -27,13 +40,20 @@ void ScoreRules_basics(float teams, float sprio, float stprio, float score_enabl
 	ScoreInfo_SetLabel_PlayerScore(SP_DEATHS,       "deaths",    SFL_LOWER_IS_BETTER);
 
 	if (!INDEPENDENT_PLAYERS)
+	{
 		ScoreInfo_SetLabel_PlayerScore(SP_SUICIDES,     "suicides",  SFL_LOWER_IS_BETTER);
+		ScoreInfo_SetLabel_PlayerScore(SP_TEAMKILLS,     "teamkills", SFL_LOWER_IS_BETTER);
+	}
 
 	if(score_enabled)
 		ScoreInfo_SetLabel_PlayerScore(SP_SCORE,        "score",     sprio);
-		
-	ScoreInfo_SetLabel_PlayerScore(SP_DMG, "damage", 0);
-	ScoreInfo_SetLabel_PlayerScore(SP_DMGTAKEN, "damagetaken", SFL_LOWER_IS_BETTER);
+
+	ScoreInfo_SetLabel_PlayerScore(SP_DMG, "dmg", 0);
+	ScoreInfo_SetLabel_PlayerScore(SP_DMGTAKEN, "dmgtaken", SFL_LOWER_IS_BETTER);
+	ScoreInfo_SetLabel_PlayerScore(SP_ELO, "elo", 0);
+
+	if(STAT(SHOWFPS))
+		ScoreInfo_SetLabel_PlayerScore(SP_FPS, "fps", 0);
 }
 void ScoreRules_basics_end()
 {
@@ -41,12 +61,12 @@ void ScoreRules_basics_end()
 }
 void ScoreRules_generic()
 {
-	if(teamplay)
+    int teams = 0;
+	if (teamplay)
 	{
-		CheckAllowedTeams(world);
-		ScoreRules_basics(((c4>=0) ? 4 : (c3>=0) ? 3 : 2), SFL_SORT_PRIO_PRIMARY, SFL_SORT_PRIO_PRIMARY, true);
+		entity balance = TeamBalance_CheckAllowedTeams(NULL);
+		teams = TeamBalance_GetAllowedTeams(balance);
+		TeamBalance_Destroy(balance);
 	}
-	else
-		ScoreRules_basics(0, SFL_SORT_PRIO_PRIMARY, SFL_SORT_PRIO_PRIMARY, true);
-	ScoreRules_basics_end();
+	GameRules_scoring(teams, SFL_SORT_PRIO_PRIMARY, SFL_SORT_PRIO_PRIMARY, {});
 }

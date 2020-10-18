@@ -1,17 +1,14 @@
-#ifndef DIALOG_MULTIPLAYER_MEDIA_H
-#define DIALOG_MULTIPLAYER_MEDIA_H
-#include "tab.qc"
-CLASS(XonoticMediaTab, XonoticTab)
-	METHOD(XonoticMediaTab, fill, void(entity));
-	ATTRIB(XonoticMediaTab, intendedWidth, float, 0.9)
-	ATTRIB(XonoticMediaTab, rows, float, 23)
-	ATTRIB(XonoticMediaTab, columns, float, 4)
-	ATTRIB(XonoticMediaTab, name, string, "Media")
-ENDCLASS(XonoticMediaTab)
-entity makeXonoticMediaTab();
-#endif
+#include "dialog_multiplayer_media.qh"
 
-#ifdef IMPLEMENTATION
+#include "demolist.qh"
+#include "dialog_multiplayer_media_demo.qh"
+#include "dialog_multiplayer_media_screenshot.qh"
+#include "dialog_multiplayer_media_musicplayer.qh"
+#include "dialog_multiplayer_media_demo_timeconfirm.qh"
+#include "dialog_multiplayer_media_demo_startconfirm.qh"
+
+#include "tabcontroller.qh"
+
 entity makeXonoticMediaTab()
 {
 	entity me;
@@ -25,7 +22,6 @@ void XonoticMediaTab_fill(entity me)
 	mc = makeXonoticTabController(me.rows - 2);
 
 	me.gotoRC(me, 0.5, 0);
-		me.TD(me, 1, 1, e = mc.makeTabButton(mc, _("Guide"), NEW(XonoticGuideTab)));
 		me.TD(me, 1, 1, e = mc.makeTabButton(mc, _("Demos"), makeXonoticDemoBrowserTab()));
 		me.TD(me, 1, 1, e = mc.makeTabButton(mc, _("Screenshots"), makeXonoticScreenshotBrowserTab()));
 		me.TD(me, 1, 1, e = mc.makeTabButton(mc, _("Music Player"), makeXonoticMusicPlayerTab()));
@@ -33,4 +29,3 @@ void XonoticMediaTab_fill(entity me)
 	me.gotoRC(me, 3, 0);
 		me.TD(me, me.rows - 2, me.columns, mc);
 }
-#endif

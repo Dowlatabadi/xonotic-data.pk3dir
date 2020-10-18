@@ -1,48 +1,10 @@
-#ifndef CVARLIST_H
-#define CVARLIST_H
-#include "listbox.qc"
-CLASS(XonoticCvarList, XonoticListBox)
-	METHOD(XonoticCvarList, configureXonoticCvarList, void(entity));
-	ATTRIB(XonoticCvarList, rowsPerItem, float, 1)
-	METHOD(XonoticCvarList, drawListBoxItem, void(entity, int, vector, bool, bool));
-	METHOD(XonoticCvarList, resizeNotify, void(entity, vector, vector, vector, vector));
-	METHOD(XonoticCvarList, keyDown, float(entity, float, float, float));
+#include "cvarlist.qh"
 
-	METHOD(XonoticCvarList, destroy, void(entity));
+#include "inputbox.qh"
+#include "../item/checkbox.qh"
+#include "../item/container.qh"
+#include "../item/checkbox.qh"
 
-	ATTRIB(XonoticCvarList, realFontSize, vector, '0 0 0')
-	ATTRIB(XonoticCvarList, realUpperMargin, float, 0)
-	ATTRIB(XonoticCvarList, columnNameOrigin, float, 0)
-	ATTRIB(XonoticCvarList, columnNameSize, float, 0)
-	ATTRIB(XonoticCvarList, columnValueOrigin, float, 0)
-	ATTRIB(XonoticCvarList, columnValueSize, float, 0)
-
-	METHOD(XonoticCvarList, mouseRelease, float(entity, vector));
-	METHOD(XonoticCvarList, setSelected, void(entity, float));
-	METHOD(XonoticCvarList, updateCvarType, float(entity));
-
-	ATTRIB(XonoticCvarList, controlledTextbox, entity, NULL)
-	ATTRIB(XonoticCvarList, cvarNameBox, entity, NULL)
-	ATTRIB(XonoticCvarList, cvarDescriptionBox, entity, NULL)
-	ATTRIB(XonoticCvarList, cvarTypeBox, entity, NULL)
-	ATTRIB(XonoticCvarList, cvarValueBox, entity, NULL)
-	ATTRIB(XonoticCvarList, cvarDefaultBox, entity, NULL)
-	ATTRIB(XonoticCvarList, cvarNeedsForcing, float, 0)
-
-	ATTRIB(XonoticCvarList, handle, float, -1)
-	ATTRIB(XonoticCvarList, cvarName, string, string_null)
-	ATTRIB(XonoticCvarList, cvarDescription, string, string_null)
-	ATTRIB(XonoticCvarList, cvarType, string, string_null)
-	ATTRIB(XonoticCvarList, cvarDefault, string, string_null)
-ENDCLASS(XonoticCvarList)
-entity makeXonoticCvarList();
-void CvarList_Filter_Change(entity box, entity me);
-void CvarList_Value_Change(entity box, entity me);
-void CvarList_Revert_Click(entity btn, entity me);
-void CvarList_End_Editing(entity box, entity me);
-#endif
-
-#ifdef IMPLEMENTATION
 entity makeXonoticCvarList()
 {
 	entity me;
@@ -53,14 +15,50 @@ entity makeXonoticCvarList()
 void XonoticCvarList_configureXonoticCvarList(entity me)
 {
 	me.configureXonoticListBox(me);
-
 	me.handle = buf_create();
-	buf_cvarlist(me.handle, "", "_");
+	me.nItems = 0;
+}
+void CvarList_Load(entity me, string filter)
+{
+	if(me.handle < 0)
+		return;
+
+	buf_cvarlist(me.handle, filter, "_");
 	me.nItems = buf_getsize(me.handle);
+	if(autocvar_menu_cvarlist_onlymodified)
+	{
+		float newbuf = buf_create();
+		for (int i = 0; i < me.nItems; ++i)
+		{
+			string k = bufstr_get(me.handle, i);
+			if(cvar_string(k) != cvar_defstring(k))
+				bufstr_add(newbuf, k, false);
+		}
+		buf_del(me.handle);
+		me.handle = newbuf;
+		me.nItems = buf_getsize(me.handle);
+	}
+}
+void XonoticCvarList_showNotify(entity me)
+{
+	bool force_initial_selection = false;
+	if(me.handle >= 0 && me.nItems <= 0) // me.handle not loaded yet?
+		force_initial_selection = true;
+	CvarList_Load(me, me.controlledTextbox.text);
+	if(force_initial_selection)
+		me.setSelected(me, 0);
+}
+void XonoticCvarList_hideNotify(entity me)
+{
+	if(me.handle)
+		buf_del(me.handle);
+	me.handle = buf_create();
+	me.nItems = 0;
 }
 void XonoticCvarList_destroy(entity me)
 {
-	buf_del(me.handle);
+	if(me.handle)
+		buf_del(me.handle);
 }
 string autocvar_menu_forced_saved_cvars;
 string autocvar_menu_reverted_nonsaved_cvars;
@@ -109,17 +107,10 @@ void XonoticCvarList_setSelected(entity me, float i)
 	if(me.nItems == 0)
 		return;
 
-	if(me.cvarName)
-		strunzone(me.cvarName);
-	if(me.cvarDescription)
-		strunzone(me.cvarDescription);
-	if(me.cvarType)
-		strunzone(me.cvarType);
-	if(me.cvarDefault)
-		strunzone(me.cvarDefault);
-	me.cvarName = strzone(bufstr_get(me.handle, me.selectedItem));
-	me.cvarDescription = strzone(cvar_description(me.cvarName));
-	me.cvarDefault = strzone(cvar_defstring(me.cvarName));
+	strfree(me.cvarType);
+	strcpy(me.cvarName, bufstr_get(me.handle, me.selectedItem));
+	strcpy(me.cvarDescription, cvar_description(me.cvarName));
+	strcpy(me.cvarDefault, cvar_defstring(me.cvarName));
 	me.cvarNameBox.setText(me.cvarNameBox, me.cvarName);
 	me.cvarDescriptionBox.setText(me.cvarDescriptionBox, me.cvarDescription);
 	float needsForcing = me.updateCvarType(me);
@@ -134,9 +125,14 @@ void XonoticCvarList_setSelected(entity me, float i)
 }
 void CvarList_Filter_Change(entity box, entity me)
 {
-	buf_cvarlist(me.handle, box.text, "_");
-	me.nItems = buf_getsize(me.handle);
-
+	CvarList_Load(me, box.text);
+	me.setSelected(me, 0);
+}
+void CvarList_Filter_ModifiedCvars(entity box, entity me)
+{
+	cvar_set("menu_cvarlist_onlymodified", ftos(!autocvar_menu_cvarlist_onlymodified));
+	box.setChecked(box, autocvar_menu_cvarlist_onlymodified);
+	CvarList_Load(me, me.controlledTextbox.text);
 	me.setSelected(me, 0);
 }
 void XonoticCvarList_resizeNotify(entity me, vector relOrigin, vector relSize, vector absOrigin, vector absSize)
@@ -151,8 +147,6 @@ void XonoticCvarList_resizeNotify(entity me, vector relOrigin, vector relSize, v
 	me.columnValueSize = me.realFontSize.x * 20;
 	me.columnNameSize = 1 - me.columnValueSize - me.realFontSize.x;
 	me.columnValueOrigin = me.columnNameOrigin + me.columnNameSize + me.realFontSize.x;
-
-	me.setSelected(me, me.selectedItem);
 }
 void XonoticCvarList_drawListBoxItem(entity me, int i, vector absSize, bool isSelected, bool isFocused)
 {
@@ -258,5 +252,3 @@ void CvarList_End_Editing(entity box, entity me)
 {
 	box.parent.setFocus(box.parent, me);
 }
-
-#endif

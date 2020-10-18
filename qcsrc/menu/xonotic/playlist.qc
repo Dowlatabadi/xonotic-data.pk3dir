@@ -1,45 +1,4 @@
-#ifndef PLAYLIST_H
-#define PLAYLIST_H
-#include "listbox.qc"
-CLASS(XonoticPlayList, XonoticListBox)
-	METHOD(XonoticPlayList, configureXonoticPlayList, void(entity));
-	ATTRIB(XonoticPlayList, rowsPerItem, float, 1)
-	METHOD(XonoticPlayList, resizeNotify, void(entity, vector, vector, vector, vector));
-	METHOD(XonoticPlayList, draw, void(entity));
-	METHOD(XonoticPlayList, drawListBoxItem, void(entity, int, vector, bool, bool));
-	METHOD(XonoticPlayList, stopSound, void(entity));
-	METHOD(XonoticPlayList, startSound, void(entity, float));
-	METHOD(XonoticPlayList, resumeSound, void(entity));
-	METHOD(XonoticPlayList, pauseSound, void(entity));
-	METHOD(XonoticPlayList, doubleClickListBoxItem, void(entity, float, vector));
-	METHOD(XonoticPlayList, keyDown, float(entity, float, float, float));
-	METHOD(XonoticPlayList, mouseDrag, float(entity, vector));
-
-	METHOD(XonoticPlayList, addToPlayList, void(entity, string));
-	METHOD(XonoticPlayList, removeSelectedFromPlayList, void(entity));
-	ATTRIB(XonoticPlayList, playingTrack, float, -1)
-
-	ATTRIB(XonoticPlayList, realFontSize, vector, '0 0 0')
-	ATTRIB(XonoticPlayList, columnNameOrigin, float, 0)
-	ATTRIB(XonoticPlayList, columnNameSize, float, 0)
-	ATTRIB(XonoticPlayList, columnNumberOrigin, float, 0)
-	ATTRIB(XonoticPlayList, columnNumberSize, float, 0)
-	ATTRIB(XonoticPlayList, realUpperMargin, float, 0)
-	ATTRIB(XonoticPlayList, origin, vector, '0 0 0')
-	ATTRIB(XonoticPlayList, itemAbsSize, vector, '0 0 0')
-ENDCLASS(XonoticPlayList)
-
-entity makeXonoticPlayList();
-void PlayList_Remove(entity btn, entity me);
-void PlayList_Remove_All(entity btn, entity me);
-void StopSound_Click(entity btn, entity me);
-void StartSound_Click(entity btn, entity me);
-void PauseSound_Click(entity btn, entity me);
-void PrevSound_Click(entity btn, entity me);
-void NextSound_Click(entity btn, entity me);
-#endif
-
-#ifdef IMPLEMENTATION
+#include "playlist.qh"
 
 entity makeXonoticPlayList()
 {
@@ -60,8 +19,10 @@ void XonoticPlayList_resizeNotify(entity me, vector relOrigin, vector relSize, v
 	me.itemAbsSize = '0 0 0';
 	SUPER(XonoticPlayList).resizeNotify(me, relOrigin, relSize, absOrigin, absSize);
 
-	me.realFontSize_y = me.fontSize / (me.itemAbsSize_y = (absSize.y * me.itemHeight));
-	me.realFontSize_x = me.fontSize / (me.itemAbsSize_x = (absSize.x * (1 - me.controlWidth)));
+	me.itemAbsSize.y = absSize.y * me.itemHeight;
+	me.itemAbsSize.x = absSize.x * (1 - me.controlWidth);
+	me.realFontSize.y = me.fontSize / me.itemAbsSize.y;
+	me.realFontSize.x = me.fontSize / me.itemAbsSize.x;
 	me.realUpperMargin = 0.5 * (1 - me.realFontSize.y);
 
 	me.columnNumberOrigin = 0;
@@ -186,6 +147,7 @@ void XonoticPlayList_drawListBoxItem(entity me, int i, vector absSize, bool isSe
 	if(i == me.playingTrack)
 	{
 		float f = cvar("music_playlist_sampleposition0");
+		// display Play symbol: Unicode char U+25B6: Black Right-Pointing Triangle
 		if(f <= 0 || (((time * 2) & 1) && f > 0))
 			draw_Text(me.realUpperMargin * eY + (me.columnNumberOrigin + me.columnNumberSize) * eX, "\xE2\x96\xB6", me.realFontSize, '1 1 1', SKINALPHA_TEXT, 0);
 	}
@@ -305,5 +267,3 @@ float XonoticPlayList_keyDown(entity me, float scan, float ascii, float shift)
 	else
 		return SUPER(XonoticPlayList).keyDown(me, scan, ascii, shift);
 }
-#endif
-

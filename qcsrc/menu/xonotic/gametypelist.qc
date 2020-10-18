@@ -1,29 +1,8 @@
-#ifndef GAMETYPELIST_H
-#define GAMETYPELIST_H
-#include "listbox.qc"
-CLASS(XonoticGametypeList, XonoticListBox)
-	METHOD(XonoticGametypeList, configureXonoticGametypeList, void(entity));
-	ATTRIB(XonoticGametypeList, rowsPerItem, float, 2)
-	METHOD(XonoticGametypeList, drawListBoxItem, void(entity, int, vector, bool, bool));
-	METHOD(XonoticGametypeList, resizeNotify, void(entity, vector, vector, vector, vector));
-	METHOD(XonoticGametypeList, setSelected, void(entity, float));
-	METHOD(XonoticGametypeList, loadCvars, void(entity));
-	METHOD(XonoticGametypeList, saveCvars, void(entity));
-	METHOD(XonoticGametypeList, keyDown, float(entity, float, float, float));
-	METHOD(XonoticGametypeList, clickListBoxItem, void(entity, float, vector));
-	METHOD(XonoticGametypeList, focusedItemChangeNotify, void(entity));
+#include "gametypelist.qh"
 
-	ATTRIB(XonoticGametypeList, realFontSize, vector, '0 0 0')
-	ATTRIB(XonoticGametypeList, realUpperMargin, float, 0)
-	ATTRIB(XonoticGametypeList, columnIconOrigin, float, 0)
-	ATTRIB(XonoticGametypeList, columnIconSize, float, 0)
-	ATTRIB(XonoticGametypeList, columnNameOrigin, float, 0)
-	ATTRIB(XonoticGametypeList, columnNameSize, float, 0)
-ENDCLASS(XonoticGametypeList)
-entity makeXonoticGametypeList();
-#endif
-
-#ifdef IMPLEMENTATION
+#include "dialog_multiplayer_create.qh"
+#include <common/gamemodes/_mod.qh>
+#include <common/mapinfo.qh>
 
 entity makeXonoticGametypeList()
 {
@@ -39,7 +18,7 @@ void XonoticGametypeList_configureXonoticGametypeList(entity me)
 
 	if(SKINBOOL_GAMETYPELIST_ICON_BLUR)
 	{
-		for(int i = 0; i < GameType_GetCount(); ++i)
+		for(int i = 0; i < GameType_GetTotalCount(); ++i)
 			draw_PreloadPictureWithFlags(GameType_GetIcon(i), PRECACHE_PIC_MIPMAP);
 	}
 
@@ -52,18 +31,18 @@ void XonoticGametypeList_setSelected(entity me, float i)
 }
 void XonoticGametypeList_loadCvars(entity me)
 {
-	float t;
-	t = MapInfo_CurrentGametype();
+	Gametype t = MapInfo_CurrentGametype();
+	int cnt = GameType_GetCount();
 	float i;
-	for(i = 0; i < GameType_GetCount(); ++i)
+	for(i = 0; i < cnt; ++i)
 		if(t == GameType_GetID(i))
 			break;
-	if(i >= GameType_GetCount())
+	if(i >= cnt)
 	{
-		for(i = 0; i < GameType_GetCount(); ++i)
+		for(i = 0; i < cnt; ++i)
 			if(t == MAPINFO_TYPE_DEATHMATCH)
 				break;
-		if(i >= GameType_GetCount())
+		if(i >= cnt)
 			i = 0;
 	}
 	me.setSelected(me, i);
@@ -71,7 +50,7 @@ void XonoticGametypeList_loadCvars(entity me)
 }
 void XonoticGametypeList_saveCvars(entity me)
 {
-	int t = GameType_GetID(me.selectedItem);
+	Gametype t = GameType_GetID(me.selectedItem);
 	if (t == MapInfo_CurrentGametype()) {
 		return;
 	}
@@ -80,6 +59,15 @@ void XonoticGametypeList_saveCvars(entity me)
 	if (owner) { // not set immediately
 		owner.gameTypeChangeNotify(owner);
 	}
+}
+void XonoticGametypeList_draw(entity me)
+{
+	if(me.nItems != GameType_GetCount())
+	{
+		me.nItems = GameType_GetCount();
+		me.setSelected(me, 0);
+	}
+	SUPER(XonoticGametypeList).draw(me);
 }
 void XonoticGametypeList_drawListBoxItem(entity me, int i, vector absSize, bool isSelected, bool isFocused)
 {
@@ -113,10 +101,12 @@ void XonoticGametypeList_drawListBoxItem(entity me, int i, vector absSize, bool 
 void XonoticGametypeList_resizeNotify(entity me, vector relOrigin, vector relSize, vector absOrigin, vector absSize)
 {
 	me.itemAbsSize = '0 0 0';
-	SUPER(XonoticServerList).resizeNotify(me, relOrigin, relSize, absOrigin, absSize);
+	SUPER(XonoticGametypeList).resizeNotify(me, relOrigin, relSize, absOrigin, absSize);
 
-	me.realFontSize_y = me.fontSize / (me.itemAbsSize_y = (absSize.y * me.itemHeight));
-	me.realFontSize_x = me.fontSize / (me.itemAbsSize_x = (absSize.x * (1 - me.controlWidth)));
+	me.itemAbsSize.y = absSize.y * me.itemHeight;
+	me.itemAbsSize.x = absSize.x * (1 - me.controlWidth);
+	me.realFontSize.y = me.fontSize / me.itemAbsSize.y;
+	me.realFontSize.x = me.fontSize / me.itemAbsSize.x;
 	me.realUpperMargin = 0.5 * (1 - me.realFontSize.y);
 	me.columnIconOrigin = 0;
 	me.columnIconSize = me.itemAbsSize.y / me.itemAbsSize.x;
@@ -145,4 +135,3 @@ void XonoticGametypeList_focusedItemChangeNotify(entity me)
 	else
 		clearTooltip(me);
 }
-#endif

@@ -1,12 +1,36 @@
+#include "radar.qh"
+
+#include <client/autocvars.qh>
+#include <client/draw.qh>
+#include <client/mapvoting.qh>
+#include <client/resources.qh>
+#include <client/teamradar.qh>
+#include <common/ent_cs.qh>
+#include <common/mutators/mutator/waypoints/all.qh>
+
 // Radar (#6)
 
-float HUD_Radar_Clickable()
+void HUD_Radar_Export(int fh)
+{
+	// allow saving cvars that aesthetically change the panel into hud skin files
+	HUD_Write_Cvar("hud_panel_radar_foreground_alpha");
+	HUD_Write_Cvar("hud_panel_radar_rotation");
+	HUD_Write_Cvar("hud_panel_radar_zoommode");
+	HUD_Write_Cvar("hud_panel_radar_scale");
+	HUD_Write_Cvar("hud_panel_radar_maximized_scale");
+	HUD_Write_Cvar("hud_panel_radar_maximized_size");
+	HUD_Write_Cvar("hud_panel_radar_maximized_rotation");
+	HUD_Write_Cvar("hud_panel_radar_maximized_zoommode");
+}
+
+bool HUD_Radar_Clickable()
 {
 	return hud_panel_radar_mouse && !hud_panel_radar_temp_hidden;
 }
 
-void HUD_Radar_Show_Maximized(bool doshow,float clickable)
+void HUD_Radar_Show_Maximized(bool doshow, bool clickable)
 {
+	TC(bool, doshow);
 	hud_panel_radar_maximized = doshow;
 	hud_panel_radar_temp_hidden = 0;
 
@@ -14,18 +38,20 @@ void HUD_Radar_Show_Maximized(bool doshow,float clickable)
 	{
 		if (clickable)
 		{
-			if(autocvar_hud_cursormode)
-				setcursormode(1);
 			hud_panel_radar_mouse = 1;
+
+			// we must unset the player's buttons, as they aren't released elsewhere
+			localcmd("-fire\n");
+			localcmd("-fire2\n");
+			localcmd("-use\n");
+			localcmd("-hook\n");
+			localcmd("-jump\n");
 		}
 	}
 	else if ( hud_panel_radar_mouse )
 	{
 		hud_panel_radar_mouse = 0;
 		mouseClicked = 0;
-		if(autocvar_hud_cursormode)
-		if(!mv_active)
-			setcursormode(0);
 	}
 }
 void HUD_Radar_Hide_Maximized()
@@ -34,8 +60,9 @@ void HUD_Radar_Hide_Maximized()
 }
 
 
-float HUD_Radar_InputEvent(float bInputType, float nPrimary, float nSecondary)
+float HUD_Radar_InputEvent(int bInputType, float nPrimary, float nSecondary)
 {
+	TC(int, bInputType);
 	if(!hud_panel_radar_maximized || !hud_panel_radar_mouse ||
 		autocvar__hud_configure || mv_active)
 		return false;
@@ -68,11 +95,9 @@ float HUD_Radar_InputEvent(float bInputType, float nPrimary, float nSecondary)
 	else
 	{
 		// allow console/use binds to work without hiding the map
-		string con_keys;
-		float keys;
-		float i;
-		con_keys = strcat(findkeysforcommand("toggleconsole", 0)," ",findkeysforcommand("+use", 0)) ;
-		keys = tokenize(con_keys); // findkeysforcommand returns data for this
+		string con_keys = strcat(findkeysforcommand("toggleconsole", 0), " ", findkeysforcommand("+use", 0)) ;
+		int keys = tokenize(con_keys); // findkeysforcommand returns data for this
+		int i;
 		for (i = 0; i < keys; ++i)
 		{
 			if(nPrimary == stof(argv(i)))
@@ -122,15 +147,8 @@ void HUD_Radar_Mouse()
 		return;
 	}
 
-	if(!autocvar_hud_cursormode)
-	{
-		mousepos = mousepos + getmousepos() * autocvar_menu_mouse_speed;
-
-		mousepos_x = bound(0, mousepos_x, vid_conwidth);
-		mousepos_y = bound(0, mousepos_y, vid_conheight);
-	}
-
-	HUD_Panel_UpdateCvars();
+	panel = HUD_PANEL(RADAR);
+	HUD_Panel_LoadCvars();
 
 
 	panel_size = autocvar_hud_panel_radar_maximized_size;
@@ -154,10 +172,6 @@ void HUD_Radar_Mouse()
 		HUD_Radar_Hide_Maximized();
 		return;
 	}
-
-
-	const vector cursor_size = '32 32 0';
-	drawpic(mousepos-'8 4 0', strcat("gfx/menu/", autocvar_menu_skin, "/cursor.tga"), cursor_size, '1 1 1', 0.8, DRAWFLAG_NORMAL);
 }
 
 void HUD_Radar()
@@ -183,7 +197,7 @@ void HUD_Radar()
 	if ( hud_panel_radar_temp_hidden )
 		return;
 
-	HUD_Panel_UpdateCvars();
+	HUD_Panel_LoadCvars();
 
 	float f = 0;
 
@@ -201,9 +215,7 @@ void HUD_Radar()
 			panel_bg = "gfx/hud/default/border_default"; // fallback
 		if(!radar_panel_modified && panel_bg != panel.current_panel_bg)
 			radar_panel_modified = true;
-		if(panel.current_panel_bg)
-			strunzone(panel.current_panel_bg);
-		panel.current_panel_bg = strzone(panel_bg);
+		strcpy(panel.current_panel_bg, panel_bg);
 
 		switch(hud_panel_radar_maximized_zoommode)
 		{
@@ -266,7 +278,11 @@ void HUD_Radar()
 	pos = panel_pos;
 	mySize = panel_size;
 
-	HUD_Panel_DrawBg(1);
+	if (autocvar_hud_panel_radar_dynamichud)
+		HUD_Scale_Enable();
+	else
+		HUD_Scale_Disable();
+	HUD_Panel_DrawBg();
 	if(panel_bg_padding)
 	{
 		pos += '1 1 0' * panel_bg_padding;
@@ -276,7 +292,7 @@ void HUD_Radar()
 	int color2;
 	float scale2d, normalsize, bigsize;
 
-	teamradar_origin2d = pos + 0.5 * mySize;
+	teamradar_origin2d = HUD_Shift(pos + 0.5 * mySize);
 	teamradar_size2d = mySize;
 
 	if(minimapname == "")
@@ -285,7 +301,7 @@ void HUD_Radar()
 	teamradar_loadcvars();
 
 	scale2d = vlen_maxnorm2d(mi_picmax - mi_picmin);
-	teamradar_size2d = mySize;
+	teamradar_size2d = HUD_Scale(mySize);
 
 	teamradar_extraclip_mins = teamradar_extraclip_maxs = '0 0 0'; // we always center
 
@@ -298,10 +314,10 @@ void HUD_Radar()
 	else
 	{
 		vector c0, c1, c2, c3, span;
-		c0 = rotate(mi_min, teamradar_angle * DEG2RAD);
-		c1 = rotate(mi_max, teamradar_angle * DEG2RAD);
-		c2 = rotate('1 0 0' * mi_min.x + '0 1 0' * mi_max.y, teamradar_angle * DEG2RAD);
-		c3 = rotate('1 0 0' * mi_max.x + '0 1 0' * mi_min.y, teamradar_angle * DEG2RAD);
+		c0 = Rotate(mi_min, teamradar_angle * DEG2RAD);
+		c1 = Rotate(mi_max, teamradar_angle * DEG2RAD);
+		c2 = Rotate('1 0 0' * mi_min.x + '0 1 0' * mi_max.y, teamradar_angle * DEG2RAD);
+		c3 = Rotate('1 0 0' * mi_max.x + '0 1 0' * mi_min.y, teamradar_angle * DEG2RAD);
 		span = '0 0 0';
 		span.x = max(c0_x, c1_x, c2_x, c3_x) - min(c0_x, c1_x, c2_x, c3_x);
 		span.y = max(c0_y, c1_y, c2_y, c3_y) - min(c0_y, c1_y, c2_y, c3_y);
@@ -333,17 +349,17 @@ void HUD_Radar()
 
 	draw_teamradar_background(hud_panel_radar_foreground_alpha);
 
-	FOREACH_ENTITY_CLASS("radarlink", true, LAMBDA(
-		draw_teamradar_link(it.origin, it.velocity, it.team);
-	));
+	IL_EACH(g_radarlinks, true, draw_teamradar_link(it.origin, it.velocity, it.team));
 
-	FOREACH_ENTITY_FLAGS(teamradar_icon, 0xFFFFFF, LAMBDA(
+	bool mutator_returnvalue = MUTATOR_CALLHOOK(TeamRadar_Draw); // TODO: allow players to show on the radar as well!
+
+	IL_EACH(g_radaricons, it.teamradar_icon, {
 		if ( hud_panel_radar_mouse )
-		if ( it.health > 0 )
-		if ( it.team == myteam+1 )
+		if ( GetResource(it, RES_HEALTH) >= 0 )
+		if ( it.team == myteam + 1 || mutator_returnvalue || !teamplay )
 		{
 			vector coord = teamradar_texcoord_to_2dcoord(teamradar_3dcoord_to_texcoord(it.origin));
-			if ( vlen(mousepos-coord) < 8 )
+			if(vdist((mousepos - coord), <, 8))
 			{
 				vector brightcolor;
 				brightcolor_x = min(1,it.teamradar_color_x*1.5);
@@ -352,26 +368,26 @@ void HUD_Radar()
 				drawpic(coord - '8 8 0', "gfx/teamradar_icon_glow", '16 16 0', brightcolor, panel_fg_alpha, 0);
 			}
 		}
-		entity icon = RadarIcons_from(it.teamradar_icon);
+		entity icon = REGISTRY_GET(RadarIcons, it.teamradar_icon);
 		draw_teamradar_icon(it.origin, icon, it, spritelookupcolor(it, icon.netname, it.teamradar_color), panel_fg_alpha);
-	));
-	AL_EACH(_entcs, e, it != NULL, LAMBDA(
+	});
+	AL_EACH(_entcs, e, it != NULL, {
 		if (!it.m_entcs_private) continue;
-		if (entcs_is_self(it)) continue;
+		if (it.sv_entnum == current_player) continue;
 		color2 = entcs_GetTeam(it.sv_entnum);
 		draw_teamradar_player(it.origin, it.angles, Team_ColorRGB(color2));
-	));
-	draw_teamradar_player(view_origin, view_angles, '1 1 1');
+	});
+	draw_teamradar_player(entcs_receiver(current_player).origin, view_angles, '1 1 1');
 
 	drawresetcliparea();
 
 	if ( hud_panel_radar_mouse )
 	{
-		string message = "Click to select teleport destination";
+		string message = _("Click to select teleport destination");
 
 		if ( STAT(HEALTH) <= 0 )
 		{
-			message = "Click to select spawn location";
+			message = _("Click to select spawn location");
 		}
 
 		drawcolorcodedstring(pos + '0.5 0 0' * (mySize_x - stringwidth(message, true, hud_fontsize)) - '0 1 0' * hud_fontsize_y * 2,

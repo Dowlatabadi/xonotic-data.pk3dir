@@ -1,6 +1,6 @@
-#ifndef FILE_H
-#define FILE_H
+#pragma once
 
+ERASEABLE
 bool fexists(string f)
 {
 	int fh = fopen(f, FILE_READ);
@@ -8,5 +8,3 @@ bool fexists(string f)
 	fclose(fh);
 	return true;
 }
-
-#endif

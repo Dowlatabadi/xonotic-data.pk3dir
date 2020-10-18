@@ -1,23 +1,26 @@
-#ifndef ITEMS_ALL_H
-#define ITEMS_ALL_H
+#pragma once
 
-#include "../command/all.qh"
+#include <common/command/_mod.qh>
 
 #include "item.qh"
 
-REGISTRY(Items, BITS(5))
-#define Items_from(i) _Items_from(i, NULL)
+// NOTE: 24 is the limit for the .items field
+REGISTRY(Items, 32)
+#ifdef GAMEQC
+REGISTRY_DEPENDS(Items, Models)
+#endif
 REGISTER_REGISTRY(Items)
-/** If you register a new item, make sure to add it to all.inc */
 #define REGISTER_ITEM(id, class) REGISTER(Items, ITEM, id, m_id, NEW(class))
 
 REGISTRY_SORT(Items)
 REGISTRY_CHECK(Items)
-STATIC_INIT(Items) { FOREACH(Items, true, LAMBDA(it.m_id = i)); }
+
+REGISTRY_DEFINE_GET(Items, NULL)
+STATIC_INIT(Items) { FOREACH(Items, true, it.m_id = i); }
 
 void Dump_Items();
 
-GENERIC_COMMAND(dumpitems, "Dump all items to the console") {
+GENERIC_COMMAND(dumpitems, "Dump all items to the console", false) {
     switch (request) {
         case CMD_REQUEST_COMMAND: {
             Dump_Items();
@@ -25,14 +28,12 @@ GENERIC_COMMAND(dumpitems, "Dump all items to the console") {
         }
         default:
         case CMD_REQUEST_USAGE: {
-            LOG_INFOF("\nUsage:^3 %s dumpitems", GetProgramCommandPrefix());
+            LOG_HELPF("Usage:^3 %s dumpitems", GetProgramCommandPrefix());
             return;
         }
     }
 }
 
-#ifndef MENUQC
+#ifdef GAMEQC
 string Item_Model(string item_mdl);
-#endif
-
 #endif

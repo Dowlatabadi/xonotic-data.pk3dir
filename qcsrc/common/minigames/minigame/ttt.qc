@@ -1,4 +1,5 @@
-REGISTER_MINIGAME(ttt, "Tic Tac Toe");
+#include "ttt.qh"
+REGISTER_MINIGAME(ttt, _("Tic Tac Toe"));
 
 const int TTT_TURN_PLACE = 0x0100; // player has to place a piece on the board
 const int TTT_TURN_WIN   = 0x0200; // player has won
@@ -25,11 +26,11 @@ const int TTT_TILE_SIZE = 3;
 // find tic tac toe piece given its tile name
 entity ttt_find_piece(entity minig, string tile)
 {
-	entity e = world;
+	entity e = NULL;
 	while ( ( e = findentity(e,owner,minig) ) )
 		if ( e.classname == "minigame_board_piece" && e.netname == tile )
 			return e;
-	return world;
+	return NULL;
 }
 
 // Checks if the given piece completes a row
@@ -82,7 +83,7 @@ void ttt_move(entity minigame, entity player, string pos )
 		if ( ttt_valid_tile(pos) )
 		if ( !ttt_find_piece(minigame,pos) )
 		{
-			entity piece = msle_spawn(minigame,"minigame_board_piece");
+			entity piece = msle_spawn(minigame,new(minigame_board_piece));
 			piece.team = player.team;
 			piece.netname = strzone(pos);
 			minigame_server_sendflags(piece,MINIG_SF_ALL);
@@ -120,10 +121,10 @@ void ttt_next_match(entity minigame, entity player)
 		minigame.minigame_flags = TTT_TURN_PLACE | minigame.ttt_nexteam;
 		minigame_server_sendflags(minigame,MINIG_SF_UPDATE);
 		minigame.ttt_npieces = 0;
-		entity e = world;
+		entity e = NULL;
 		while ( ( e = findentity(e,owner,minigame) ) )
 			if ( e.classname == "minigame_board_piece" )
-				remove(e);
+				delete(e);
 	}
 }
 
@@ -142,12 +143,12 @@ int ttt_server_event(entity minigame, string event, ...)
 		}
 		case "end":
 		{
-			entity e = world;
+			entity e = NULL;
 			while( (e = findentity(e, owner, minigame)) )
 			if(e.classname == "minigame_board_piece")
 			{
-				if(e.netname) { strunzone(e.netname); }
-				remove(e);
+				strfree(e.netname);
+				delete(e);
 			}
 			return false;
 		}
@@ -272,7 +273,7 @@ void ttt_hud_board(vector pos, vector mySize)
 // Required function, draw the game status panel
 void ttt_hud_status(vector pos, vector mySize)
 {
-	HUD_Panel_DrawBg(1);
+	HUD_Panel_DrawBg();
 	vector ts;
 	ts = minigame_drawstring_wrapped(mySize_x,pos,active_minigame.descriptor.message,
 		hud_fontsize * 2, '0.25 0.47 0.72', panel_fg_alpha, DRAWFLAG_NORMAL,0.5);
@@ -319,14 +320,16 @@ string ttt_turn_to_string(int turnflags)
 
 	if ( turnflags & TTT_TURN_WIN )
 	{
-		if ( (turnflags&TTT_TURN_TEAM) != minigame_self.team )
-			return _("You lost the game!\nSelect \"^1Next Match^7\" on the menu for a rematch!");
-		return _("You win!\nSelect \"^1Next Match^7\" on the menu to start a new match!");
+		// translator-friendly messages composed of 2 existing messages
+		// TODO: proper "you win" banner instead of hijacking the help message
+		if ( (turnflags & TTT_TURN_TEAM) != minigame_self.team )
+			return strcat(_("You lost the game!"), "\n", _("Select \"^1Next Match^7\" on the menu for a rematch!"));
+		return strcat(_("You win!"), "\n", _("Select \"^1Next Match^7\" on the menu to start a new match!"));
 	}
 
 	if ( turnflags & TTT_TURN_NEXT )
 	{
-		if ( (turnflags&TTT_TURN_TEAM) != minigame_self.team )
+		if ( (turnflags & TTT_TURN_TEAM) != minigame_self.team )
 			return _("Select \"^1Next Match^7\" on the menu to start a new match!");
 		return _("Wait for your opponent to confirm the rematch");
 	}
@@ -417,11 +420,11 @@ int ttt_ai_random(int piecemask)
 	for ( int i = 0; i < 9; i++ )
 	{
 		if ( piecemask & f )
-			RandomSelection_Add(world, f, string_null, 1, 1);
+			RandomSelection_AddFloat(f, 1, 1);
 		f <<= 1;
 	}
 
-	LOG_TRACE(sprintf("TTT AI: selected %x from %x\n",
+	LOG_TRACE(sprintf("TTT AI: selected %x from %x",
 			RandomSelection_chosen_float, piecemask) );
 	return RandomSelection_chosen_float;
 }
@@ -439,7 +442,7 @@ int ttt_ai_block3 ( int piecemask, int piecemask_free )
 	r |= ttt_ai_1of3(piecemask,TTT_AI_POSFLAG_A3,TTT_AI_POSFLAG_B3,TTT_AI_POSFLAG_C3);
 	r |= ttt_ai_1of3(piecemask,TTT_AI_POSFLAG_A1,TTT_AI_POSFLAG_B2,TTT_AI_POSFLAG_C3);
 	r |= ttt_ai_1of3(piecemask,TTT_AI_POSFLAG_A3,TTT_AI_POSFLAG_B2,TTT_AI_POSFLAG_C1);
-	LOG_TRACE(sprintf("TTT AI: possible 3 in a rows in %x: %x (%x)\n",piecemask,r, r&piecemask_free));
+	LOG_TRACE(sprintf("TTT AI: possible 3 in a rows in %x: %x (%x)",piecemask,r, r&piecemask_free));
 	r &= piecemask_free;
 	return ttt_ai_random(r);
 }
@@ -452,15 +455,15 @@ string ttt_ai_choose_simple(int piecemask_self, int piecemask_opponent, int piec
 {
 	int move = 0;
 
-	LOG_TRACE("TTT AI: checking winning move\n");
+	LOG_TRACE("TTT AI: checking winning move");
 	if (( move = ttt_ai_block3(piecemask_self,piecemask_free) ))
 		return ttt_ai_piece_flag2pos(move); // place winning move
 
-	LOG_TRACE("TTT AI: checking opponent's winning move\n");
+	LOG_TRACE("TTT AI: checking opponent's winning move");
 	if (( move = ttt_ai_block3(piecemask_opponent,piecemask_free) ))
 		return ttt_ai_piece_flag2pos(move); // block opponent
 
-	LOG_TRACE("TTT AI: random move\n");
+	LOG_TRACE("TTT AI: random move");
 	return ttt_ai_piece_flag2pos(ttt_ai_random(piecemask_free));
 }
 
@@ -469,7 +472,7 @@ void ttt_aimove(entity minigame)
 {
 	if ( minigame.minigame_flags == (TTT_TURN_PLACE|minigame.ttt_ai) )
 	{
-		entity aiplayer = world;
+		entity aiplayer = NULL;
 		while ( ( aiplayer = findentity(aiplayer,owner,minigame) ) )
 			if ( aiplayer.classname == "minigame_player" && !aiplayer.minigame_playerslot )
 				break;
@@ -510,16 +513,16 @@ void ttt_aimove(entity minigame)
 		}
 
 		// TODO multiple AI difficulties
-		LOG_TRACE(sprintf("TTT AI: self: %x opponent: %x free: %x\n",
+		LOG_TRACE(sprintf("TTT AI: self: %x opponent: %x free: %x",
 				piecemask_self, piecemask_opponent, piecemask_free));
 		pos = ttt_ai_choose_simple(piecemask_self, piecemask_opponent, piecemask_free);
-		LOG_TRACE("TTT AI: chosen move: ",pos,"\n\n");
+		LOG_TRACE("TTT AI: chosen move: ", pos);
 		if ( !pos )
-			LOG_TRACE("Tic Tac Toe AI has derped!\n");
+			LOG_TRACE("Tic Tac Toe AI has derped!");
 		else
 			ttt_move(minigame,aiplayer,pos);
 	}
-	minigame.message = ttt_turn_to_string(minigame.minigame_flags);
+	strcpy(minigame.message, ttt_turn_to_string(minigame.minigame_flags));
 }
 
 // Make the correct move
@@ -539,8 +542,7 @@ void ttt_make_move(entity minigame)
 
 void ttt_set_curr_pos(string s)
 {
-	if ( ttt_curr_pos )
-		strunzone(ttt_curr_pos);
+	strfree(ttt_curr_pos);
 	if ( s )
 		s = strzone(s);
 	ttt_curr_pos = s;
@@ -554,7 +556,12 @@ int ttt_client_event(entity minigame, string event, ...)
 		case "activate":
 		{
 			ttt_set_curr_pos("");
-			minigame.message = ttt_turn_to_string(minigame.minigame_flags);
+			strcpy(minigame.message, ttt_turn_to_string(minigame.minigame_flags));
+			return false;
+		}
+		case "deactivate":
+		{
+			strfree(minigame.message);
 			return false;
 		}
 		case "key_pressed":
@@ -629,7 +636,7 @@ int ttt_client_event(entity minigame, string event, ...)
 			{
 				if ( sf & MINIG_SF_UPDATE )
 				{
-					sent.message = ttt_turn_to_string(sent.minigame_flags);
+					strcpy(sent.message, ttt_turn_to_string(sent.minigame_flags));
 					if ( sent.minigame_flags & minigame_self.team )
 						minigame_prompt();
 				}

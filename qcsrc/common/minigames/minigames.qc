@@ -4,12 +4,8 @@ REGISTER_NET_LINKED(ENT_CLIENT_MINIGAME)
 
 entity minigame_get_descriptor(string id)
 {
-	FOREACH(Minigames, true, LAMBDA(
-	{
-		if(it.netname == id)
-			return it;
-	}));
-	return world;
+	FOREACH(Minigames, it.netname == id, return it);
+	return NULL;
 }
 
 // Get letter index of a tile name
@@ -30,8 +26,8 @@ int minigame_tile_number(string id)
 // Get relative position of the center of a given tile
 vector minigame_tile_pos(string id, int rows, int columns)
 {
-	return eX*(minigame_tile_letter(id)+0.5)/columns +
-	       eY - eY*(minigame_tile_number(id)+0.5)/rows;
+	return vec2((minigame_tile_letter(id) + 0.5) / columns,
+		(1 - (minigame_tile_number(id) + 0.5) / rows));
 }
 
 // Get a tile name from indices
@@ -88,14 +84,12 @@ void minigame_server_sendflags(entity ent, int mgflags)
 
 // Spawn linked entity on the server or local entity on the client
 // This entity will be removed automatically when the minigame ends
-entity msle_spawn(entity minigame_session, string class_name)
+entity msle_spawn(entity minigame_session, entity e)
 {
-	entity e = spawn();
-	e.classname = class_name;
 	e.owner = minigame_session;
 	e.minigame_autoclean = 1;
 	#ifdef SVQC
-		e.customizeentityforclient = minigame_CheckSend;
+		setcefc(e, minigame_CheckSend);
 		Net_LinkEntity(e, false, 0, minigame_SendEntity);
 	#endif
 	return e;
@@ -131,10 +125,17 @@ int minigame_count_players(entity minigame)
 #ifdef SVQC
 	for(e = minigame.minigame_players; e; e = e.list_next)
 #elif defined(CSQC)
-	e = world;
+	e = NULL;
 	while( (e = findentity(e,owner,minigame)) )
 		if ( e.classname == "minigame_player" )
 #endif
 		pl_num++;
 	return pl_num;
 }
+
+#ifdef CSQC
+#include "cl_minigames.qc"
+#endif
+#ifdef SVQC
+#include "sv_minigames.qc"
+#endif

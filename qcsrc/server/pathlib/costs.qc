@@ -1,4 +1,4 @@
-#include "pathlib.qh"
+#include "costs.qh"
 
 float pathlib_g_static(entity parent,vector to, float static_cost)
 {
@@ -28,15 +28,14 @@ float pathlib_g_euclidean_water(entity parent,vector to, float static_cost)
 
 
 /**
-    Manhattan Menas we expect to move up,down left or right
-    No diagonal moves espected. (like moving bewteen city blocks)
+    Manhattan heuristic means we expect to move up, down left or right
+    No diagonal moves expected. (like moving between city blocks)
 **/
-float pathlib_h_manhattan(vector a,vector b)
+float pathlib_h_manhattan(vector a, vector b)
 {
     //h(n) = D * (abs(n.x-goal.x) + abs(n.y-goal.y))
 
-    float h;
-    h  = fabs(a.x - b.x);
+    float h  = fabs(a.x - b.x);
     h += fabs(a.y - b.y);
     h *= pathlib_gridsize;
 
@@ -44,102 +43,92 @@ float pathlib_h_manhattan(vector a,vector b)
 }
 
 /**
-    This heuristic consider both stright and disagonal moves
-    to have teh same cost.
+    This heuristic consider both straight and diagonal moves
+    to have the same cost.
 **/
-float pathlib_h_diagonal(vector a,vector b)
+float pathlib_h_diagonal(vector a, vector b)
 {
     //h(n) = D * max(abs(n.x-goal.x), abs(n.y-goal.y))
-    float h,x,y;
 
-    x = fabs(a.x - b.x);
-    y = fabs(a.y - b.y);
-    h = pathlib_movecost * max(x,y);
+    float hx = fabs(a.x - b.x);
+    float hy = fabs(a.y - b.y);
+    float h = pathlib_movecost * max(hx, hy);
 
     return h;
 }
 
 /**
-    This heuristic only considers the stright line distance.
-    Will usualy mean a lower H then G meaning A* Will speand more
-    and run slower.
+    This heuristic only considers the straight line distance.
+    Usually means a lower H then G, resulting in A* spreading more
+    (and running slower).
 **/
-float pathlib_h_euclidean(vector a,vector b)
+float pathlib_h_euclidean(vector a, vector b)
 {
     return vlen(a - b);
 }
 
 /**
-    This heuristic consider both stright and disagonal moves,
-    But has a separate cost for diagonal moves.
+    This heuristic consider both straight and diagonal moves,
+    but has a separate cost for diagonal moves.
 **/
 float pathlib_h_diagonal2(vector a,vector b)
 {
-    float h_diag,h_str,h,x,y;
-
     /*
     h_diagonal(n) = min(abs(n.x-goal.x), abs(n.y-goal.y))
     h_straight(n) = (abs(n.x-goal.x) + abs(n.y-goal.y))
     h(n) = D2 * h_diagonal(n) + D * (h_straight(n) - 2*h_diagonal(n)))
     */
 
-    x = fabs(a.x - b.x);
-    y = fabs(a.y - b.y);
+    float hx = fabs(a.x - b.x);
+    float hy = fabs(a.y - b.y);
 
-    h_diag = min(x,y);
-    h_str = x + y;
+    float h_diag = min(hx,hy);
+    float h_str = hx + hy;
 
-    h =  pathlib_movecost_diag * h_diag;
+    float h =  pathlib_movecost_diag * h_diag;
     h += pathlib_movecost * (h_str - 2 * h_diag);
 
     return h;
 }
 
 /**
-    This heuristic consider both stright and disagonal moves,
+    This heuristic consider both straight and diagonal moves,
     But has a separate cost for diagonal moves.
 **/
-float pathlib_h_diagonal2sdp(vector preprev,vector prev,vector point,vector end)
+float pathlib_h_diagonal2sdp(vector preprev, vector prev, vector point, vector end)
 {
-    float h_diag,h_str,h,x,y,z;
-
     //h_diagonal(n) = min(abs(n.x-goal.x), abs(n.y-goal.y))
     //h_straight(n) = (abs(n.x-goal.x) + abs(n.y-goal.y))
     //h(n) = D2 * h_diagonal(n) + D * (h_straight(n) - 2*h_diagonal(n)))
 
-    x = fabs(point.x - end.x);
-    y = fabs(point.y - end.y);
-    z = fabs(point.z - end.z);
+    float hx = fabs(point.x - end.x);
+    float hy = fabs(point.y - end.y);
+    float hz = fabs(point.z - end.z);
 
-    h_diag = min3(x,y,z);
-    h_str = x + y + z;
+    float h_diag = min3(hx,hy,hz);
+    float h_str = hx + hy + hz;
 
-    h =  pathlib_movecost_diag * h_diag;
+    float h =  pathlib_movecost_diag * h_diag;
     h += pathlib_movecost * (h_str - 2 * h_diag);
 
-    float m;
-    vector d1,d2;
-
-    d1 = normalize(preprev - point);
-    d2 = normalize(prev    - point);
-    m = vlen(d1-d2);
+    vector d1 = normalize(preprev - point);
+    vector d2 = normalize(prev    - point);
+    float m = vlen(d1 - d2);
 
     return h * m;
 }
 
 
-float pathlib_h_diagonal3(vector a,vector b)
+float pathlib_h_diagonal3(vector a, vector b)
 {
-    float h_diag,h_str,h,x,y,z;
+    float hx = fabs(a.x - b.x);
+    float hy = fabs(a.y - b.y);
+    float hz = fabs(a.z - b.z);
 
-    x = fabs(a.x - b.x);
-    y = fabs(a.y - b.y);
-    z = fabs(a.z - b.z);
+    float h_diag = min3(hx,hy,hz);
+    float h_str = hx + hy + hz;
 
-    h_diag = min3(x,y,z);
-    h_str = x + y + z;
-
-    h =  pathlib_movecost_diag * h_diag;
+    float h =  pathlib_movecost_diag * h_diag;
     h += pathlib_movecost * (h_str - 2 * h_diag);
 
     return h;

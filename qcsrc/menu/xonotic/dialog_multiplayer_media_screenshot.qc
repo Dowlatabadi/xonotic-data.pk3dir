@@ -1,21 +1,13 @@
-#ifndef DIALOG_MULTIPLAYER_MEDIA_SCREENSHOT_H
-#define DIALOG_MULTIPLAYER_MEDIA_SCREENSHOT_H
-#include "tab.qc"
-CLASS(XonoticScreenshotBrowserTab, XonoticTab)
-	METHOD(XonoticScreenshotBrowserTab, fill, void(entity));
-	ATTRIB(XonoticScreenshotBrowserTab, intendedWidth, float, 1)
-	ATTRIB(XonoticScreenshotBrowserTab, rows, float, 21)
-	ATTRIB(XonoticScreenshotBrowserTab, columns, float, 6.5)
-	ATTRIB(XonoticScreenshotBrowserTab, name, string, "ScreenshotBrowser")
+#include "dialog_multiplayer_media_screenshot.qh"
 
-	METHOD(XonoticScreenshotBrowserTab, loadPreviewScreenshot, void(entity, string));
-	ATTRIB(XonoticScreenshotBrowserTab, screenshotImage, entity, NULL)
-	ATTRIB(XonoticScreenshotBrowserTab, currentScrPath, string, string_null)
-ENDCLASS(XonoticScreenshotBrowserTab)
-entity makeXonoticScreenshotBrowserTab();
-#endif
+#include "dialog_multiplayer_media_screenshot_viewer.qh"
+#include "screenshotlist.qh"
 
-#ifdef IMPLEMENTATION
+#include "textlabel.qh"
+#include "inputbox.qh"
+#include "checkbox.qh"
+#include "button.qh"
+
 entity makeXonoticScreenshotBrowserTab()
 {
 	entity me;
@@ -27,9 +19,7 @@ void XonoticScreenshotBrowserTab_loadPreviewScreenshot(entity me, string scrImag
 {
 	if (me.currentScrPath == scrImage)
 		return;
-	if (me.currentScrPath)
-		strunzone(me.currentScrPath);
-	me.currentScrPath = strzone(scrImage);
+	strcpy(me.currentScrPath, scrImage);
 	me.screenshotImage.load(me.screenshotImage, me.currentScrPath);
 }
 void XonoticScreenshotBrowserTab_fill(entity me)
@@ -49,6 +39,7 @@ void XonoticScreenshotBrowserTab_fill(entity me)
 
 	me.gotoRC(me, 0, 3.1);
 		me.TD(me, 1, 1.9, e = makeXonoticCheckBoxEx(2, 1, "cl_autoscreenshot", _("Auto screenshot scoreboard")));
+			e.sendCvars = true;
 		me.TD(me, 1, 1, e = makeXonoticButton(_("Refresh"), '0 0 0'));
 			e.onClick = ScreenshotList_Refresh_Click;
 			e.onClickEntity = slist;
@@ -80,4 +71,3 @@ void XonoticScreenshotBrowserTab_fill(entity me)
 			slist.screenshotBrowserDialog = me;
 */
 }
-#endif

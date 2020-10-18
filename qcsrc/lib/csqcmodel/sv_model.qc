@@ -22,36 +22,37 @@
 #include "sv_model.qh"
 
 #include "common.qh"
-#include "../../common/animdecide.qh"
-#include "../../common/constants.qh"
-#include "../../common/util.qh"
-#include "../../server/constants.qh"
-#include "../../server/defs.qh"
 
 // generic CSQC model code
 
-bool CSQCModel_Send(entity to, int sf)
-{SELFPARAM();
+bool CSQCModel_Send(entity this, entity to, int sf)
+{
 	// some nice flags for CSQCMODEL_IF
-	float isplayer = (IS_CLIENT(self));
-	float islocalplayer = (self == to);
-	float isnolocalplayer = (isplayer && (self != to));
+	noref bool isplayer = IS_CLIENT(this);
+	noref bool islocalplayer = (this == to);
+	noref bool isnolocalplayer = (isplayer && (this != to));
 
-	unused_float = isplayer;
-	unused_float = islocalplayer;
-	unused_float = isnolocalplayer;
+	int psf = 0;
+	psf = BITSET(psf, ISPLAYER_CLIENT, isplayer);
+	psf = BITSET(psf, ISPLAYER_LOCAL, islocalplayer);
+	psf = BITSET(psf, ISPLAYER_PLAYER, IS_PLAYER(this));
 
 	WriteHeader(MSG_ENTITY, ENT_CLIENT_MODEL);
 	WriteInt24_t(MSG_ENTITY, sf);
+	WriteByte(MSG_ENTITY, psf);
 
 #define CSQCMODEL_IF(cond) if(cond) {
 #define CSQCMODEL_ENDIF }
 #define CSQCMODEL_PROPERTY(flag,t,r,w,f) \
 	if(sf & flag) \
 	{ \
-		w(MSG_ENTITY, self.csqcmodel_##f); \
+		w(MSG_ENTITY, this.csqcmodel_##f); \
 	}
-#define CSQCMODEL_PROPERTY_SCALED(flag,t,r,w,f,s,mi,ma) CSQCMODEL_PROPERTY(flag,t,r,w,f)
+#define CSQCMODEL_PROPERTY_SCALED(flag,t,r,w,f,s,mi,ma) \
+	if(sf & flag) \
+	{ \
+		w(MSG_ENTITY, this.csqcmodel_##f); \
+	}
 	ALLPROPERTIES
 #undef CSQCMODEL_PROPERTY_SCALED
 #undef CSQCMODEL_PROPERTY
@@ -67,19 +68,15 @@ bool CSQCModel_Send(entity to, int sf)
 void CSQCModel_CheckUpdate(entity e)
 {
 	// some nice flags for CSQCMODEL_IF
-	float isplayer = (IS_CLIENT(e));
-	float islocalplayer = isplayer; // we set BOTH to 1 here as we need the sendflags
-	float isnolocalplayer = isplayer; // we set BOTH to 1 here as we need the sendflags
-
-	unused_float = isplayer;
-	unused_float = islocalplayer;
-	unused_float = isnolocalplayer;
+	noref float isplayer = IS_CLIENT(e);
+	noref float islocalplayer = isplayer; // we set BOTH to 1 here as we need the sendflags
+	noref float isnolocalplayer = isplayer; // we set BOTH to 1 here as we need the sendflags
 
 #if CSQCPLAYER_FORCE_UPDATES
 	if(isplayer && time > e.csqcmodel_nextforcedupdate)
 	{
 		e.SendFlags |= CSQCMODEL_PROPERTY_ORIGIN;
-		e.csqcmodel_nextforcedupdate = time + CSQCPLAYER_FORCE_UPDATES * (0.5 + random()); // ensure about 4 origin sends per sec
+		e.csqcmodel_nextforcedupdate = time + (1 / (CSQCPLAYER_FORCE_UPDATES)) * (0.5 + random()); // ensure about 4 origin sends per sec
 	}
 #endif
 
@@ -124,12 +121,12 @@ void CSQCModel_CheckUpdate(entity e)
 
 void CSQCModel_LinkEntity(entity e)
 {
-	e.SendEntity = CSQCModel_Send;
+	setSendEntity(e, CSQCModel_Send);
 	e.SendFlags = 0xFFFFFF;
 	CSQCModel_CheckUpdate(e);
 }
 
 void CSQCModel_UnlinkEntity(entity e)
 {
-	e.SendEntity = func_null;
+	setSendEntity(e, func_null);
 }

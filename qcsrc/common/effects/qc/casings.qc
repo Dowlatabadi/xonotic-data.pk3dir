@@ -1,101 +1,113 @@
-#ifdef IMPLEMENTATION
+#include "casings.qh"
 
-#include "../../util.qh"
+#include <common/replicate.qh>
+#include <common/util.qh>
 
 #ifdef CSQC
-#include "../../movetypes/movetypes.qh"
+#include <common/physics/movetypes/movetypes.qh>
 #include "rubble.qh"
 #endif
 
 REGISTER_NET_TEMP(casings)
 
+#if defined(SVQC)
+.bool cvar_cl_casings;
+#elif defined(CSQC)
+bool cvar_cl_casings;
+#endif
+REPLICATE(cvar_cl_casings, bool, "cl_casings");
+
 #ifdef SVQC
-void SpawnCasing(vector vel, float randomvel, vector ang, vector avel, float randomavel, int casingtype, entity casingowner)
-{SELFPARAM();
-    .entity weaponentity = weaponentities[0]; // TODO: parameter
-    entity wep = self.(weaponentity);
-    vector org = self.origin + self.view_ofs + wep.spawnorigin.x * v_forward - wep.spawnorigin.y * v_right + wep.spawnorigin.z * v_up;
+void SpawnCasing(vector vel, float randomvel, vector ang, vector avel, float randomavel, int casingtype, entity casingowner, .entity weaponentity)
+{
+	entity wep = casingowner.(weaponentity);
+	vector org = casingowner.origin + casingowner.view_ofs + wep.spawnorigin.x * v_forward - wep.spawnorigin.y * v_right + wep.spawnorigin.z * v_up;
 
-    if (!sound_allowed(MSG_BROADCAST, casingowner))
-        casingtype |= 0x80;
+	FOREACH_CLIENT(true, {
+		if (!(CS(it).cvar_cl_casings))
+			continue;
 
-    WriteHeader(MSG_ALL, casings);
-    WriteByte(MSG_ALL, casingtype);
-    WriteCoord(MSG_ALL, org.x);
-    WriteCoord(MSG_ALL, org.y);
-    WriteCoord(MSG_ALL, org.z);
-    WriteShort(MSG_ALL, compressShortVector(vel)); // actually compressed velocity
-    WriteByte(MSG_ALL, ang.x * 256 / 360);
-    WriteByte(MSG_ALL, ang.y * 256 / 360);
-    WriteByte(MSG_ALL, ang.z * 256 / 360);
+		msg_entity = it;
+		if (!sound_allowed(MSG_ONE, it))
+			casingtype |= 0x80; // silent
+
+		WriteHeader(MSG_ONE, casings);
+		WriteByte(MSG_ONE, casingtype);
+		WriteVector(MSG_ONE, org);
+		WriteShort(MSG_ONE, compressShortVector(vel)); // actually compressed velocity
+		WriteByte(MSG_ONE, ang.x * 256 / 360);
+		WriteByte(MSG_ONE, ang.y * 256 / 360);
+		WriteByte(MSG_ONE, ang.z * 256 / 360);
+	});
 }
 #endif
 
 #ifdef CSQC
 entityclass(Casing);
-class(Casing) .float alpha;
-class(Casing) .bool silent;
-class(Casing) .int state;
-class(Casing) .float cnt;
+classfield(Casing) .float alpha;
+classfield(Casing) .bool silent;
+classfield(Casing) .int state;
+classfield(Casing) .float cnt;
 
-void Casing_Delete()
-{SELFPARAM();
-    remove(self);
+void Casing_Delete(entity this)
+{
+    delete(this);
 }
 
 void Casing_Draw(entity this)
 {
-    if (self.move_flags & FL_ONGROUND)
+    if (IS_ONGROUND(this))
     {
-        self.move_angles_x = 0;
-        self.move_angles_z = 0;
-        self.flags &= ~FL_ONGROUND;
+        this.angles_x = 0;
+        this.angles_z = 0;
+        //UNSET_ONGROUND(this);
     }
 
-    Movetype_Physics_MatchTicrate(self, autocvar_cl_casings_ticrate, autocvar_cl_casings_sloppy);
-    if (wasfreed(self))
-        return; // deleted by touch function
+    this.renderflags = 0;
+    this.alpha = bound(0, this.cnt - time, 1);
 
-    self.renderflags = 0;
-    self.alpha = bound(0, self.cnt - time, 1);
-
-    if (self.alpha < ALPHA_MIN_VISIBLE)
+    if (this.alpha < ALPHA_MIN_VISIBLE)
     {
-        Casing_Delete();
-        self.drawmask = 0;
+        Casing_Delete(this);
+        this.drawmask = 0;
+        return;
     }
+
+    Movetype_Physics_MatchTicrate(this, autocvar_cl_casings_ticrate, autocvar_cl_casings_sloppy);
+    //if (wasfreed(this))
+    //    return; // deleted by touch function
 }
 
 SOUND(BRASS1, W_Sound("brass1"));
 SOUND(BRASS2, W_Sound("brass2"));
 SOUND(BRASS3, W_Sound("brass3"));
 Sound SND_BRASS_RANDOM() {
-    return Sounds_from(SND_BRASS1.m_id + floor(prandom() * 3));
+    return REGISTRY_GET(Sounds, SND_BRASS1.m_id + floor(prandom() * 3));
 }
 SOUND(CASINGS1, W_Sound("casings1"));
 SOUND(CASINGS2, W_Sound("casings2"));
 SOUND(CASINGS3, W_Sound("casings3"));
 Sound SND_CASINGS_RANDOM() {
-    return Sounds_from(SND_CASINGS1.m_id + floor(prandom() * 3));
+    return REGISTRY_GET(Sounds, SND_CASINGS1.m_id + floor(prandom() * 3));
 }
 
-void Casing_Touch()
-{SELFPARAM();
+void Casing_Touch(entity this, entity toucher)
+{
     if (trace_dphitq3surfaceflags & Q3SURFACEFLAG_NOIMPACT)
     {
-        Casing_Delete();
+        Casing_Delete(this);
         return;
     }
 
-    if (!self.silent)
+    if (!this.silent)
     if (!trace_ent || trace_ent.solid == SOLID_BSP)
     {
-        if (vlen(self.velocity) > 50)
+        if(vdist(this.velocity, >, 50))
         {
-            if (time >= self.nextthink)
+            if (time >= this.nextthink)
             {
                 Sound s;
-                switch (self.state)
+                switch (this.state)
                 {
                     case 1:
                         s = SND_CASINGS_RANDOM();
@@ -105,29 +117,26 @@ void Casing_Touch()
                         break;
                 }
 
-                sound (self, CH_SHOTS, s, VOL_BASE, ATTEN_LARGE);
+                sound (this, CH_SHOTS, s, VOL_BASE, ATTEN_LARGE);
             }
         }
     }
 
-    self.nextthink = time + 0.2;
+    this.nextthink = time + 0.2;
 }
 
-void Casing_Damage(float thisdmg, int hittype, vector org, vector thisforce)
-{SELFPARAM();
+void Casing_Damage(entity this, float thisdmg, int hittype, vector org, vector thisforce)
+{
     if (thisforce.z < 0)
         thisforce.z = 0;
-    self.move_velocity = self.move_velocity + thisforce + '0 0 100';
-    self.move_flags &= ~FL_ONGROUND;
+    this.velocity = this.velocity + thisforce + '0 0 100';
+    UNSET_ONGROUND(this);
 }
 
 NET_HANDLE(casings, bool isNew)
 {
     int _state = ReadByte();
-    vector org;
-    org_x = ReadCoord();
-    org_y = ReadCoord();
-    org_z = ReadCoord();
+    vector org = ReadVector();
     vector vel = decompressShortVector(ReadShort());
     vector ang;
     ang_x = ReadByte() * 360 / 256;
@@ -135,9 +144,7 @@ NET_HANDLE(casings, bool isNew)
     ang_z = ReadByte() * 360 / 256;
     return = true;
 
-    if (!autocvar_cl_casings) return;
-
-    Casing casing = RubbleNew("casing");
+    Casing casing = RubbleNew(new(casing));
     casing.silent = (_state & 0x80);
     casing.state = (_state & 0x7F);
     casing.origin = org;
@@ -147,12 +154,12 @@ NET_HANDLE(casings, bool isNew)
     casing.drawmask = MASK_NORMAL;
 
     casing.draw = Casing_Draw;
-    casing.move_origin = casing.origin;
-    casing.move_velocity = casing.velocity + 2 * prandomvec();
-    casing.move_angles = casing.angles;
-    casing.move_avelocity = '0 250 0' + 100 * prandomvec();
-    casing.move_movetype = MOVETYPE_BOUNCE;
-    casing.move_touch = Casing_Touch;
+    if (isNew) IL_PUSH(g_drawables, casing);
+    casing.velocity = casing.velocity + 2 * prandomvec();
+    casing.avelocity = '0 250 0' + 100 * prandomvec();
+    set_movetype(casing, MOVETYPE_BOUNCE);
+    casing.bouncefactor = 0.25;
+    settouch(casing, Casing_Touch);
     casing.move_time = time;
     casing.event_damage = Casing_Damage;
     casing.solid = SOLID_TRIGGER;
@@ -174,5 +181,4 @@ NET_HANDLE(casings, bool isNew)
     RubbleLimit("casing", autocvar_cl_casings_maxcount, Casing_Delete);
 }
 
-#endif
 #endif

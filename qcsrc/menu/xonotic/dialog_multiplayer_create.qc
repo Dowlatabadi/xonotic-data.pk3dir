@@ -1,25 +1,19 @@
-#ifndef DIALOG_MULTIPLAYER_CREATE_H
-#define DIALOG_MULTIPLAYER_CREATE_H
-#include "tab.qc"
-CLASS(XonoticServerCreateTab, XonoticTab)
-	METHOD(XonoticServerCreateTab, fill, void(entity));
-	METHOD(XonoticServerCreateTab, gameTypeChangeNotify, void(entity));
-	METHOD(XonoticServerCreateTab, gameTypeSelectNotify, void(entity));
-	ATTRIB(XonoticServerCreateTab, intendedWidth, float, 0.9)
-	ATTRIB(XonoticServerCreateTab, rows, float, 23)
-	ATTRIB(XonoticServerCreateTab, columns, float, 6.2) // added extra .2 for center space
+#include "dialog_multiplayer_create.qh"
 
-	ATTRIB(XonoticServerCreateTab, mapListBox, entity, NULL)
-	ATTRIB(XonoticServerCreateTab, sliderFraglimit, entity, NULL)
-	ATTRIB(XonoticServerCreateTab, sliderTeams, entity, NULL)
-	ATTRIB(XonoticServerCreateTab, sliderTimelimit, entity, NULL)
-	ATTRIB(XonoticServerCreateTab, labelFraglimit, entity, NULL)
-	ATTRIB(XonoticServerCreateTab, labelTeams, entity, NULL)
-ENDCLASS(XonoticServerCreateTab)
-entity makeXonoticServerCreateTab();
-#endif
+#include "dialog_multiplayer_create_mapinfo.qh"
+#include "dialog_multiplayer_create_mutators.qh"
 
-#ifdef IMPLEMENTATION
+#include "gametypelist.qh"
+#include "maplist.qh"
+#include <common/mapinfo.qh>
+
+#include "image.qh"
+#include "textslider.qh"
+#include "textlabel.qh"
+#include "slider.qh"
+#include "mainwindow.qh"
+#include "button.qh"
+#include "inputbox.qh"
 
 void GameType_ConfigureSliders(entity me, string pLabel, float pMin, float pMax, float pStep, string pCvar, string tCvar, string pTooltip)
 {
@@ -33,16 +27,8 @@ void GameType_ConfigureSliders(entity me, string pLabel, float pMin, float pMax,
 	// clear old values
 	for(i = 0; i < e.nValues; ++i);
 	{
-		if(e.(valueStrings[i]))
-		{
-			strunzone(e.(valueStrings[i]));
-			e.(valueStrings[i]) = string_null;
-		}
-		if(e.(valueIdentifiers[i]))
-		{
-			strunzone(e.(valueIdentifiers[i]));
-			e.(valueIdentifiers[i]) = string_null;
-		}
+		strfree(e.(valueStrings[i]));
+		strfree(e.(valueIdentifiers[i]));
 	}
 	e.clearValues(e);
 
@@ -62,6 +48,12 @@ void GameType_ConfigureSliders(entity me, string pLabel, float pMin, float pMax,
 	tl.disabled = t.disabled = !tCvar;
 	t.nValues = (tCvar == "") ? 0 : 4; // instead of clearing / readding the very same values
 	t.configureXonoticTextSliderValues(t);
+}
+
+void GameType_ConfigureSliders_for_CurrentGametype(entity me)
+{
+	Gametype gt = MapInfo_CurrentGametype();
+	gt.m_configuremenu(gt, me, GameType_ConfigureSliders);
 }
 
 entity makeXonoticServerCreateTab()
@@ -216,28 +208,12 @@ void XonoticServerCreateTab_fill(entity me)
 			e.onClickEntity = me.mapListBox;
 			me.mapListBox.startButton = e;
 
-	me.gameTypeChangeNotify(me);
+	GameType_ConfigureSliders_for_CurrentGametype(me);
 }
 
 void XonoticServerCreateTab_gameTypeChangeNotify(entity me)
 {
-	switch(MapInfo_CurrentGametype())
-	{
-		case MAPINFO_TYPE_CA:              GameType_ConfigureSliders(me, _("Frag limit:"),      5,  100,  5, "fraglimit_override",        "g_ca_teams_override",          _("The amount of frags needed before the match will end")); break;
-		case MAPINFO_TYPE_FREEZETAG:       GameType_ConfigureSliders(me, _("Frag limit:"),      5,  100,  5, "fraglimit_override",        "g_freezetag_teams_override",   _("The amount of frags needed before the match will end")); break;
-		case MAPINFO_TYPE_CTF:             GameType_ConfigureSliders(me, _("Capture limit:"),   1,   20,  1, "capturelimit_override",     string_null,                    _("The amount of captures needed before the match will end")); break;
-		case MAPINFO_TYPE_DOMINATION:      GameType_ConfigureSliders(me, _("Point limit:"),    50,  500, 10, "g_domination_point_limit",  "g_domination_teams_override",  _("The amount of points needed before the match will end")); break;
-		case MAPINFO_TYPE_KEYHUNT:         GameType_ConfigureSliders(me, _("Point limit:"),   200, 1500, 50, "g_keyhunt_point_limit",     "g_keyhunt_teams_override",     _("The amount of points needed before the match will end")); break;
-		case MAPINFO_TYPE_LMS:             GameType_ConfigureSliders(me, _("Lives:"),           3,   50,  1, "g_lms_lives_override",      string_null,                    string_null); break;
-		case MAPINFO_TYPE_RACE:            GameType_ConfigureSliders(me, _("Laps:"),            1,   25,  1, "g_race_laps_limit",         string_null,                    string_null); break;
-		case MAPINFO_TYPE_NEXBALL:         GameType_ConfigureSliders(me, _("Goals:"),           1,   50,  1, "g_nexball_goallimit",       string_null,                    _("The amount of goals needed before the match will end")); break;
-		case MAPINFO_TYPE_ASSAULT:         GameType_ConfigureSliders(me, _("Point limit:"),    50,  500, 10, string_null,                 string_null,                    string_null); break;
-		case MAPINFO_TYPE_ONSLAUGHT:       GameType_ConfigureSliders(me, _("Point limit:"),    50,  500, 10, string_null,                 string_null,                    string_null); break;
-		case MAPINFO_TYPE_CTS:             GameType_ConfigureSliders(me, _("Point limit:"),    50,  500, 10, string_null,                 string_null,                    string_null); break;
-		case MAPINFO_TYPE_INVASION:        GameType_ConfigureSliders(me, _("Point limit:"),    50,  500, 10, string_null,                 string_null,                    string_null); break;
-		case MAPINFO_TYPE_TEAM_DEATHMATCH: GameType_ConfigureSliders(me, _("Point limit:"),     5,  100,  5, "g_tdm_point_limit",         "g_tdm_teams_override",         _("The amount of points needed before the match will end")); break;
-		default:                           GameType_ConfigureSliders(me, _("Frag limit:"),      5,  100,  5, "fraglimit_override",        string_null,                    _("The amount of frags needed before the match will end")); break;
-	}
+	GameType_ConfigureSliders_for_CurrentGametype(me);
 
 	me.mapListBox.refilter(me.mapListBox);
 }
@@ -246,5 +222,3 @@ void XonoticServerCreateTab_gameTypeSelectNotify(entity me)
 {
 	me.setFocus(me, me.mapListBox);
 }
-
-#endif

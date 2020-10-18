@@ -2,166 +2,152 @@
 #include "common.qh"
 
 #if defined(CSQC)
-	#include "../../client/autocvars.qh"
-	#include "../csqcmodel/cl_model.qh"
+	#include <client/autocvars.qh>
+	#include <lib/csqcmodel/cl_model.qh>
 #elif defined(MENUQC)
 #elif defined(SVQC)
 #endif
 
-void WarpZone_Fade_PreDraw()
-{SELFPARAM();
+void WarpZone_Fade_PreDraw(entity this)
+{
 	vector org;
 	org = getpropertyvec(VF_ORIGIN);
-	if(!checkpvs(org, self)) // this makes sense as long as we don't support recursive warpzones
-		self.alpha = 0;
-	else if(self.warpzone_fadestart)
-		self.alpha = bound(0, (self.warpzone_fadeend - vlen(org - self.origin - 0.5 * (self.mins + self.maxs))) / (self.warpzone_fadeend - self.warpzone_fadestart), 1);
+	if(!checkpvs(org, this)) // this makes sense as long as we don't support recursive warpzones
+		this.alpha = 0;
+	else if(this.warpzone_fadestart)
+		this.alpha = bound(0, (this.warpzone_fadeend - vlen(org - this.origin - 0.5 * (this.mins + this.maxs))) / (this.warpzone_fadeend - this.warpzone_fadestart), 1);
 	else
-		self.alpha = 1;
-	//printf("%v <-> %v\n", view_origin, self.origin + 0.5 * (self.mins + self.maxs));
-	if(self.alpha <= 0)
-		self.drawmask = 0;
+		this.alpha = 1;
+	//printf("%v <-> %v\n", view_origin, this.origin + 0.5 * (this.mins + this.maxs));
+	if(this.alpha <= 0)
+		this.drawmask = 0;
 	else
-		self.drawmask = MASK_NORMAL;
+		this.drawmask = MASK_NORMAL;
 }
 
-void WarpZone_Touch ();
+void WarpZone_Touch(entity this, entity toucher);
 NET_HANDLE(ENT_CLIENT_WARPZONE, bool isnew)
 {
-	warpzone_warpzones_exist = 1;
-	if (!self.enemy)
+	if(!warpzone_warpzones_exist)
 	{
-		self.enemy = new(warpzone_from);
+		cvar_settemp("r_water", "1"); // HACK for DarkPlaces: always enable reflections when a map has warpzones
+		cvar_settemp("r_water_resolutionmultiplier", "1"); // HACK for DarkPlaces: enforce full quality so entities can be seen clearly through warpzones
 	}
-	self.classname = "trigger_warpzone";
+	warpzone_warpzones_exist = 1;
+	if (!this.enemy)
+	{
+		this.enemy = new(warpzone_from);
+	}
+	this.classname = "trigger_warpzone";
+
+	if(isnew)
+		IL_PUSH(g_warpzones, this);
 
 	int f = ReadByte();
-	self.warpzone_isboxy = (f & 1);
+	this.warpzone_isboxy = (f & 1);
 	if(f & 4)
 	{
-		self.origin_x = ReadCoord();
-		self.origin_y = ReadCoord();
-		self.origin_z = ReadCoord();
+		this.origin = ReadVector();
 	}
 	else
-		self.origin = '0 0 0';
-	self.modelindex = ReadShort();
-	self.mins_x = ReadCoord();
-	self.mins_y = ReadCoord();
-	self.mins_z = ReadCoord();
-	self.maxs_x = ReadCoord();
-	self.maxs_y = ReadCoord();
-	self.maxs_z = ReadCoord();
-	self.scale = ReadByte() / 16;
-	self.enemy.oldorigin_x = ReadCoord();
-	self.enemy.oldorigin_y = ReadCoord();
-	self.enemy.oldorigin_z = ReadCoord();
-	self.enemy.avelocity_x = ReadCoord();
-	self.enemy.avelocity_y = ReadCoord();
-	self.enemy.avelocity_z = ReadCoord();
-	self.oldorigin_x = ReadCoord();
-	self.oldorigin_y = ReadCoord();
-	self.oldorigin_z = ReadCoord();
-	self.avelocity_x = ReadCoord();
-	self.avelocity_y = ReadCoord();
-	self.avelocity_z = ReadCoord();
+		this.origin = '0 0 0';
+	this.modelindex = ReadShort();
+	this.mins = ReadVector();
+	this.maxs = ReadVector();
+	this.scale = ReadByte() / 16;
+	this.enemy.oldorigin = ReadVector();
+	this.enemy.avelocity = ReadVector();
+	this.oldorigin = ReadVector();
+	this.avelocity = ReadVector();
 
 	if(f & 2)
 	{
-		self.warpzone_fadestart = ReadShort();
-		self.warpzone_fadeend = max(self.warpzone_fadestart + 1, ReadShort());
+		this.warpzone_fadestart = ReadShort();
+		this.warpzone_fadeend = max(this.warpzone_fadestart + 1, ReadShort());
 	}
 	else
 	{
-		self.warpzone_fadestart = 0;
-		self.warpzone_fadeend = 0;
+		this.warpzone_fadestart = 0;
+		this.warpzone_fadeend = 0;
 	}
 
 	// common stuff
-	WarpZone_SetUp(self, self.enemy.oldorigin, self.enemy.avelocity, self.oldorigin, self.avelocity);
+	WarpZone_SetUp(this, this.enemy.oldorigin, this.enemy.avelocity, this.oldorigin, this.avelocity);
 
 	// link me
-	//setmodel(self, self.model);
-	setorigin(self, self.origin);
-	setsize(self, self.mins, self.maxs);
+	//setmodel(this, this.model);
+	setorigin(this, this.origin);
+	setsize(this, this.mins, this.maxs);
 
 	// how to draw
 	// engine currently wants this
-	self.predraw = WarpZone_Fade_PreDraw;
+	setpredraw(this, WarpZone_Fade_PreDraw);
 
-	//self.move_touch = WarpZone_Touch;
+	//settouch(this, WarpZone_Touch);
 	return true;
 }
 
 NET_HANDLE(ENT_CLIENT_WARPZONE_CAMERA, bool isnew)
 {
+	if(!warpzone_cameras_exist)
+	{
+		cvar_settemp("r_water", "1"); // HACK for DarkPlaces: always enable reflections when a map has cameras
+		cvar_settemp("r_water_resolutionmultiplier", "1"); // HACK for DarkPlaces: enforce full quality so entities can be seen clearly through warpzones
+	}
 	warpzone_cameras_exist = 1;
-	self.classname = "func_warpzone_camera";
+	this.classname = "func_warpzone_camera";
 
 	int f = ReadByte();
 	if(f & 4)
 	{
-		self.origin_x = ReadCoord();
-		self.origin_y = ReadCoord();
-		self.origin_z = ReadCoord();
+		this.origin = ReadVector();
 	}
 	else
-		self.origin = '0 0 0';
-	self.modelindex = ReadShort();
-	self.mins_x = ReadCoord();
-	self.mins_y = ReadCoord();
-	self.mins_z = ReadCoord();
-	self.maxs_x = ReadCoord();
-	self.maxs_y = ReadCoord();
-	self.maxs_z = ReadCoord();
-	self.scale = ReadByte() / 16;
-	self.oldorigin_x = ReadCoord();
-	self.oldorigin_y = ReadCoord();
-	self.oldorigin_z = ReadCoord();
-	self.avelocity_x = ReadCoord();
-	self.avelocity_y = ReadCoord();
-	self.avelocity_z = ReadCoord();
+		this.origin = '0 0 0';
+	this.modelindex = ReadShort();
+	this.mins = ReadVector();
+	this.maxs = ReadVector();
+	this.scale = ReadByte() / 16;
+	this.oldorigin = ReadVector();
+	this.avelocity = ReadVector();
 
 	if(f & 2)
 	{
-		self.warpzone_fadestart = ReadShort();
-		self.warpzone_fadeend = max(self.warpzone_fadestart + 1, ReadShort());
+		this.warpzone_fadestart = ReadShort();
+		this.warpzone_fadeend = max(this.warpzone_fadestart + 1, ReadShort());
 	}
 	else
 	{
-		self.warpzone_fadestart = 0;
-		self.warpzone_fadeend = 0;
+		this.warpzone_fadestart = 0;
+		this.warpzone_fadeend = 0;
 	}
 
 	// common stuff
-	WarpZone_Camera_SetUp(self, self.oldorigin, self.avelocity);
+	WarpZone_Camera_SetUp(this, this.oldorigin, this.avelocity);
 
 	// engine currently wants this
-	self.drawmask = MASK_NORMAL;
+	this.drawmask = MASK_NORMAL;
 
 	// link me
-	//setmodel(self, self.model);
-	setorigin(self, self.origin);
-	setsize(self, self.mins, self.maxs);
+	//setmodel(this, this.model);
+	setorigin(this, this.origin);
+	setsize(this, this.mins, this.maxs);
 
 	// how to draw
 	// engine currently wants this
-	self.predraw = WarpZone_Fade_PreDraw;
+	setpredraw(this, WarpZone_Fade_PreDraw);
 	return true;
 }
 
 void CL_RotateMoves(vector ang) = #638;
 NET_HANDLE(ENT_CLIENT_WARPZONE_TELEPORTED, bool isnew)
 {
-	self.classname = "warpzone_teleported";
-	vector v;
-	v.x = ReadCoord();
-	v.y = ReadCoord();
-	v.z = ReadCoord();
+	this.classname = "warpzone_teleported";
+	vector v = ReadVector();
 	return = true;
 	if (!isnew) return;
-	self.warpzone_transform = v;
-	setproperty(VF_CL_VIEWANGLES, WarpZone_TransformVAngles(self, getpropertyvec(VF_CL_VIEWANGLES)));
+	this.warpzone_transform = v;
+	setproperty(VF_CL_VIEWANGLES, WarpZone_TransformVAngles(this, getpropertyvec(VF_CL_VIEWANGLES)));
 	if(checkextension("DP_CSQC_ROTATEMOVES"))
 		CL_RotateMoves(v);
 		//CL_RotateMoves('0 90 0');
@@ -226,8 +212,7 @@ vector WarpZone_FixNearClip(vector o, vector c0, vector c1, vector c2, vector c3
 
 void WarpZone_FixPMove()
 {
-	entity e;
-	e = WarpZone_Find(pmove_org, pmove_org);
+	entity e = WarpZone_Find(pmove_org, pmove_org);
 	if(e)
 	{
 		pmove_org = WarpZone_TransformOrigin(e, pmove_org);
@@ -242,7 +227,6 @@ void WarpZone_FixView()
 {
 	entity e;
 	vector org, ang, nearclip, corner0, corner1, corner2, corner3, o;
-	float f;
 
 	warpzone_save_view_origin = org = getpropertyvec(VF_ORIGIN);
 	warpzone_save_view_angles = ang = getpropertyvec(VF_ANGLES);
@@ -259,10 +243,29 @@ void WarpZone_FixView()
 
 #ifndef KEEP_ROLL
 	float rick;
-	if(autocvar_cl_rollkillspeed)
-		f = max(0, (1 - frametime * autocvar_cl_rollkillspeed));
-	else
+	float f;
+	static float rollkill;
+	if (STAT(HEALTH) > 0 || STAT(HEALTH) == -666 || STAT(HEALTH) == -2342)
+	{
 		f = 0;
+		// reset roll when passing through a warpzone that change player's roll angle
+		if(autocvar_cl_rollkillspeed)
+			f = max(0, (1 - frametime * autocvar_cl_rollkillspeed));
+		if(rollkill)
+			rollkill = 0;
+	}
+	else
+	{
+		f = 1;
+		// roll the view when killed (v_deathtilt)
+		if(autocvar_cl_rollkillspeed)
+		{
+			rollkill += frametime * autocvar_cl_rollkillspeed;
+			f = min(1, rollkill);
+		}
+		else if(rollkill)
+			rollkill = 0;
+	}
 
 	rick = getproperty(VF_CL_VIEWANGLES_Z);
 	rick *= f;

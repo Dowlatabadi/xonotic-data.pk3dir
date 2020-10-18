@@ -30,7 +30,7 @@ void cpicon_draw(entity this)
 	this.cp_bob_spd = this.cp_bob_spd + 1.875 * frametime;
 	this.colormod = '1 1 1' * (2 - bound(0, (this.pain_finished - time) / 10, 1));
 
-	if(!this.iscaptured) this.alpha = this.health / this.max_health;
+	if(!this.iscaptured) this.alpha = GetResource(this, RES_HEALTH) / this.max_health;
 
 	if(this.iscaptured)
 	{
@@ -74,9 +74,9 @@ void cpicon_draw(entity this)
 		}
 
 		this.angles_x = this.punchangle_x;
-		this.angles_y = this.punchangle_y + this.move_angles_y;
+		this.angles_y = this.punchangle_y + this.angles_y;
 		this.angles_z = this.punchangle_z;
-		this.move_angles_y = this.move_angles_y + 45 * frametime;
+		this.angles_y = this.angles_y + 45 * frametime;
 	}
 
 	setorigin(this, this.cp_origin + this.cp_bob_origin + this.cp_bob_dmg);
@@ -104,30 +104,28 @@ void cpicon_damage(entity this, float hp)
 	setsize(this, CPICON_MIN, CPICON_MAX);
 }
 
-void cpicon_construct(entity this)
+void cpicon_construct(entity this, bool isnew)
 {
 	this.netname = "Control Point Icon";
 
 	setmodel(this, MDL_ONS_CP);
 	setsize(this, CPICON_MIN, CPICON_MAX);
 
-	if(this.icon_realmodel == world)
+	if(this.icon_realmodel == NULL)
 	{
-		this.icon_realmodel = spawn();
+		this.icon_realmodel = new(cpicon_model);
 		setmodel(this.icon_realmodel, MDL_Null);
 		setorigin(this.icon_realmodel, this.origin);
 		setsize(this.icon_realmodel, CPICON_MIN, CPICON_MAX);
-		this.icon_realmodel.movetype = MOVETYPE_NOCLIP;
+		set_movetype(this.icon_realmodel, MOVETYPE_NOCLIP);
 		this.icon_realmodel.solid = SOLID_NOT;
-		this.icon_realmodel.move_origin = this.icon_realmodel.origin;
 	}
 
 	if(this.iscaptured) { this.icon_realmodel.solid = SOLID_BBOX; }
 
-	this.move_movetype	= MOVETYPE_NOCLIP;
+	set_movetype(this, MOVETYPE_NOCLIP);
 	this.solid			= SOLID_NOT;
-	this.movetype		= MOVETYPE_NOCLIP;
-	this.move_origin	= this.origin;
+	set_movetype(this, MOVETYPE_NOCLIP);
 	this.move_time		= time;
 	this.drawmask		= MASK_NORMAL;
 	this.alpha			= 1;
@@ -135,6 +133,9 @@ void cpicon_construct(entity this)
 	this.cp_origin		= this.origin;
 	this.cp_bob_origin 	= '0 0 0.1';
 	this.cp_bob_spd 	= 0;
+
+	if(isnew)
+		IL_PUSH(g_drawables, this);
 }
 
 .vector glowmod;
@@ -161,22 +162,20 @@ NET_HANDLE(ENT_CLIENT_CONTROLPOINT_ICON, bool isnew)
 
 	if(sf & CPSF_SETUP)
 	{
-		this.origin_x = ReadCoord();
-		this.origin_y = ReadCoord();
-		this.origin_z = ReadCoord();
+		this.origin = ReadVector();
 		setorigin(this, this.origin);
 
-		this.health = ReadByte();
+		SetResourceExplicit(this, RES_HEALTH, ReadByte());
 		this.max_health = ReadByte();
 		this.count = ReadByte();
 		this.team = ReadByte();
 		this.iscaptured = ReadByte();
 
 		if(!this.count)
-			this.count = (this.health - this.max_health) * frametime;
+			this.count = (GetResource(this, RES_HEALTH) - this.max_health) * frametime;
 
 		cpicon_changeteam(this);
-		cpicon_construct(this);
+		cpicon_construct(this, isnew);
 	}
 
 	if(sf & CPSF_STATUS)
@@ -190,9 +189,9 @@ NET_HANDLE(ENT_CLIENT_CONTROLPOINT_ICON, bool isnew)
 
 		_tmp = ReadByte();
 
-		if(_tmp != this.health)
+		if(_tmp != GetResource(this, RES_HEALTH))
 			cpicon_damage(this, _tmp);
 
-		this.health = _tmp;
+		SetResourceExplicit(this, RES_HEALTH, _tmp);
 	}
 }

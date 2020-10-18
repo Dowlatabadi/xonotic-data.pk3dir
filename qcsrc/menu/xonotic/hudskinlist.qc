@@ -1,49 +1,6 @@
-#ifndef HUDSKINLIST_H
-#define HUDSKINLIST_H
-#include "listbox.qc"
-CLASS(XonoticHUDSkinList, XonoticListBox)
-	METHOD(XonoticHUDSkinList, configureXonoticHUDSkinList, void(entity));
-	ATTRIB(XonoticHUDSkinList, rowsPerItem, float, 1)
-	METHOD(XonoticHUDSkinList, resizeNotify, void(entity, vector, vector, vector, vector));
-	METHOD(XonoticHUDSkinList, draw, void(entity));
-	METHOD(XonoticHUDSkinList, drawListBoxItem, void(entity, int, vector, bool, bool));
-	METHOD(XonoticHUDSkinList, getHUDSkins, void(entity));
-	METHOD(XonoticHUDSkinList, setHUDSkin, void(entity));
-	METHOD(XonoticHUDSkinList, hudskinName, string(entity, float));
-	METHOD(XonoticHUDSkinList, hudskinPath, string(entity, float));
-	METHOD(XonoticHUDSkinList, hudskinTitle, string(entity, float));
-	METHOD(XonoticHUDSkinList, hudskinAuthor, string(entity, float));
-	METHOD(XonoticHUDSkinList, doubleClickListBoxItem, void(entity, float, vector));
-	METHOD(XonoticHUDSkinList, keyDown, float(entity, float, float, float));
-	METHOD(XonoticHUDSkinList, destroy, void(entity));
-	METHOD(XonoticHUDSkinList, showNotify, void(entity));
+#include "hudskinlist.qh"
 
-	ATTRIB(XonoticHUDSkinList, listHUDSkin, float, -1)
-	ATTRIB(XonoticHUDSkinList, realFontSize, vector, '0 0 0')
-	ATTRIB(XonoticHUDSkinList, columnNameOrigin, float, 0)
-	ATTRIB(XonoticHUDSkinList, columnNameSize, float, 0)
-	ATTRIB(XonoticHUDSkinList, realUpperMargin, float, 0)
-	ATTRIB(XonoticHUDSkinList, origin, vector, '0 0 0')
-	ATTRIB(XonoticHUDSkinList, itemAbsSize, vector, '0 0 0')
-
-	ATTRIB(XonoticHUDSkinList, filterString, string, string_null)
-	ATTRIB(XonoticHUDSkinList, delayedRefreshTime, float, 0)
-	ATTRIB(XonoticHUDSkinList, savedName, string, string_null)
-ENDCLASS(XonoticHUDSkinList)
-
-#ifndef IMPLEMENTATION
-// public:
-entity hudskinlist;
-entity makeXonoticHUDSkinList();
-void SaveHUDSkin_Click(entity btn, entity me);
-void SetHUDSkin_Click(entity btn, entity me);
-#endif
-void HUDSkinList_Refresh_Click(entity btn, entity me);
-void HUDSkinList_Filter_Change(entity box, entity me);
-void HUDSkinList_SavedName_Change(entity box, entity me);
-#endif
-
-#ifdef IMPLEMENTATION
+#include "inputbox.qh"
 
 entity makeXonoticHUDSkinList()
 {
@@ -56,7 +13,7 @@ entity makeXonoticHUDSkinList()
 void XonoticHUDSkinList_configureXonoticHUDSkinList(entity me)
 {
 	me.configureXonoticListBox(me);
-	me.getHUDSkins(me);
+	me.nItems = 0;
 }
 
 const float HUDSKINPARM_NAME = 0;
@@ -189,8 +146,10 @@ void XonoticHUDSkinList_resizeNotify(entity me, vector relOrigin, vector relSize
 	me.itemAbsSize = '0 0 0';
 	SUPER(XonoticHUDSkinList).resizeNotify(me, relOrigin, relSize, absOrigin, absSize);
 
-	me.realFontSize_y = me.fontSize / (me.itemAbsSize_y = (absSize.y * me.itemHeight));
-	me.realFontSize_x = me.fontSize / (me.itemAbsSize_x = (absSize.x * (1 - me.controlWidth)));
+	me.itemAbsSize.y = absSize.y * me.itemHeight;
+	me.itemAbsSize.x = absSize.x * (1 - me.controlWidth);
+	me.realFontSize.y = me.fontSize / me.itemAbsSize.y;
+	me.realFontSize.x = me.fontSize / me.itemAbsSize.x;
 	me.realUpperMargin = 0.5 * (1 - me.realFontSize.y);
 
 	me.columnNameOrigin = me.realFontSize.x;
@@ -231,19 +190,15 @@ void HUDSkinList_Refresh_Click(entity btn, entity me)
 
 void HUDSkinList_SavedName_Change(entity box, entity me)
 {
-	if(me.savedName)
-		strunzone(me.savedName);
+	strfree(me.savedName);
 
 	if(box.text != "")
 		me.savedName = strzone(box.text);
-	else
-		me.savedName = string_null;
 }
 
 void HUDSkinList_Filter_Change(entity box, entity me)
 {
-	if(me.filterString)
-		strunzone(me.filterString);
+	strfree(me.filterString);
 
 	if(box.text != "")
 	{
@@ -252,8 +207,6 @@ void HUDSkinList_Filter_Change(entity box, entity me)
 		else
 			me.filterString = strzone(strcat("*", box.text, "*"));
 	}
-	else
-		me.filterString = string_null;
 
 	me.getHUDSkins(me);
 }
@@ -306,5 +259,3 @@ float XonoticHUDSkinList_keyDown(entity me, float scan, float ascii, float shift
 		return SUPER(XonoticHUDSkinList).keyDown(me, scan, ascii, shift);
 	}
 }
-#endif
-

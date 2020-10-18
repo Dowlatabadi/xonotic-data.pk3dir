@@ -1,54 +1,5 @@
-#ifndef ITEM_CONTAINER_H
-	#define ITEM_CONTAINER_H
-	#include "../item.qc"
-	CLASS(Container, Item)
-		METHOD(Container, draw, void(entity));
-		METHOD(Container, keyUp, float(entity, float, float, float));
-		METHOD(Container, keyDown, float(entity, float, float, float));
-		METHOD(Container, mouseMove, float(entity, vector));
-		METHOD(Container, mousePress, float(entity, vector));
-		METHOD(Container, mouseDrag, float(entity, vector));
-		METHOD(Container, mouseRelease, float(entity, vector));
-		METHOD(Container, focusLeave, void(entity));
-		METHOD(Container, resizeNotify, void(entity, vector, vector, vector, vector));
-		METHOD(Container, resizeNotifyLie, void(entity, vector, vector, vector, vector, .vector, .vector, .vector));
-		METHOD(Container, addItem, void(entity, entity, vector, vector, float));
-		METHOD(Container, addItemCentered, void(entity, entity, vector, float));
-		METHOD(Container, addItemRightCentered, void(entity, entity, vector, float));
-		METHOD(Container, moveItemAfter, void(entity, entity, entity));
-		METHOD(Container, removeItem, void(entity, entity));
-		METHOD(Container, setFocus, void(entity, entity));
-		METHOD(Container, saveFocus, void(entity));
-		METHOD(Container, setAlphaOf, void(entity, entity, float));
-		METHOD(Container, itemFromPoint, entity(entity, vector));
-		METHOD(Container, showNotify, void(entity));
-		METHOD(Container, hideNotify, void(entity));
-		METHOD(Container, preferredFocusedGrandChild, entity(entity));
-		ATTRIB(Container, focusable, float, 0)
-		ATTRIB(Container, firstChild, entity, NULL)
-		ATTRIB(Container, lastChild, entity, NULL)
-		ATTRIB(Container, focusedChild, entity, NULL)
-		ATTRIB(Container, savedFocus, entity, NULL)
-		ATTRIB(Container, shown, float, 0)
+#include "container.qh"
 
-		METHOD(Container, enterSubitem, void(entity, entity));
-		METHOD(Container, enterLieSubitem, void(entity, vector, vector, vector, float));
-		METHOD(Container, leaveSubitem, void(entity));
-	ENDCLASS(Container)
-	.entity nextSibling;
-	.entity prevSibling;
-	.float resized;
-	.vector Container_origin;
-	.vector Container_size;
-	.vector Container_fontscale;
-	.float Container_alpha;
-	.vector Container_save_shift;
-	.vector Container_save_scale;
-	.vector Container_save_fontscale;
-	.float Container_save_alpha;
-#endif
-
-#ifdef IMPLEMENTATION
 	void Container_enterSubitem(entity me, entity sub)
 	{
 		me.enterLieSubitem(me, sub.Container_origin, sub.Container_size, sub.Container_fontscale, sub.Container_alpha);
@@ -227,19 +178,17 @@
 		}
 		return 0;
 	}
-	float Container_mousePress(entity me, vector pos)
+	METHOD(Container, mousePress, bool(Container this, vector pos))
 	{
-		entity f;
-		float r;
-		f = me.focusedChild;
+		entity f = this.focusedChild;
 		if (f)
 		{
-			me.enterSubitem(me, f);
-			r = f.mousePress(f, globalToBox(pos, f.Container_origin, f.Container_size));
-			me.leaveSubitem(me);
+			this.enterSubitem(this, f);
+			bool r = f.mousePress(f, globalToBox(pos, f.Container_origin, f.Container_size));
+			this.leaveSubitem(this);
 			return r;
 		}
-		return 0;
+		return false;
 	}
 	float Container_mouseDrag(entity me, vector pos)
 	{
@@ -302,7 +251,10 @@
 		other.parent = me;
 		other.Container_origin = theOrigin;
 		other.Container_size = theSize;
-		me.setAlphaOf(me, other, theAlpha);
+
+		// don't call setAlphaOf, it would uneccessarily trigger showNotify
+		//me.setAlphaOf(me, other, theAlpha);
+		other.Container_alpha = theAlpha;
 
 		entity l;
 		l = me.lastChild;
@@ -356,7 +308,8 @@
 				me.focusedChild.focused = 1;
 				me.focusedChild.focusEnter(me.focusedChild);
 
-				if (me.focusedChild.instanceOfContainer) me.focusedChild.setFocus(me.focusedChild, me.focusedChild.savedFocus);
+				if (me.focusedChild.instanceOfContainer)
+					me.focusedChild.setFocus(me.focusedChild, me.focusedChild.savedFocus);
 			}
 			else
 			{
@@ -423,4 +376,3 @@
 
 		return best;
 	}
-#endif

@@ -7,6 +7,8 @@ const float URL_FH_STDOUT = -2;
 
 // URLs
 .string url_url;
+.string url_content_type;
+.string url_verb;
 .float url_wbuf;
 .float url_wbufpos;
 .float url_rbuf;
@@ -22,6 +24,7 @@ const float URL_FH_STDOUT = -2;
 entity url_fromid[NUM_URL_ID];
 int autocvar__urllib_nextslot;
 
+ERASEABLE
 float url_URI_Get_Callback(int id, float status, string data)
 {
 	if (id < MIN_URL_ID) return 0;
@@ -32,7 +35,7 @@ float url_URI_Get_Callback(int id, float status, string data)
 	if (!e) return 0;
 	if (e.url_rbuf >= 0 || e.url_wbuf >= 0)
 	{
-		LOG_INFOF("WARNING: handle %d (%s) has already received data?!?\n", id + NUM_URL_ID, e.url_url);
+		LOG_INFOF("WARNING: handle %d (%s) has already received data?!?", id + NUM_URL_ID, e.url_url);
 		return 0;
 	}
 
@@ -50,19 +53,19 @@ float url_URI_Get_Callback(int id, float status, string data)
 		e.url_rbuf = buf_create();
 		if (e.url_rbuf < 0)
 		{
-			LOG_INFO("url_URI_Get_Callback: out of memory in buf_create\n");
+			LOG_INFO("url_URI_Get_Callback: out of memory in buf_create");
 			e.url_ready(e, e.url_ready_pass, URL_READY_ERROR);
-			strunzone(e.url_url);
-			remove(e);
+			strfree(e.url_url);
+			delete(e);
 			return 1;
 		}
 		e.url_rbufpos = 0;
 		if (e.url_rbuf < 0)
 		{
-			LOG_INFO("url_URI_Get_Callback: out of memory in buf_create\n");
+			LOG_INFO("url_URI_Get_Callback: out of memory in buf_create");
 			e.url_ready(e, e.url_ready_pass, URL_READY_ERROR);
-			strunzone(e.url_url);
-			remove(e);
+			strfree(e.url_url);
+			delete(e);
 			return 1;
 		}
 		for (i = 0; i < n; ++i)
@@ -74,12 +77,13 @@ float url_URI_Get_Callback(int id, float status, string data)
 	{
 		// an ERROR
 		e.url_ready(e, e.url_ready_pass, -fabs(status));
-		strunzone(e.url_url);
-		remove(e);
+		strfree(e.url_url);
+		delete(e);
 		return 1;
 	}
 }
 
+ERASEABLE
 void url_single_fopen(string url, int mode, url_ready_func rdy, entity pass)
 {
 	entity e;
@@ -94,17 +98,18 @@ void url_single_fopen(string url, int mode, url_ready_func rdy, entity pass)
 				// attempts to close will result in a reading handle
 
 				// create a writing end that does nothing yet
-				e = new(url_single_fopen_file);
-				make_pure(e);
+				e = new_pure(url_single_fopen_file);
 				e.url_url = strzone(url);
+				e.url_content_type = "text/plain";
+				e.url_verb = "";
 				e.url_fh = URL_FH_CURL;
 				e.url_wbuf = buf_create();
 				if (e.url_wbuf < 0)
 				{
-					LOG_INFO("url_single_fopen: out of memory in buf_create\n");
+					LOG_INFO("url_single_fopen: out of memory in buf_create");
 					rdy(e, pass, URL_READY_ERROR);
-					strunzone(e.url_url);
-					remove(e);
+					strfree(e.url_url);
+					delete(e);
 					return;
 				}
 				e.url_wbufpos = 0;
@@ -126,7 +131,7 @@ void url_single_fopen(string url, int mode, url_ready_func rdy, entity pass)
 						if (url_fromid[i] == NULL) break;
 					if (i >= autocvar__urllib_nextslot)
 					{
-						LOG_INFO("url_single_fopen: too many concurrent requests\n");
+						LOG_INFO("url_single_fopen: too many concurrent requests");
 						rdy(NULL, pass, URL_READY_ERROR);
 						return;
 					}
@@ -135,7 +140,7 @@ void url_single_fopen(string url, int mode, url_ready_func rdy, entity pass)
 				// GET the data
 				if (!crypto_uri_postbuf(url, i + MIN_URL_ID, string_null, string_null, -1, 0))
 				{
-					LOG_INFO("url_single_fopen: failure in crypto_uri_postbuf\n");
+					LOG_INFO("url_single_fopen: failure in crypto_uri_postbuf");
 					rdy(NULL, pass, URL_READY_ERROR);
 					return;
 				}
@@ -143,8 +148,7 @@ void url_single_fopen(string url, int mode, url_ready_func rdy, entity pass)
 				// Make a dummy handle object (no buffers at
 				// all). Wait for data to come from the
 				// server, then call the callback
-				e = new(url_single_fopen_file);
-				make_pure(e);
+				e = new_pure(url_single_fopen_file);
 				e.url_url = strzone(url);
 				e.url_fh = URL_FH_CURL;
 				e.url_rbuf = -1;
@@ -165,15 +169,14 @@ void url_single_fopen(string url, int mode, url_ready_func rdy, entity pass)
 		{
 			case FILE_WRITE:
 			case FILE_APPEND:
-				e = new(url_single_fopen_stdout);
-				make_pure(e);
+				e = new_pure(url_single_fopen_stdout);
 				e.url_fh = URL_FH_STDOUT;
 				e.url_ready = rdy;
 				e.url_ready_pass = pass;
 				rdy(e, pass, URL_READY_CANWRITE);
 				break;
 			case FILE_READ:
-				LOG_INFO("url_single_fopen: cannot open '-' for reading\n");
+				LOG_INFO("url_single_fopen: cannot open '-' for reading");
 				rdy(NULL, pass, URL_READY_ERROR);
 				break;
 		}
@@ -189,8 +192,7 @@ void url_single_fopen(string url, int mode, url_ready_func rdy, entity pass)
 		}
 		else
 		{
-			e = new(url_single_fopen_file);
-			make_pure(e);
+			e = new_pure(url_single_fopen_file);
 			e.url_fh = fh;
 			e.url_ready = rdy;
 			e.url_ready_pass = pass;
@@ -201,6 +203,7 @@ void url_single_fopen(string url, int mode, url_ready_func rdy, entity pass)
 }
 
 // close a file
+ERASEABLE
 void url_fclose(entity e)
 {
 	int i;
@@ -225,23 +228,23 @@ void url_fclose(entity e)
 					if (url_fromid[i] == NULL) break;
 				if (i >= autocvar__urllib_nextslot)
 				{
-					LOG_INFO("url_fclose: too many concurrent requests\n");
+					LOG_INFO("url_fclose: too many concurrent requests");
 					e.url_ready(e, e.url_ready_pass, URL_READY_ERROR);
 					buf_del(e.url_wbuf);
-					strunzone(e.url_url);
-					remove(e);
+					strfree(e.url_url);
+					delete(e);
 					return;
 				}
 			}
 
 			// POST the data
-			if (!crypto_uri_postbuf(e.url_url, i + MIN_URL_ID, "text/plain", "", e.url_wbuf, 0))
+			if (!crypto_uri_postbuf(e.url_url, i + MIN_URL_ID, e.url_content_type, e.url_verb, e.url_wbuf, 0))
 			{
-				LOG_INFO("url_fclose: failure in crypto_uri_postbuf\n");
+				LOG_INFO("url_fclose: failure in crypto_uri_postbuf");
 				e.url_ready(e, e.url_ready_pass, URL_READY_ERROR);
 				buf_del(e.url_wbuf);
-				strunzone(e.url_url);
-				remove(e);
+				strfree(e.url_url);
+				delete(e);
 				return;
 			}
 
@@ -261,25 +264,26 @@ void url_fclose(entity e)
 			// we have READ all data, just close
 			e.url_ready(e, e.url_ready_pass, URL_READY_CLOSED);
 			buf_del(e.url_rbuf);
-			strunzone(e.url_url);
-			remove(e);
+			strfree(e.url_url);
+			delete(e);
 		}
 	}
 	else if (e.url_fh == URL_FH_STDOUT)
 	{
 		e.url_ready(e, e.url_ready_pass, URL_READY_CLOSED);  // closing creates no reading handle
-		remove(e);
+		delete(e);
 	}
 	else
 	{
 		// file
 		fclose(e.url_fh);
 		e.url_ready(e, e.url_ready_pass, URL_READY_CLOSED);  // closing creates no reading handle
-		remove(e);
+		delete(e);
 	}
 }
 
 // with \n (blame FRIK_FILE)
+ERASEABLE
 string url_fgets(entity e)
 {
 	if (e.url_fh == URL_FH_CURL)
@@ -304,6 +308,7 @@ string url_fgets(entity e)
 }
 
 // without \n (blame FRIK_FILE)
+ERASEABLE
 void url_fputs(entity e, string s)
 {
 	if (e.url_fh == URL_FH_CURL)
@@ -316,7 +321,7 @@ void url_fputs(entity e, string s)
 	else if (e.url_fh == URL_FH_STDOUT)
 	{
 		// stdout
-		LOG_INFO(s);
+		print(s);
 	}
 	else
 	{
@@ -326,6 +331,7 @@ void url_fputs(entity e, string s)
 }
 
 // multi URL object, tries URLs separated by space in sequence
+ERASEABLE
 void url_multi_ready(entity fh, entity me, float status)
 {
 	float n;
@@ -333,10 +339,10 @@ void url_multi_ready(entity fh, entity me, float status)
 	{
 		if (status == -422)  // Unprocessable Entity
 		{
-			LOG_INFO("uri_multi_ready: got HTTP error 422, data is in unusable format - not continuing\n");
+			LOG_INFO("uri_multi_ready: got HTTP error 422, data is in unusable format - not continuing");
 			me.url_ready(fh, me.url_ready_pass, status);
-			strunzone(me.url_url);
-			remove(me);
+			strfree(me.url_url);
+			delete(me);
 			return;
 		}
 		me.url_attempt += 1;
@@ -344,8 +350,8 @@ void url_multi_ready(entity fh, entity me, float status)
 		if (n <= me.url_attempt)
 		{
 			me.url_ready(fh, me.url_ready_pass, status);
-			strunzone(me.url_url);
-			remove(me);
+			strfree(me.url_url);
+			delete(me);
 			return;
 		}
 		url_single_fopen(argv(me.url_attempt), me.url_mode, url_multi_ready, me);
@@ -353,19 +359,20 @@ void url_multi_ready(entity fh, entity me, float status)
 	}
 	me.url_ready(fh, me.url_ready_pass, status);
 }
+
+ERASEABLE
 void url_multi_fopen(string url, int mode, url_ready_func rdy, entity pass)
 {
 	float n;
 	n = tokenize_console(url);
 	if (n <= 0)
 	{
-		LOG_INFO("url_multi_fopen: need at least one URL\n");
+		LOG_INFO("url_multi_fopen: need at least one URL");
 		rdy(NULL, pass, URL_READY_ERROR);
 		return;
 	}
 
-	entity me = new(url_multi);
-	make_pure(me);
+	entity me = new_pure(url_multi);
 	me.url_url = strzone(url);
 	me.url_attempt = 0;
 	me.url_mode = mode;

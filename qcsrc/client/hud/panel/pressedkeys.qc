@@ -1,18 +1,35 @@
-/** Draw pressed keys (#11) */
+#include "pressedkeys.qh"
+
+#include <client/autocvars.qh>
+#include <client/draw.qh>
+
+// Pressed keys (#11)
+
+void HUD_PressedKeys_Export(int fh)
+{
+	// allow saving cvars that aesthetically change the panel into hud skin files
+	HUD_Write_Cvar("hud_panel_pressedkeys_aspect");
+	HUD_Write_Cvar("hud_panel_pressedkeys_attack");
+}
+
 void HUD_PressedKeys()
 {
 	if(!autocvar__hud_configure)
 	{
-		if(!autocvar_hud_panel_pressedkeys) return;
+		if(!autocvar_hud_panel_pressedkeys || spectatee_status < 0) return;
 		if(spectatee_status <= 0 && autocvar_hud_panel_pressedkeys < 2) return;
 	}
 
-	HUD_Panel_UpdateCvars();
+	HUD_Panel_LoadCvars();
 	vector pos, mySize;
 	pos = panel_pos;
 	mySize = panel_size;
 
-	HUD_Panel_DrawBg(1);
+	if (autocvar_hud_panel_pressedkeys_dynamichud)
+		HUD_Scale_Enable();
+	else
+		HUD_Scale_Disable();
+	HUD_Panel_DrawBg();
 	if(panel_bg_padding)
 	{
 		pos += '1 1 0' * panel_bg_padding;
@@ -41,22 +58,21 @@ void HUD_PressedKeys()
 		mySize = newSize;
 	}
 
-	vector keysize;
-	keysize = eX * mySize.x * (1/3.0) + eY * mySize.y * (1/(3.0 - !autocvar_hud_panel_pressedkeys_attack));
+	vector keysize = vec2(mySize.x / (14/4), mySize.y / (3 - !autocvar_hud_panel_pressedkeys_attack));
 	int pressedkeys = STAT(PRESSED_KEYS);
 
 	if(autocvar_hud_panel_pressedkeys_attack)
 	{
-		drawpic_aspect_skin(pos + eX * keysize.x * 0.5, ((pressedkeys & KEY_ATCK) ? "key_atck_inv.tga" : "key_atck.tga"), keysize, '1 1 1', panel_fg_alpha, DRAWFLAG_NORMAL);
-		drawpic_aspect_skin(pos + eX * keysize.x * 1.5, ((pressedkeys & KEY_ATCK2) ? "key_atck_inv.tga" : "key_atck.tga"), keysize, '1 1 1', panel_fg_alpha, DRAWFLAG_NORMAL);
+		drawpic_aspect_skin(pos + eX * (3/4 * keysize.x), ((pressedkeys & KEY_ATCK) ? "key_atck_inv.tga" : "key_atck.tga"), keysize, '1 1 1', panel_fg_alpha, DRAWFLAG_NORMAL);
+		drawpic_aspect_skin(pos + eX * (7/4 * keysize.x), ((pressedkeys & KEY_ATCK2) ? "key_atck2_inv.tga" : "key_atck2.tga"), keysize, '1 1 1', panel_fg_alpha, DRAWFLAG_NORMAL);
 		pos.y += keysize.y;
 	}
 
 	drawpic_aspect_skin(pos, ((pressedkeys & KEY_CROUCH) ? "key_crouch_inv.tga" : "key_crouch.tga"), keysize, '1 1 1', panel_fg_alpha, DRAWFLAG_NORMAL);
-	drawpic_aspect_skin(pos + eX * keysize.x, ((pressedkeys & KEY_FORWARD) ? "key_forward_inv.tga" : "key_forward.tga"), keysize, '1 1 1', panel_fg_alpha, DRAWFLAG_NORMAL);
-	drawpic_aspect_skin(pos + eX * keysize.x * 2, ((pressedkeys & KEY_JUMP) ? "key_jump_inv.tga" : "key_jump.tga"), keysize, '1 1 1', panel_fg_alpha, DRAWFLAG_NORMAL);
+	drawpic_aspect_skin(pos + eX * (5/4 * keysize.x), ((pressedkeys & KEY_FORWARD) ? "key_forward_inv.tga" : "key_forward.tga"), keysize, '1 1 1', panel_fg_alpha, DRAWFLAG_NORMAL);
+	drawpic_aspect_skin(pos + eX * (10/4 * keysize.x), ((pressedkeys & KEY_JUMP) ? "key_jump_inv.tga" : "key_jump.tga"), keysize, '1 1 1', panel_fg_alpha, DRAWFLAG_NORMAL);
 	pos.y += keysize.y;
-	drawpic_aspect_skin(pos, ((pressedkeys & KEY_LEFT) ? "key_left_inv.tga" : "key_left.tga"), keysize, '1 1 1', panel_fg_alpha, DRAWFLAG_NORMAL);
-	drawpic_aspect_skin(pos + eX * keysize.x, ((pressedkeys & KEY_BACKWARD) ? "key_backward_inv.tga" : "key_backward.tga"), keysize, '1 1 1', panel_fg_alpha, DRAWFLAG_NORMAL);
-	drawpic_aspect_skin(pos + eX * keysize.x * 2, ((pressedkeys & KEY_RIGHT) ? "key_right_inv.tga" : "key_right.tga"), keysize, '1 1 1', panel_fg_alpha, DRAWFLAG_NORMAL);
+	drawpic_aspect_skin(pos + eX * (1/4 * keysize.x), ((pressedkeys & KEY_LEFT) ? "key_left_inv.tga" : "key_left.tga"), keysize, '1 1 1', panel_fg_alpha, DRAWFLAG_NORMAL);
+	drawpic_aspect_skin(pos + eX * (5/4 * keysize.x), ((pressedkeys & KEY_BACKWARD) ? "key_backward_inv.tga" : "key_backward.tga"), keysize, '1 1 1', panel_fg_alpha, DRAWFLAG_NORMAL);
+	drawpic_aspect_skin(pos + eX * (9/4 * keysize.x), ((pressedkeys & KEY_RIGHT) ? "key_right_inv.tga" : "key_right.tga"), keysize, '1 1 1', panel_fg_alpha, DRAWFLAG_NORMAL);
 }

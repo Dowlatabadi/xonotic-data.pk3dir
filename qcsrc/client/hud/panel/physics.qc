@@ -1,4 +1,30 @@
-// Physics panel (#15)
+#include "physics.qh"
+
+#include <client/autocvars.qh>
+#include <client/draw.qh>
+#include <lib/csqcmodel/cl_player.qh>
+
+// Physics (#15)
+
+void HUD_Physics_Export(int fh)
+{
+	// allow saving cvars that aesthetically change the panel into hud skin files
+	HUD_Write_Cvar("hud_panel_physics_speed_unit_show");
+	HUD_Write_Cvar("hud_panel_physics_speed_max");
+	HUD_Write_Cvar("hud_panel_physics_speed_vertical");
+	HUD_Write_Cvar("hud_panel_physics_topspeed");
+	HUD_Write_Cvar("hud_panel_physics_topspeed_time");
+	HUD_Write_Cvar("hud_panel_physics_acceleration_max");
+	HUD_Write_Cvar("hud_panel_physics_acceleration_vertical");
+	HUD_Write_Cvar("hud_panel_physics_flip");
+	HUD_Write_Cvar("hud_panel_physics_baralign");
+	HUD_Write_Cvar("hud_panel_physics_progressbar");
+	HUD_Write_Cvar("hud_panel_physics_acceleration_progressbar_mode");
+	HUD_Write_Cvar("hud_panel_physics_acceleration_progressbar_scale");
+	HUD_Write_Cvar("hud_panel_physics_acceleration_progressbar_nonlinear");
+	HUD_Write_Cvar("hud_panel_physics_text");
+	HUD_Write_Cvar("hud_panel_physics_text_scale");
+}
 
 vector acc_prevspeed;
 float acc_prevtime, acc_avg, top_speed, top_speed_time;
@@ -9,14 +35,18 @@ void HUD_Physics()
 	{
 		if(!autocvar_hud_panel_physics) return;
 		if(spectatee_status == -1 && (autocvar_hud_panel_physics == 1 || autocvar_hud_panel_physics == 3)) return;
-		if(autocvar_hud_panel_physics == 3 && !(gametype == MAPINFO_TYPE_RACE || gametype == MAPINFO_TYPE_CTS)) return;
+		if(autocvar_hud_panel_physics == 3 && !MUTATOR_CALLHOOK(HUD_Physics_showoptional)) return;
 	}
 
-	HUD_Panel_UpdateCvars();
+	HUD_Panel_LoadCvars();
 
 	draw_beginBoldFont();
 
-	HUD_Panel_DrawBg(1);
+	if (autocvar_hud_panel_physics_dynamichud)
+		HUD_Scale_Enable();
+	else
+		HUD_Scale_Disable();
+	HUD_Panel_DrawBg();
 	if(panel_bg_padding)
 	{
 		panel_pos += '1 1 0' * panel_bg_padding;
@@ -34,34 +64,8 @@ void HUD_Physics()
 		text_scale = min(autocvar_hud_panel_physics_text_scale, 1);
 
 	//compute speed
-	float speed, conversion_factor;
-	string unit;
-
-	switch(autocvar_hud_panel_physics_speed_unit)
-	{
-		default:
-		case 1:
-			unit = _(" qu/s");
-			conversion_factor = 1.0;
-			break;
-		case 2:
-			unit = _(" m/s");
-			conversion_factor = 0.0254;
-			break;
-		case 3:
-			unit = _(" km/h");
-			conversion_factor = 0.0254 * 3.6;
-			break;
-		case 4:
-			unit = _(" mph");
-			conversion_factor = 0.0254 * 3.6 * 0.6213711922;
-			break;
-		case 5:
-			unit = _(" knots");
-			conversion_factor = 0.0254 * 1.943844492; // 1 m/s = 1.943844492 knots, because 1 knot = 1.852 km/h
-			break;
-	}
-
+	float speed, conversion_factor = GetSpeedUnitFactor(autocvar_hud_panel_physics_speed_unit);
+	string unit = GetSpeedUnit(autocvar_hud_panel_physics_speed_unit);
 	vector vel = (csqcplayer ? csqcplayer.velocity : pmove_vel);
 
 	float max_speed = floor( autocvar_hud_panel_physics_speed_max * conversion_factor + 0.5 );
@@ -98,15 +102,17 @@ void HUD_Physics()
 		}
 	}
 
-	int acc_decimals = 2;
+	const int acc_decimals = 2;
 	if(time > physics_update_time)
 	{
-		// workaround for ftos_decimals returning a negative 0
-		if(discrete_acceleration > -1 / pow(10, acc_decimals) && discrete_acceleration < 0)
-			discrete_acceleration = 0;
 		discrete_acceleration = acceleration;
+		// workaround for ftos_decimals returning a negative 0
+		if(discrete_acceleration > -1 / (10 ** acc_decimals) && discrete_acceleration < 0)
+			discrete_acceleration = 0;
 		discrete_speed = speed;
 		physics_update_time += autocvar_hud_panel_physics_update_interval;
+		if(physics_update_time < time)
+			physics_update_time = time + autocvar_hud_panel_physics_update_interval;
 	}
 
 	//compute layout

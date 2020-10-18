@@ -1,49 +1,8 @@
-#ifndef ITEM_INPUTBOX_H
-	#define ITEM_INPUTBOX_H
-	#include "label.qc"
-	CLASS(InputBox, Label)
-		METHOD(InputBox, configureInputBox, void(entity, string, float, float, string));
-		METHOD(InputBox, draw, void(entity));
-		METHOD(InputBox, setText, void(entity, string));
-		METHOD(InputBox, enterText, void(entity, string));
-		METHOD(InputBox, keyDown, float(entity, float, float, float));
-		METHOD(InputBox, mouseMove, float(entity, vector));
-		METHOD(InputBox, mouseRelease, float(entity, vector));
-		METHOD(InputBox, mousePress, float(entity, vector));
-		METHOD(InputBox, mouseDrag, float(entity, vector));
-		METHOD(InputBox, showNotify, void(entity));
-		METHOD(InputBox, resizeNotify, void(entity, vector, vector, vector, vector));
+#include "inputbox.qh"
 
-		ATTRIB(InputBox, src, string, string_null)
+.float cb_offset;
+.string cb_src;
 
-		ATTRIB(InputBox, cursorPos, float, 0)  // characters
-		ATTRIB(InputBox, scrollPos, float, 0)  // widths
-
-		ATTRIB(InputBox, focusable, float, 1)
-		ATTRIB(InputBox, allowFocusSound, float, 1)
-		ATTRIB(InputBox, disabled, float, 0)
-		ATTRIB(InputBox, lastChangeTime, float, 0)
-		ATTRIB(InputBox, dragScrollTimer, float, 0)
-		ATTRIB(InputBox, dragScrollPos, vector, '0 0 0')
-		ATTRIB(InputBox, pressed, float, 0)
-		ATTRIB(InputBox, editColorCodes, float, 1)
-		ATTRIB(InputBox, forbiddenCharacters, string, "")
-		ATTRIB(InputBox, color, vector, '1 1 1')
-		ATTRIB(InputBox, colorF, vector, '1 1 1')
-		ATTRIB(InputBox, maxLength, float, 255)  // if negative, it counts bytes, not chars
-
-		ATTRIB(InputBox, enableClearButton, float, 1)
-		ATTRIB(InputBox, clearButton, entity, NULL)
-		ATTRIB(InputBox, cb_width, float, 0)
-		ATTRIB(InputBox, cb_pressed, float, 0)
-		ATTRIB(InputBox, cb_focused, float, 0)
-		ATTRIB(InputBox, cb_color, vector, '1 1 1')
-		ATTRIB(InputBox, cb_colorF, vector, '1 1 1')
-		ATTRIB(InputBox, cb_colorC, vector, '1 1 1')
-	ENDCLASS(InputBox)
-#endif
-
-#ifdef IMPLEMENTATION
 	void InputBox_configureInputBox(entity me, string theText, float theCursorPos, float theFontSize, string gfx)
 	{
 		SUPER(InputBox).configureLabel(me, theText, theFontSize, 0.0);
@@ -63,7 +22,7 @@
 
 	void InputBox_setText(entity me, string txt)
 	{
-		if (me.text) strunzone(me.text);
+		strfree(me.text);
 		SUPER(InputBox).setText(me, strzone(txt));
 	}
 
@@ -112,17 +71,17 @@
 		return 1;
 	}
 
-	float InputBox_mousePress(entity me, vector pos)
+	METHOD(InputBox, mousePress, bool(InputBox this, vector pos))
 	{
-		if (me.enableClearButton)
-			if (over_ClearButton(me, pos))
+		if (this.enableClearButton)
+			if (over_ClearButton(this, pos))
 			{
-				me.cb_pressed = 1;
-				return 1;
+				this.cb_pressed = 1;
+				return true;
 			}
-		me.dragScrollTimer = time;
-		me.pressed = 1;
-		return InputBox_mouseDrag(me, pos);
+		this.dragScrollTimer = time;
+		this.pressed = 1;
+		return InputBox_mouseDrag(this, pos);
 	}
 
 	float InputBox_mouseRelease(entity me, vector pos)
@@ -132,6 +91,8 @@
 			{
 				m_play_click_sound(MENU_SOUND_CLEAR);
 				me.setText(me, "");
+				if(me.applyButton)
+					me.applyButton.disabled = false;
 				me.cb_pressed = 0;
 				return 1;
 			}
@@ -145,19 +106,19 @@
 
 	void InputBox_enterText(entity me, string ch)
 	{
-		float i;
-		for (i = 0; i < strlen(ch); ++i)
+		int len = strlen(ch);
+		for (int i = 0; i < len; ++i)
 			if (strstrofs(me.forbiddenCharacters, substring(ch, i, 1), 0) > -1) return;
 		if (me.maxLength > 0)
 		{
-			if (strlen(ch) + strlen(me.text) > me.maxLength) return;
+			if (len + strlen(me.text) > me.maxLength) return;
 		}
 		else if (me.maxLength < 0)
 		{
 			if (u8_strsize(ch) + u8_strsize(me.text) > -me.maxLength) return;
 		}
 		me.setText(me, strcat(substring(me.text, 0, me.cursorPos), ch, substring(me.text, me.cursorPos, strlen(me.text) - me.cursorPos)));
-		me.cursorPos += strlen(ch);
+		me.cursorPos += len;
 	}
 
 	float InputBox_keyDown(entity me, float key, float ascii, float shift)
@@ -167,6 +128,8 @@
 		if (ascii >= 32 && ascii != 127)
 		{
 			me.enterText(me, chr(ascii));
+			if(me.applyButton)
+				me.applyButton.disabled = false;
 			return 1;
 		}
 		switch (key)
@@ -192,6 +155,8 @@
 				{
 					me.cursorPos -= 1;
 					me.setText(me, strcat(substring(me.text, 0, me.cursorPos), substring(me.text, me.cursorPos + 1, strlen(me.text) - me.cursorPos - 1)));
+					if(me.applyButton)
+						me.applyButton.disabled = false;
 				}
 				return 1;
 			case K_KP_DEL:
@@ -202,9 +167,9 @@
 					me.setText(me, "");
 				}
 				else
-				{
 					me.setText(me, strcat(substring(me.text, 0, me.cursorPos), substring(me.text, me.cursorPos + 1, strlen(me.text) - me.cursorPos - 1)));
-				}
+				if(me.applyButton)
+					me.applyButton.disabled = false;
 				return 1;
 		}
 		return 0;
@@ -391,11 +356,10 @@
 			}
 
 		// skipping SUPER(InputBox).draw(me);
-		Item_draw(me);
+		MenuItem_draw(me);
 	}
 
 	void InputBox_showNotify(entity me)
 	{
 		me.focusable = !me.disabled;
 	}
-#endif

@@ -1,4 +1,20 @@
+#include "powerups.qh"
+
+#include <client/autocvars.qh>
+#include <client/draw.qh>
+#include <common/items/_mod.qh>
+#include <common/util.qh>
+
 // Powerups (#2)
+
+void HUD_Powerups_Export(int fh)
+{
+	// allow saving cvars that aesthetically change the panel into hud skin files
+	HUD_Write_Cvar("hud_panel_powerups_iconalign");
+	HUD_Write_Cvar("hud_panel_powerups_baralign");
+	HUD_Write_Cvar("hud_panel_powerups_progressbar");
+	HUD_Write_Cvar("hud_panel_powerups_text");
+}
 
 // Powerup item fields (reusing existing fields)
 .string message;  // Human readable name
@@ -40,6 +56,7 @@ void addPowerupItem(string name, string icon, vector color, float currentTime, f
 
 int getPowerupItemAlign(int align, int column, int row, int columns, int rows, bool isVertical)
 {
+	TC(int, align); TC(int, column); TC(int, row); TC(int, columns); TC(int, rows); TC(bool, isVertical);
 	if(align < 2)
 		return align;
 
@@ -58,15 +75,16 @@ void HUD_Powerups()
 {
 	int allItems = STAT(ITEMS);
 	int allBuffs = STAT(BUFFS);
-	int strengthTime, shieldTime, superTime;
+	float strengthTime, shieldTime, superTime;
 
 	// Initialize items
 	if(!autocvar__hud_configure)
 	{
-		if(!autocvar_hud_panel_powerups) return;
-		if(spectatee_status == -1) return;
-		if(STAT(HEALTH) <= 0) return;
-		if(!(allItems & (ITEM_Strength.m_itemid | ITEM_Shield.m_itemid | IT_SUPERWEAPON)) && !allBuffs) return;
+		if((!autocvar_hud_panel_powerups) || (spectatee_status == -1))
+			return;
+		if(STAT(HEALTH) <= 0 && autocvar_hud_panel_powerups_hide_ondeath)
+			return;
+		//if(!(allItems & (ITEM_Strength.m_itemid | ITEM_Shield.m_itemid | IT_SUPERWEAPON)) && !allBuffs) return;
 
 		strengthTime = bound(0, STAT(STRENGTH_FINISHED) - time, 99);
 		shieldTime = bound(0, STAT(INVINCIBLE_FINISHED) - time, 99);
@@ -94,7 +112,7 @@ void HUD_Powerups()
 		addPowerupItem("Strength", "strength", autocvar_hud_progressbar_strength_color, strengthTime, 30);
 	if(shieldTime)
 		addPowerupItem("Shield", "shield", autocvar_hud_progressbar_shield_color, shieldTime, 30);
-	if(superTime)
+	if(superTime && !(allItems & IT_UNLIMITED_SUPERWEAPONS))
 		addPowerupItem("Superweapons", "superweapons", autocvar_hud_progressbar_superweapons_color, superTime, 30);
 
 	MUTATOR_CALLHOOK(HUD_Powerups_add);
@@ -103,8 +121,13 @@ void HUD_Powerups()
 		return;
 
 	// Draw panel background
-	HUD_Panel_UpdateCvars();
-	HUD_Panel_DrawBg(1);
+	HUD_Panel_LoadCvars();
+
+	if (autocvar_hud_panel_powerups_dynamichud)
+		HUD_Scale_Enable();
+	else
+		HUD_Scale_Disable();
+	HUD_Panel_DrawBg();
 
 	// Set drawing area
 	vector pos = panel_pos;
@@ -156,7 +179,7 @@ void HUD_Powerups()
 
 	// Draw items from linked list
 	vector itemPos = pos;
-	vector itemSize = eX * (size.x / columns) + eY * (size.y / rows);
+	vector itemSize = vec2(size.x / columns, size.y / rows);
 	vector textColor = '1 1 1';
 
 	int fullSeconds = 0;
@@ -167,7 +190,7 @@ void HUD_Powerups()
 	draw_beginBoldFont();
 	for(entity item = powerupItems; item.count; item = item.chain)
 	{
-		itemPos = eX * (pos.x + column * itemSize.x) + eY * (pos.y + row * itemSize.y);
+		itemPos = vec2(pos.x + column * itemSize.x, pos.y + row * itemSize.y);
 
 		// Draw progressbar
 		if(autocvar_hud_panel_powerups_progressbar)

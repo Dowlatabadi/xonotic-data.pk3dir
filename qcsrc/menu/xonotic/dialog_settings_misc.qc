@@ -1,17 +1,16 @@
-#ifndef DIALOG_SETTINGS_MISC_H
-#define DIALOG_SETTINGS_MISC_H
-#include "tab.qc"
-CLASS(XonoticMiscSettingsTab, XonoticTab)
-	METHOD(XonoticMiscSettingsTab, fill, void(entity));
-	ATTRIB(XonoticMiscSettingsTab, intendedWidth, float, 0.9)
-	ATTRIB(XonoticMiscSettingsTab, rows, float, 15.5)
-	ATTRIB(XonoticMiscSettingsTab, columns, float, 6.2)
-ENDCLASS(XonoticMiscSettingsTab)
-entity makeXonoticMiscSettingsTab();
-#endif
+#include "dialog_settings_misc.qh"
 
-#ifdef IMPLEMENTATION
+#include "textlabel.qh"
+#include "inputbox.qh"
+#include "textslider.qh"
+#include "slider.qh"
+#include "checkbox.qh"
+#include "button.qh"
+#include "mainwindow.qh"
+
 #define ADDVALUE_FPS(i) e.addValue(e, strzone(sprintf(_("%d fps"), i)), #i)
+#define ADDVALUE_SPEED_KB(i) e.addValue(e, strzone(sprintf(_("%d KB/s"), i)), #i)
+#define ADDVALUE_SPEED_MB(i, j) e.addValue(e, strzone(sprintf(_("%d MB/s"), i)), #j)
 entity makeXonoticMiscSettingsTab()
 {
 	entity me;
@@ -37,29 +36,28 @@ void XonoticMiscSettingsTab_fill(entity me)
 			_("Specify your network speed")));
 			e.addValue(e, _("56k"), "4000");
 			e.addValue(e, _("ISDN"), "7000");
-			e.addValue(e, _("Slow ADSL"), "15000");
-			e.addValue(e, _("Fast ADSL"), "20000");
+			e.addValue(e, _("Slow ADSL"), "20000");
+			e.addValue(e, _("Fast ADSL"), "40000");
 			e.addValue(e, _("Broadband"), "66666");
 			e.configureXonoticTextSliderValues(e);
-	me.TR(me);
-		me.TD(me, 1, 1, e = makeXonoticTextLabel(0, _("Input packets/s:")));
-		me.TD(me, 1, 2, e = makeXonoticSlider_T(20, 100, 5, "cl_netfps",
-			_("How many input packets to send to the server each second")));
-	me.TR(me);
-		me.TD(me, 1, 1, e = makeXonoticTextLabel(0, _("Server queries/s:")));
-		me.TD(me, 1, 2, e = makeXonoticSlider(20, 100, 10, "net_slist_queriespersecond"));
 	me.TR(me);
 	me.TR(me);
 		me.TD(me, 1, 1, e = makeXonoticTextLabel(0, _("Downloads:")));
 		me.TD(me, 1, 2, e = makeXonoticSlider_T(1, 5, 1, "cl_curl_maxdownloads",
 			_("Maximum number of concurrent HTTP/FTP downloads")));
 	me.TR(me);
-		me.TDempty(me, 0.1);
-		me.TD(me, 1, 0.9, e = makeXonoticTextLabel(0, _("Speed (kB/s):")));
-		me.TD(me, 1, 2, e = makeXonoticSlider_T(10, 2000, 50, "cl_curl_maxspeed",
-			_("Maximum download speed")));
+		me.TD(me, 1, 1, e = makeXonoticTextLabel(0, _("Download speed:")));
+		me.TD(me, 1, 2, e = makeXonoticTextSlider("cl_curl_maxspeed"));
+		ADDVALUE_SPEED_KB(50);
+		ADDVALUE_SPEED_KB(100);
+		ADDVALUE_SPEED_KB(300);
+		ADDVALUE_SPEED_KB(500);
+		ADDVALUE_SPEED_MB(1, 1000);
+		ADDVALUE_SPEED_MB(2, 2000);
+		e.addValue(e, strzone(_("Unlimited")), "0");
+		e.configureXonoticTextSliderValues(e);
 	me.TR(me);
-		if(cvar("developer"))
+		if(cvar("developer") > 0)
 		{
 			me.TD(me, 1, 1, e = makeXonoticTextLabel(0, _("Local latency:")));
 			me.TD(me, 1, 2, e = makeXonoticSlider(0, 1000, 25, "cl_netlocalping"));
@@ -81,17 +79,14 @@ void XonoticMiscSettingsTab_fill(entity me)
 	me.TR(me);
 		me.TD(me, 1, 1, e = makeXonoticTextLabel(0, _("Maximum:")));
 		me.TD(me, 1, 2, e = makeXonoticTextSlider("cl_maxfps"));
-			ADDVALUE_FPS(5);
-			ADDVALUE_FPS(10);
-			ADDVALUE_FPS(20);
 			ADDVALUE_FPS(30);
-			ADDVALUE_FPS(40);
-			ADDVALUE_FPS(50);
 			ADDVALUE_FPS(60);
-			ADDVALUE_FPS(70);
 			ADDVALUE_FPS(100);
 			ADDVALUE_FPS(125);
+			ADDVALUE_FPS(150);
 			ADDVALUE_FPS(200);
+			ADDVALUE_FPS(250);
+			ADDVALUE_FPS(400);
 			e.addValue(e, ZCTX(_("MAXFPS^Unlimited")), "0");
 			e.configureXonoticTextSliderValues(e);
 	me.TR(me);
@@ -99,12 +94,13 @@ void XonoticMiscSettingsTab_fill(entity me)
 		me.TD(me, 1, 2, e = makeXonoticTextSlider("cl_minfps"));
 			e.addValue(e, ZCTX(_("TRGT^Disabled")), "0");
 			ADDVALUE_FPS(30);
-			ADDVALUE_FPS(40);
-			ADDVALUE_FPS(50);
 			ADDVALUE_FPS(60);
 			ADDVALUE_FPS(100);
 			ADDVALUE_FPS(125);
+			ADDVALUE_FPS(150);
 			ADDVALUE_FPS(200);
+			ADDVALUE_FPS(250);
+			ADDVALUE_FPS(400);
 			e.configureXonoticTextSliderValues(e);
 	me.TR(me);
 		me.TD(me, 1, 1, e = makeXonoticTextLabel(0, _("Idle limit:")));
@@ -153,4 +149,3 @@ void XonoticMiscSettingsTab_fill(entity me)
 			e.onClickEntity = main.resetDialog;
 }
 #undef ADDVALUE_FPS
-#endif

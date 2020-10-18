@@ -1,16 +1,4 @@
-#ifndef SLIDER_DECIBELS_H
-#define SLIDER_DECIBELS_H
-#include "slider.qc"
-CLASS(XonoticDecibelsSlider, XonoticSlider)
-	METHOD(XonoticDecibelsSlider, loadCvars, void(entity));
-	METHOD(XonoticDecibelsSlider, saveCvars, void(entity));
-	METHOD(XonoticDecibelsSlider, valueToText, string(entity, float));
-ENDCLASS(XonoticDecibelsSlider)
-entity makeXonoticDecibelsSlider_T(float, float, float, string, string);
-entity makeXonoticDecibelsSlider(float, float, float, string);
-#endif
-
-#ifdef IMPLEMENTATION
+#include "slider_decibels.qh"
 
 float toDecibelOfSquare(float f, float mi)
 {
@@ -19,9 +7,9 @@ float toDecibelOfSquare(float f, float mi)
 	{
 		// linear scale part
 		float t = 1 / A + mi;
-		float y = exp(1 + A * mi);
-		if(f <= y)
-			return mi + (t - mi) * (f / y);
+		float u = exp(1 + A * mi);
+		if(f <= u)
+			return mi + (t - mi) * (f / u);
 	}
 	return log(f) / A;
 }
@@ -33,9 +21,9 @@ float fromDecibelOfSquare(float f, float mi)
 	{
 		// linear scale part
 		float t = 1 / A + mi;
-		float y = exp(1 + A * mi);
+		float u = exp(1 + A * mi);
 		if(f <= t)
-			return y * ((f - mi) / (t - mi));
+			return u * ((f - mi) / (t - mi));
 	}
 	return exp(A * f);
 }
@@ -95,19 +83,17 @@ string XonoticDecibelsSlider_valueToText(entity me, float v)
 }
 
 bool autocvar_test_XonoticDecibelsSlider = false;
-TEST(XonoticDecibelsSlider)
+TEST(XonoticDecibelsSlider, SoundTest)
 {
-	if (!autocvar_test_XonoticDecibelsSlider) { TEST_OK(); return; }
+	if (!autocvar_test_XonoticDecibelsSlider) { SUCCEED(); return; }
 	for (int i = -400; i < 0; ++i)
 	{
 		float db = i * 0.1;
 		float v = fromDecibelOfSquare(db, -40);
 		float dbv = toDecibelOfSquare(v, -40);
 		float d = dbv - db;
-		LOG_INFOF("%f -> %f -> %f (diff: %f)\n", db, v, dbv, d);
-		TEST_Check(fabs(d) > 0.02);
+		LOG_INFOF("%f -> %f -> %f (diff: %f)", db, v, dbv, d);
+		EXPECT_GT(fabs(d), 0.02);
 	}
-	TEST_OK();
+	SUCCEED();
 }
-
-#endif

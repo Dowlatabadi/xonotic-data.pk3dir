@@ -1,13 +1,18 @@
-#ifndef TURRETS_UTIL_H
-#define TURRETS_UTIL_H
+#pragma once
 
-vector real_origin(entity ent);
-float shortangle_f(float ang1, float ang2);
-float anglemods(float v);
-float turret_tag_fire_update();
-vector shortangle_vxy(vector ang1, vector ang2);
-vector angleofs(entity from, entity to);
-vector angleofs3(vector from, vector from_a, entity to);
-void FireImoBeam (vector start, vector end, vector smin, vector smax, float bforce, float f_dmg, float f_velfactor, float deathtype);
+#ifdef SVQC
+
+float turret_tag_fire_update(entity this);
+void FireImoBeam(entity this, vector start, vector end, vector smin, vector smax, float bforce, float f_dmg, float f_velfactor, float deathtype);
+
+#ifdef TURRET_DEBUG
+void mark_error(vector where,float lifetime);
+void mark_info(vector where,float lifetime);
+entity mark_misc(vector where,float lifetime);
+
+void paint_target(entity onwho, float f_size, vector v_color, float f_time);
+void paint_target2(entity onwho, float f_size, vector v_color, float f_time);
+void paint_target3(vector where, float f_size, vector v_color, float f_time);
+#endif
 
 #endif

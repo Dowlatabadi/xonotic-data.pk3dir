@@ -1,4 +1,26 @@
+#include "ammo.qh"
+
+#include <client/autocvars.qh>
+#include <client/draw.qh>
+#include <client/items/items.qh>
+#include <client/view.qh>
+#include <common/mutators/mutator/nades/nades.qh>
+#include <common/wepent.qh>
+
 // Ammo (#1)
+
+void HUD_Ammo_Export(int fh)
+{
+	// allow saving cvars that aesthetically change the panel into hud skin files
+	HUD_Write_Cvar("hud_panel_ammo_onlycurrent");
+	HUD_Write_Cvar("hud_panel_ammo_noncurrent_alpha");
+	HUD_Write_Cvar("hud_panel_ammo_noncurrent_scale");
+	HUD_Write_Cvar("hud_panel_ammo_iconalign");
+	HUD_Write_Cvar("hud_panel_ammo_progressbar");
+	HUD_Write_Cvar("hud_panel_ammo_progressbar_name");
+	HUD_Write_Cvar("hud_panel_ammo_progressbar_xoffset");
+	HUD_Write_Cvar("hud_panel_ammo_text");
+}
 
 void DrawNadeProgressBar(vector myPos, vector mySize, float progress, vector color)
 {
@@ -10,11 +32,10 @@ void DrawNadeProgressBar(vector myPos, vector mySize, float progress, vector col
 		autocvar_hud_progressbar_alpha * panel_fg_alpha, DRAWFLAG_NORMAL);
 }
 
-void DrawAmmoNades(vector myPos, vector mySize, bool draw_expanding, float expand_time); // TODO: mutator
-
-void DrawAmmoItem(vector myPos, vector mySize, .int ammoType, bool isCurrent, bool isInfinite)
+void DrawAmmoItem(vector myPos, vector mySize, int ammoType, bool isCurrent, bool isInfinite)
 {
-	if(ammoType == ammo_none)
+	TC(bool, isCurrent); TC(bool, isInfinite);
+	if(ammoType == RES_NONE)
 		return;
 
 	// Initialize variables
@@ -22,7 +43,7 @@ void DrawAmmoItem(vector myPos, vector mySize, .int ammoType, bool isCurrent, bo
 	int ammo;
 	if(autocvar__hud_configure)
 	{
-		isCurrent = (ammoType == ammo_rockets); // Rockets always current
+		isCurrent = (ammoType == RES_ROCKETS); // Rockets always current
 		ammo = 60;
 	}
 	else
@@ -93,11 +114,13 @@ void HUD_Ammo()
 	if(hud != HUD_NORMAL) return;
 	if(!autocvar__hud_configure)
 	{
-		if(!autocvar_hud_panel_ammo) return;
-		if(spectatee_status == -1) return;
+		if((!autocvar_hud_panel_ammo) || (spectatee_status == -1))
+			return;
+		if(STAT(HEALTH) < 1 && autocvar_hud_panel_ammo_hide_ondeath)
+			return;
 	}
 
-	HUD_Panel_UpdateCvars();
+	HUD_Panel_LoadCvars();
 
 	draw_beginBoldFont();
 
@@ -105,7 +128,11 @@ void HUD_Ammo()
 	pos = panel_pos;
 	mySize = panel_size;
 
-	HUD_Panel_DrawBg(1);
+	if (autocvar_hud_panel_ammo_dynamichud)
+		HUD_Scale_Enable();
+	else
+		HUD_Scale_Disable();
+	HUD_Panel_DrawBg();
 	if(panel_bg_padding)
 	{
 		pos += '1 1 0' * panel_bg_padding;
@@ -139,9 +166,9 @@ void HUD_Ammo()
 
 	rows = HUD_GetRowCount(total_ammo_count, mySize, 3);
 	columns = ceil((total_ammo_count)/rows);
-	ammo_size = eX * mySize.x*(1/columns) + eY * mySize.y*(1/rows);
+	ammo_size = vec2(mySize.x / columns, mySize.y / rows);
 
-	vector offset = '0 0 0'; // fteqcc sucks
+	vector offset = '0 0 0';
 	float newSize;
 	if(ammo_size.x/ammo_size.y > 3)
 	{
@@ -158,22 +185,24 @@ void HUD_Ammo()
 		ammo_size.y = newSize;
 	}
 
-	Weapon wep = switchweapon;
+	entity wepent = viewmodels[0]; // TODO: unhardcode
+
+	Weapon wep = wepent.switchweapon;
 	int i;
-	bool infinite_ammo = (STAT(ITEMS) & IT_UNLIMITED_WEAPON_AMMO);
+	bool infinite_ammo = (STAT(ITEMS) & IT_UNLIMITED_AMMO);
 	row = column = 0;
 	if(autocvar_hud_panel_ammo_onlycurrent)
 	{
 		if(autocvar__hud_configure)
 		{
-			DrawAmmoItem(pos, ammo_size, ammo_rockets, true, false);
+			DrawAmmoItem(pos, ammo_size, RES_ROCKETS, true, false);
 		}
 		else
 		{
 			DrawAmmoItem(
 				pos,
 				ammo_size,
-				wep.ammo_field,
+				wep.ammo_type,
 				true,
 				infinite_ammo
 			);
@@ -188,16 +217,16 @@ void HUD_Ammo()
 	}
 	else
 	{
-		.int ammotype;
+		int ammotype;
 		row = column = 0;
 		for(i = 0; i < AMMO_COUNT; ++i)
 		{
-			ammotype = GetAmmoFieldFromNum(i);
+			ammotype = GetAmmoTypeFromNum(i);
 			DrawAmmoItem(
-				pos + eX * column * (ammo_size.x + offset.x) + eY * row * (ammo_size.y + offset.y),
+				pos + vec2(column * (ammo_size.x + offset.x), row * (ammo_size.y + offset.y)),
 				ammo_size,
 				ammotype,
-				(wep.ammo_field == ammotype),
+				(wep.ammo_type == ammotype),
 				infinite_ammo
 			);
 
@@ -216,7 +245,7 @@ void HUD_Ammo()
 
 		float f = bound(0, nade_statuschange_elapsedtime*2, 1);
 
-		DrawAmmoNades(pos + eX * column * (ammo_size.x + offset.x) + eY * row * (ammo_size.y + offset.y), ammo_size, nade_prevstatus < nade_cnt && nade_cnt != 0 && f < 1, f);
+		DrawAmmoNades(pos + vec2(column * (ammo_size.x + offset.x), row * (ammo_size.y + offset.y)), ammo_size, nade_prevstatus < nade_cnt && nade_cnt != 0 && f < 1, f);
 	}
 
 	draw_endBoldFont();

@@ -1,20 +1,11 @@
-#ifndef DIALOG_SETTINGS_GAME_VIEW_H
-#define DIALOG_SETTINGS_GAME_VIEW_H
-#include "tab.qc"
-CLASS(XonoticGameViewSettingsTab, XonoticTab)
-	METHOD(XonoticGameViewSettingsTab, fill, void(entity));
-	METHOD(XonoticGameViewSettingsTab, showNotify, void(entity));
-	ATTRIB(XonoticGameViewSettingsTab, title, string, _("View"))
-	ATTRIB(XonoticGameViewSettingsTab, intendedWidth, float, 0.9)
-	ATTRIB(XonoticGameViewSettingsTab, rows, float, 13)
-	ATTRIB(XonoticGameViewSettingsTab, columns, float, 6.2)
-ENDCLASS(XonoticGameViewSettingsTab)
-entity makeXonoticGameViewSettingsTab();
-#include "../gamesettings.qh"
-REGISTER_SETTINGS(View, makeXonoticGameViewSettingsTab());
-#endif
+#include "dialog_settings_game_view.qh"
 
-#ifdef IMPLEMENTATION
+#include "textlabel.qh"
+#include "checkbox.qh"
+#include "textslider.qh"
+#include "slider.qh"
+#include "radiobutton.qh"
+
 void XonoticGameViewSettingsTab_showNotify(entity me)
 {
 	loadAllCvars(me);
@@ -33,10 +24,9 @@ void XonoticGameViewSettingsTab_fill(entity me)
 
 	me.TR(me);
 		me.TD(me, 1, 3, e = makeXonoticRadioButton(1, "chase_active", "0", _("1st person perspective")));
-		makeMulti(e, "crosshair_hittest_showimpact");
 	me.TR(me);
 		me.TDempty(me, 0.2);
-		me.TD(me, 1, 2.8, e = makeXonoticCheckBox(0, "cl_eventchase_death", _("Slide to third person upon death")));
+		me.TD(me, 1, 2.8, e = makeXonoticCheckBoxEx(2, 0, "cl_eventchase_death", _("Slide to third person upon death")));
 		setDependent(e, "chase_active", -1, 0);
 	me.TR(me);
 		me.TDempty(me, 0.2);
@@ -58,7 +48,6 @@ void XonoticGameViewSettingsTab_fill(entity me)
 	me.TR(me);
 	me.TR(me);
 		me.TD(me, 1, 3, e = makeXonoticRadioButton(1, "chase_active", "1", _("3rd person perspective")));
-		makeMulti(e, "crosshair_hittest_showimpact");
 	me.TR(me);
 		me.TDempty(me, 0.2);
 		me.TD(me, 1, 0.8, e = makeXonoticTextLabel(0, _("Back distance")));
@@ -74,11 +63,12 @@ void XonoticGameViewSettingsTab_fill(entity me)
 	me.TR(me);
 	me.TR(me);
 		me.TD(me, 1, 3, e = makeXonoticCheckBox(1, "cl_clippedspectating", _("Allow passing through walls while spectating")));
+			e.sendCvars = true;
 
 	me.gotoRC(me, 0, 3.2); me.setFirstColumn(me, me.currentColumn);
 		me.TD(me, 1, 1, e = makeXonoticTextLabel(0, _("Field of view:")));
 		me.TD(me, 1, 2, e = makeXonoticSlider_T(60, 130, 5, "fov",
-			_("Field of vision in degrees (default: 100)")));
+			_("Field of vision in degrees")));
 	me.TR(me);
 	me.TR(me);
 		//me.TDempty(me, 0.2);
@@ -128,4 +118,3 @@ void XonoticGameViewSettingsTab_fill(entity me)
 		//me.TDempty(me, 0.2);
 		me.TD(me, 1, 3, e = makeXonoticCheckBox(0, "cl_unpress_zoom_on_weapon_switch", _("Release zoom when you switch weapons")));
 }
-#endif

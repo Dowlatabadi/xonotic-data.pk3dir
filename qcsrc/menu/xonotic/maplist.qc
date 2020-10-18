@@ -1,63 +1,12 @@
-#ifndef MAPLIST_H
-#define MAPLIST_H
-#include "listbox.qc"
-CLASS(XonoticMapList, XonoticListBox)
-	METHOD(XonoticMapList, configureXonoticMapList, void(entity));
-	ATTRIB(XonoticMapList, rowsPerItem, float, 4)
-	METHOD(XonoticMapList, draw, void(entity));
-	METHOD(XonoticMapList, drawListBoxItem, void(entity, int, vector, bool, bool));
-	METHOD(XonoticMapList, clickListBoxItem, void(entity, float, vector));
-	METHOD(XonoticMapList, doubleClickListBoxItem, void(entity, float, vector));
-	METHOD(XonoticMapList, resizeNotify, void(entity, vector, vector, vector, vector));
-	METHOD(XonoticMapList, refilter, void(entity));
-	METHOD(XonoticMapList, refilterCallback, void(entity, entity));
-	METHOD(XonoticMapList, keyDown, float(entity, float, float, float));
+#include "maplist.qh"
 
-	ATTRIB(XonoticMapList, realFontSize, vector, '0 0 0')
-	ATTRIB(XonoticMapList, columnPreviewOrigin, float, 0)
-	ATTRIB(XonoticMapList, columnPreviewSize, float, 0)
-	ATTRIB(XonoticMapList, columnNameOrigin, float, 0)
-	ATTRIB(XonoticMapList, columnNameSize, float, 0)
-	ATTRIB(XonoticMapList, checkMarkOrigin, vector, '0 0 0')
-	ATTRIB(XonoticMapList, checkMarkSize, vector, '0 0 0')
-	ATTRIB(XonoticMapList, realUpperMargin1, float, 0)
-	ATTRIB(XonoticMapList, realUpperMargin2, float, 0)
+#include <common/mapinfo.qh>
+#include "dialog_multiplayer_create_mapinfo.qh"
+#include "mainwindow.qh"
+#include "inputbox.qh"
 
-	ATTRIB(XonoticMapList, lastGametype, float, 0)
-	ATTRIB(XonoticMapList, lastFeatures, float, 0)
+.bool disabled;
 
-	ATTRIB(XonoticMapList, origin, vector, '0 0 0')
-	ATTRIB(XonoticMapList, itemAbsSize, vector, '0 0 0')
-
-	ATTRIB(XonoticMapList, g_maplistCache, string, string_null)
-	METHOD(XonoticMapList, g_maplistCacheToggle, void(entity, float));
-	METHOD(XonoticMapList, g_maplistCacheQuery, float(entity, float));
-
-	ATTRIB(XonoticMapList, stringFilter, string, string_null)
-	ATTRIB(XonoticMapList, stringFilterBox, entity, NULL)
-
-	ATTRIB(XonoticMapList, startButton, entity, NULL)
-
-	METHOD(XonoticMapList, loadCvars, void(entity));
-
-	ATTRIB(XonoticMapList, typeToSearchString, string, string_null)
-	ATTRIB(XonoticMapList, typeToSearchTime, float, 0)
-
-	METHOD(XonoticMapList, destroy, void(entity));
-
-	ATTRIB(XonoticMapList, alphaBG, float, 0)
-ENDCLASS(XonoticMapList)
-entity makeXonoticMapList();
-void MapList_StringFilterBox_Change(entity box, entity me);
-float MapList_StringFilterBox_keyDown(entity me, float key, float ascii, float shift);
-void MapList_Add_Shown(entity btn, entity me);
-void MapList_Remove_Shown(entity btn, entity me);
-void MapList_Add_All(entity btn, entity me);
-void MapList_Remove_All(entity btn, entity me);
-void MapList_LoadMap(entity btn, entity me);
-#endif
-
-#ifdef IMPLEMENTATION
 void XonoticMapList_destroy(entity me)
 {
 	MapInfo_Shutdown();
@@ -139,8 +88,10 @@ void XonoticMapList_resizeNotify(entity me, vector relOrigin, vector relSize, ve
 	me.itemAbsSize = '0 0 0';
 	SUPER(XonoticMapList).resizeNotify(me, relOrigin, relSize, absOrigin, absSize);
 
-	me.realFontSize_y = me.fontSize / (me.itemAbsSize_y = (absSize.y * me.itemHeight));
-	me.realFontSize_x = me.fontSize / (me.itemAbsSize_x = (absSize.x * (1 - me.controlWidth)));
+	me.itemAbsSize.y = absSize.y * me.itemHeight;
+	me.itemAbsSize.x = absSize.x * (1 - me.controlWidth);
+	me.realFontSize.y = me.fontSize / me.itemAbsSize.y;
+	me.realFontSize.x = me.fontSize / me.itemAbsSize.x;
 	me.realUpperMargin1 = 0.5 * (1 - 2.5 * me.realFontSize.y);
 	me.realUpperMargin2 = me.realUpperMargin1 + 1.5 * me.realFontSize.y;
 
@@ -223,9 +174,8 @@ void XonoticMapList_refilter(entity me)
 {
 	float i, j, n;
 	string s;
-	float gt, f;
-	gt = MapInfo_CurrentGametype();
-	f = MapInfo_CurrentFeatures();
+	Gametype gt = MapInfo_CurrentGametype();
+	int f = MapInfo_CurrentFeatures();
 	MapInfo_FilterGametype(gt, f, MapInfo_RequiredFlags(), MapInfo_ForbiddenFlags(), 0);
 	if (me.stringFilter)
 		MapInfo_FilterString(me.stringFilter);
@@ -233,8 +183,6 @@ void XonoticMapList_refilter(entity me)
 
 	for(i = 0; i < MapInfo_count; ++i)
 		draw_PreloadPicture(strcat("/maps/", MapInfo_BSPName_ByID(i)));
-	if(me.g_maplistCache)
-		strunzone(me.g_maplistCache);
 	s = "0";
 	for(i = 1; i < MapInfo_count; i *= 2)
 		s = strcat(s, s);
@@ -253,7 +201,7 @@ void XonoticMapList_refilter(entity me)
 				);
 		}
 	}
-	me.g_maplistCache = strzone(s);
+	strcpy(me.g_maplistCache, s);
 	if(gt != me.lastGametype || f != me.lastFeatures)
 	{
 		me.lastGametype = gt;
@@ -269,12 +217,9 @@ void XonoticMapList_refilterCallback(entity me, entity cb)
 
 void MapList_StringFilterBox_Change(entity box, entity me)
 {
-	if(me.stringFilter)
-		strunzone(me.stringFilter);
+	strfree(me.stringFilter);
 	if(box.text != "")
 		me.stringFilter = strzone(box.text);
-	else
-		me.stringFilter = string_null;
 
 	me.refilter(me);
 }
@@ -307,7 +252,7 @@ void MapList_Add_All(entity btn, entity me)
 {
 	float i;
 	string s;
-	MapInfo_FilterGametype(MAPINFO_TYPE_ALL, 0, 0, MapInfo_ForbiddenFlags(), 0); // all
+	_MapInfo_FilterGametype(MAPINFO_TYPE_ALL, 0, 0, MapInfo_ForbiddenFlags(), 0); // all
 	s = "";
 	for(i = 0; i < MapInfo_count; ++i)
 		s = strcat(s, " ", MapInfo_BSPName_ByID(i));
@@ -340,7 +285,7 @@ void MapList_LoadMap(entity btn, entity me)
 	m = MapInfo_BSPName_ByID(i);
 	if (!m)
 	{
-		LOG_INFO(_("Huh? Can't play this (m is NULL). Refiltering so this won't happen again.\n"));
+		LOG_INFO(_("Huh? Can't play this (m is NULL). Refiltering so this won't happen again."));
 		me.refilter(me);
 		return;
 	}
@@ -353,7 +298,7 @@ void MapList_LoadMap(entity btn, entity me)
 	}
 	else
 	{
-		LOG_INFO(_("Huh? Can't play this (invalid game type). Refiltering so this won't happen again.\n"));
+		LOG_INFO(_("Huh? Can't play this (invalid game type). Refiltering so this won't happen again."));
 		me.refilter(me);
 		return;
 	}
@@ -397,9 +342,7 @@ float XonoticMapList_keyDown(entity me, float scan, float ascii, float shift)
 		if(time < me.typeToSearchTime)
 		{
 			save = substring(me.typeToSearchString, 0, strlen(me.typeToSearchString) - 1);
-			if(me.typeToSearchString)
-				strunzone(me.typeToSearchString);
-			me.typeToSearchString = strzone(save);
+			strcpy(me.typeToSearchString, save);
 			me.typeToSearchTime = time + 0.5;
 			if(strlen(me.typeToSearchString))
 			{
@@ -416,19 +359,17 @@ float XonoticMapList_keyDown(entity me, float scan, float ascii, float shift)
 			save = ch;
 		else
 			save = strcat(me.typeToSearchString, ch);
-		if(me.typeToSearchString)
-			strunzone(me.typeToSearchString);
-		me.typeToSearchString = strzone(save);
+		strcpy(me.typeToSearchString, save);
 		me.typeToSearchTime = time + 0.5;
 		MapInfo_FindName(me.typeToSearchString);
 		if(MapInfo_FindName_firstResult >= 0)
 			me.setSelected(me, MapInfo_FindName_firstResult);
 	}
-	else if(shift & S_CTRL && scan == 'f') // ctrl-f (as in "F"ind)
+	else if((shift & S_CTRL) && scan == 'f') // ctrl-f (as in "F"ind)
 	{
 		me.parent.setFocus(me.parent, me.stringFilterBox);
 	}
-	else if(shift & S_CTRL && scan == 'u') // ctrl-u (remove stringFilter line
+	else if((shift & S_CTRL) && scan == 'u') // ctrl-u (remove stringFilter line
 	{
 		me.stringFilterBox.setText(me.stringFilterBox, "");
 		MapList_StringFilterBox_Change(me.stringFilterBox, me);
@@ -458,4 +399,3 @@ float MapList_StringFilterBox_keyDown(entity me, float scan, float ascii, float 
 	}
 	return SUPER(XonoticInputBox).keyDown(me, scan, ascii, shift);
 }
-#endif

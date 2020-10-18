@@ -1,190 +1,6 @@
-#ifndef MAPINFO_H
-#define MAPINFO_H
+#pragma once
 
 #include "util.qh"
-
-CLASS(Gametype, Object)
-    ATTRIB(Gametype, m_id, int, 0)
-    /** game type ID */
-    ATTRIB(Gametype, items, int, 0)
-    /** game type name as in cvar (with g_ prefix) */
-    ATTRIB(Gametype, netname, string, string_null)
-    /** game type short name */
-    ATTRIB(Gametype, mdl, string, string_null)
-    /** human readable name */
-    ATTRIB(Gametype, message, string, string_null)
-    /** does this gametype support teamplay? */
-    ATTRIB(Gametype, team, bool, false)
-    /** game type defaults */
-    ATTRIB(Gametype, model2, string, string_null)
-    /** game type description */
-    ATTRIB(Gametype, gametype_description, string, string_null)
-
-    ATTRIB(Gametype, m_mutators, string, string_null)
-    ATTRIB(Gametype, m_parse_mapinfo, bool(string k, string v), func_null)
-
-    METHOD(Gametype, describe, string(entity this)) { return this.gametype_description; }
-
-    METHOD(Gametype, display, void(entity this, void(string name, string icon) returns)) {
-        returns(this.message, strcat("gametype_", this.mdl));
-    }
-
-    CONSTRUCTOR(Gametype, string hname, string sname, string g_name, bool gteamplay, string mutators, string defaults, string gdescription)
-    {
-        CONSTRUCT(Gametype);
-        this.netname = g_name;
-        this.mdl = sname;
-        this.message = hname;
-        this.team = gteamplay;
-        this.m_mutators = mutators;
-        this.model2 = defaults;
-        this.gametype_description = gdescription;
-    }
-ENDCLASS(Gametype)
-
-REGISTRY(Gametypes, BITS(4))
-#define Gametypes_from(i) _Gametypes_from(i, NULL)
-REGISTER_REGISTRY(Gametypes)
-REGISTRY_CHECK(Gametypes)
-int MAPINFO_TYPE_ALL;
-#define REGISTER_GAMETYPE(hname, sname, g_name, NAME, gteamplay, mutators, defaults, gdescription)          \
-    int MAPINFO_TYPE_##NAME;                                                                                \
-    bool NAME##_mapinfo(string k, string v) { return = false; }                                             \
-    REGISTER(Gametypes, MAPINFO_TYPE, g_name, m_id,                                      \
-        NEW(Gametype, hname, #sname, #g_name, gteamplay, #sname " " mutators, defaults, gdescription)       \
-    ) {                                                                                                     \
-        /* same as `1 << m_id` */                                                                           \
-        MAPINFO_TYPE_##NAME = MAPINFO_TYPE_ALL + 1; MAPINFO_TYPE_ALL |= MAPINFO_TYPE_##NAME;                \
-        this.items = MAPINFO_TYPE_##NAME;                                                                   \
-        this.m_parse_mapinfo = NAME##_mapinfo;                                                              \
-    }                                                                                                       \
-    [[accumulate]] bool NAME##_mapinfo(string k, string v)
-
-#define IS_GAMETYPE(NAME) \
-    (MapInfo_LoadedGametype == MAPINFO_TYPE_##NAME)
-
-REGISTER_GAMETYPE(_("Deathmatch"),dm,g_dm,DEATHMATCH,false,"","timelimit=20 pointlimit=30 leadlimit=0",_("Score as many frags as you can"));
-
-REGISTER_GAMETYPE(_("Last Man Standing"),lms,g_lms,LMS,false,"","timelimit=20 lives=9 leadlimit=0",_("Survive and kill until the enemies have no lives left"));
-
-REGISTER_GAMETYPE(_("Race"),rc,g_race,RACE,false,"","timelimit=20 qualifying_timelimit=5 laplimit=7 teamlaplimit=15 leadlimit=0",_("Race against other players to the finish line"))
-{
-    if (!k) {
-    	cvar_set("g_race_qualifying_timelimit", cvar_defstring("g_race_qualifying_timelimit"));
-        return true;
-    }
-    switch (k) {
-        case "qualifying_timelimit":
-            cvar_set("g_race_qualifying_timelimit", v);
-            return true;
-    }
-}
-#define g_race IS_GAMETYPE(RACE)
-
-REGISTER_GAMETYPE(_("Race CTS"),cts,g_cts,CTS,false,"cloaked","timelimit=20",_("Race for fastest time."));
-#define g_cts IS_GAMETYPE(CTS)
-
-REGISTER_GAMETYPE(_("Team Deathmatch"),tdm,g_tdm,TEAM_DEATHMATCH,true,"","timelimit=20 pointlimit=50 teams=2 leadlimit=0",_("Help your team score the most frags against the enemy team"))
-{
-    if (!k) {
-        cvar_set("g_tdm_teams", cvar_defstring("g_tdm_teams"));
-        return true;
-    }
-    switch (k) {
-        case "teams":
-            cvar_set("g_tdm_teams", v);
-            return true;
-    }
-}
-#define g_tdm IS_GAMETYPE(TEAM_DEATHMATCH)
-
-REGISTER_GAMETYPE(_("Capture the Flag"),ctf,g_ctf,CTF,true,"","timelimit=20 caplimit=10 leadlimit=6",_("Find and bring the enemy flag to your base to capture it, defend your base from the other team"));
-#define g_ctf IS_GAMETYPE(CTF)
-
-REGISTER_GAMETYPE(_("Clan Arena"),ca,g_ca,CA,true,"","timelimit=20 pointlimit=10 teams=2 leadlimit=0",_("Kill all enemy teammates to win the round"))
-{
-    if (!k) {
-        cvar_set("g_ca_teams", cvar_defstring("g_ca_teams"));
-        return true;
-    }
-    switch (k) {
-        case "teams":
-            cvar_set("g_ca_teams", v);
-            return true;
-    }
-}
-#define g_ca IS_GAMETYPE(CA)
-
-REGISTER_GAMETYPE(_("Domination"),dom,g_domination,DOMINATION,true,"","timelimit=20 pointlimit=200 teams=2 leadlimit=0",_("Capture and defend all the control points to win"))
-{
-    if (!k) {
-        cvar_set("g_domination_default_teams", cvar_defstring("g_domination_default_teams"));
-        return true;
-    }
-    switch (k) {
-        case "teams":
-            cvar_set("g_domination_default_teams", v);
-            return true;
-    }
-}
-
-REGISTER_GAMETYPE(_("Key Hunt"),kh,g_keyhunt,KEYHUNT,true,"","timelimit=20 pointlimit=1000 teams=3 leadlimit=0",_("Gather all the keys to win the round"))
-{
-    if (!k) {
-    	cvar_set("g_keyhunt_teams", cvar_defstring("g_keyhunt_teams"));
-    	return true;
-    }
-    switch (k) {
-        case "teams":
-            cvar_set("g_keyhunt_teams", v);
-            return true;
-    }
-}
-
-REGISTER_GAMETYPE(_("Assault"),as,g_assault,ASSAULT,true,"","timelimit=20",_("Destroy obstacles to find and destroy the enemy power core before time runs out"));
-#define g_assault IS_GAMETYPE(ASSAULT)
-
-REGISTER_GAMETYPE(_("Onslaught"),ons,g_onslaught,ONSLAUGHT,true,"","pointlimit=1 timelimit=20",_("Capture control points to reach and destroy the enemy generator"));
-
-REGISTER_GAMETYPE(_("Nexball"),nb,g_nexball,NEXBALL,true,"","timelimit=20 pointlimit=5 leadlimit=0",_("Shoot and kick the ball into the enemies goal, keep your goal clean"));
-#define g_nexball IS_GAMETYPE(NEXBALL)
-
-REGISTER_GAMETYPE(_("Freeze Tag"),ft,g_freezetag,FREEZETAG,true,"","timelimit=20 pointlimit=10 teams=2 leadlimit=0",_("Kill enemies to freeze them, stand next to teammates to revive them, freeze the most enemies to win"))
-{
-    if (!k) {
-        cvar_set("g_freezetag_teams", cvar_defstring("g_freezetag_teams"));
-        return true;
-    }
-    switch (k) {
-        case "teams":
-            cvar_set("g_freezetag_teams", v);
-            return true;
-    }
-}
-#define g_freezetag IS_GAMETYPE(FREEZETAG)
-
-REGISTER_GAMETYPE(_("Keepaway"),ka,g_keepaway,KEEPAWAY,true,"","timelimit=20 pointlimit=30",_("Hold the ball to get points for kills"));
-
-REGISTER_GAMETYPE(_("Invasion"),inv,g_invasion,INVASION,false,"","pointlimit=50 teams=0",_("Survive against waves of monsters"))
-{
-    switch (k) {
-        case "teams":
-            cvar_set("g_invasion_teams", v);
-            return true;
-    }
-}
-
-const int MAPINFO_FEATURE_WEAPONS       = 1; // not defined for instagib-only maps
-const int MAPINFO_FEATURE_VEHICLES      = 2;
-const int MAPINFO_FEATURE_TURRETS       = 4;
-const int MAPINFO_FEATURE_MONSTERS      = 8;
-
-const int MAPINFO_FLAG_HIDDEN           = 1; // not in lsmaps/menu/vcall/etc., can just be changed to manually
-const int MAPINFO_FLAG_FORBIDDEN        = 2; // don't even allow the map by a cvar setting that allows hidden maps
-const int MAPINFO_FLAG_FRUSTRATING      = 4; // this map is near impossible to play, enable at your own risk
-const int MAPINFO_FLAG_NOAUTOMAPLIST    = 8; // do not include when automatically building maplist (counts as hidden for maplist building purposes)
-
-float MapInfo_count;
 
 // info about a map that MapInfo loads
 string MapInfo_Map_bspname;
@@ -200,25 +16,146 @@ int MapInfo_Map_flags;
 vector MapInfo_Map_mins; // these are '0 0 0' if not supported!
 vector MapInfo_Map_maxs; // these are '0 0 0' if not specified!
 
+const int GAMETYPE_FLAG_TEAMPLAY        = BIT(0); // teamplay based
+const int GAMETYPE_FLAG_USEPOINTS       = BIT(1); // gametype has point-based scoring
+const int GAMETYPE_FLAG_PREFERRED       = BIT(2); // preferred (when available) in random selections
+const int GAMETYPE_FLAG_PRIORITY        = BIT(3); // priority selection when preferred gametype isn't available in random selections
+const int GAMETYPE_FLAG_HIDELIMITS      = BIT(4); // don't display a score limit needed for winning the match in the scoreboard
+
+int MAPINFO_TYPE_ALL;
+.int m_flags;
+
+CLASS(Gametype, Object)
+    ATTRIB(Gametype, m_id, int, 0);
+    /** game type ID */
+    ATTRIB(Gametype, items, int, 0);
+    /** game type name as in cvar (with g_ prefix) */
+    ATTRIB(Gametype, netname, string);
+    /** game type short name */
+    ATTRIB(Gametype, mdl, string);
+    /** human readable name */
+    ATTRIB(Gametype, message, string);
+    /** does this gametype support teamplay? */
+    ATTRIB(Gametype, team, bool, false);
+    /** does this gametype use a point limit? */
+    ATTRIB(Gametype, frags, bool, true);
+    /** should this gametype display a score limit in the scoreboard? */
+    ATTRIB(Gametype, m_hidelimits, bool, false);
+    /** game type defaults */
+    ATTRIB(Gametype, model2, string);
+    /** game type description */
+    ATTRIB(Gametype, gametype_description, string);
+    /** game type priority in random selections */
+    ATTRIB(Gametype, m_priority, int, 0);
+#ifdef CSQC
+    ATTRIB(Gametype, m_modicons, void(vector pos, vector mySize));
+    ATTRIB(Gametype, m_modicons_reset, void());
+    ATTRIB(Gametype, m_modicons_export, void(int fh));
+#endif
+
+    /** DO NOT USE, this is compatibility for legacy maps! */
+    ATTRIB(Gametype, m_legacydefaults, string, "");
+
+    ATTRIB(Gametype, m_mutators, string);
+    METHOD(Gametype, m_parse_mapinfo, bool(string k, string v))
+    {
+        return false;
+    }
+    METHOD(Gametype, m_generate_mapinfo, void(Gametype this, string v))
+    {
+        TC(Gametype, this);
+    }
+    METHOD(Gametype, m_isTwoBaseMode, bool())
+    {
+        return false;
+    }
+    METHOD(Gametype, m_isAlwaysSupported, bool(Gametype this, int spawnpoints, float diameter))
+    {
+        return false;
+    }
+    METHOD(Gametype, m_isForcedSupported, bool(Gametype this))
+    {
+        return false;
+    }
+    METHOD(Gametype, m_configuremenu, void(Gametype this, entity menu, void(entity me, string pLabel, float pMin, float pMax, float pStep, string pCvar, string tCvar, string pTooltip) returns))
+    {
+        TC(Gametype, this);
+        returns(menu, _("Frag limit:"),      5,  100,  5, "fraglimit_override",        string_null,                    _("The amount of frags needed before the match will end"));
+    }
+
+    METHOD(Gametype, describe, string(Gametype this))
+    {
+        TC(Gametype, this);
+        return this.gametype_description;
+    }
+
+    METHOD(Gametype, display, void(Gametype this, void(string name, string icon) returns))
+    {
+        TC(Gametype, this);
+        returns(this.message, strcat("gametype_", this.mdl));
+    }
+
+    METHOD(Gametype, gametype_init, void(Gametype this, string hname, string sname, string g_name, int gflags, string mutators, string defaults, string gdescription))
+    {
+        this.netname = g_name;
+        this.mdl = sname;
+        this.message = hname;
+        this.team = (gflags & GAMETYPE_FLAG_TEAMPLAY);
+        this.m_mutators = cons(sname, mutators);
+        this.model2 = defaults;
+        this.gametype_description = gdescription;
+        this.frags = (gflags & GAMETYPE_FLAG_USEPOINTS);
+        this.m_priority = ((gflags & GAMETYPE_FLAG_PREFERRED) ? 2 : ((gflags & GAMETYPE_FLAG_PRIORITY) ? 1 : 0));
+        this.m_hidelimits = (gflags & GAMETYPE_FLAG_HIDELIMITS);
+
+        // same as `1 << m_id`
+        MAPINFO_TYPE_ALL |= this.items = this.m_flags = (MAPINFO_TYPE_ALL + 1);
+    }
+ENDCLASS(Gametype)
+
+REGISTRY(Gametypes, 32)
+REGISTER_REGISTRY(Gametypes)
+REGISTRY_SORT(Gametypes);
+REGISTRY_CHECK(Gametypes)
+
+REGISTRY_DEFINE_GET(Gametypes, NULL)
+STATIC_INIT(Gametypes_renumber) { FOREACH(Gametypes, true, it.m_id = i); }
+#define REGISTER_GAMETYPE(NAME, inst) REGISTER(Gametypes, MAPINFO_TYPE, NAME, m_id, inst)
+
+#define IS_GAMETYPE(NAME) (MapInfo_LoadedGametype == MAPINFO_TYPE_##NAME)
+
+const int MAPINFO_FEATURE_WEAPONS       = 1; // not defined for instagib-only maps
+const int MAPINFO_FEATURE_VEHICLES      = 2;
+const int MAPINFO_FEATURE_TURRETS       = 4;
+const int MAPINFO_FEATURE_MONSTERS      = 8;
+
+const int MAPINFO_FLAG_HIDDEN           = 1; // not in lsmaps/menu/vcall/etc., can just be changed to manually
+const int MAPINFO_FLAG_FORBIDDEN        = 2; // don't even allow the map by a cvar setting that allows hidden maps
+const int MAPINFO_FLAG_FRUSTRATING      = 4; // this map is near impossible to play, enable at your own risk
+const int MAPINFO_FLAG_NOAUTOMAPLIST    = 8; // do not include when automatically building maplist (counts as hidden for maplist building purposes)
+
+float MapInfo_count;
+
 // load MapInfo_count; generate mapinfo for maps that miss them, and clear the
 // cache; you need to call MapInfo_FilterGametype afterwards!
 void MapInfo_Enumerate();
 
 // filter the info by game type mask (updates MapInfo_count)
 float MapInfo_progress;
-float MapInfo_FilterGametype(float gametype, float features, float pFlagsRequired, float pFlagsForbidden, float pAbortOnGenerate); // 1 on success, 0 on temporary failure (call it again next frame then; use MapInfo_progress as progress indicator)
+float MapInfo_FilterGametype(Gametype gametypeFlags, float features, float pFlagsRequired, float pFlagsForbidden, float pAbortOnGenerate); // 1 on success, 0 on temporary failure (call it again next frame then; use MapInfo_progress as progress indicator)
+float _MapInfo_FilterGametype(int gametypeFlags, float features, float pFlagsRequired, float pFlagsForbidden, float pAbortOnGenerate); // 1 on success, 0 on temporary failure (call it again next frame then; use MapInfo_progress as progress indicator)
 void MapInfo_FilterString(string sf); // filter _MapInfo_filtered (created by MapInfo_FilterGametype) with keyword
 int MapInfo_CurrentFeatures(); // retrieves currently required features from cvars
-int MapInfo_CurrentGametype(); // retrieves current gametype from cvars
+Gametype MapInfo_CurrentGametype(); // retrieves current gametype from cvars
 int MapInfo_ForbiddenFlags(); // retrieves current flags from cvars
 int MapInfo_RequiredFlags(); // retrieves current flags from cvars
 
 // load info about the i-th map into the MapInfo_Map_* globals
-float MapInfo_Get_ByID(float i); // 1 on success, 0 on failure
+bool MapInfo_Get_ByID(int i); // 1 on success, 0 on failure
 string MapInfo_BSPName_ByID(float i);
 
 // load info about a map by name into the MapInfo_Map_* globals
-float MapInfo_Get_ByName(string s, float allowGenerate, float gametypeToSet); // 1 on success, 0 on failure, 2 if it autogenerated a mapinfo file
+int MapInfo_Get_ByName(string s, float allowGenerate, Gametype gametypeToSet); // 1 on success, 0 on failure, 2 if it autogenerated a mapinfo file
 
 // look for a map by a prefix, returns the actual map name on success, string_null on failure or ambigous match
 string MapInfo_FindName_match; // the name of the map that was found
@@ -231,27 +168,28 @@ float MapInfo_CheckMap(string s); // returns 0 if the map can't be played with t
 void MapInfo_LoadMap(string s, float reinit);
 
 // list all maps for the current game type
-string MapInfo_ListAllowedMaps(float type, float pFlagsRequired, float pFlagsForbidden);
+string MapInfo_ListAllowedMaps(Gametype type, float pFlagsRequired, float pFlagsForbidden);
 // list all allowed maps (for any game type)
 string MapInfo_ListAllAllowedMaps(float pFlagsRequired, float pFlagsForbidden);
 
 // gets a gametype from a string
-string _MapInfo_GetDefaultEx(float t);
-float _MapInfo_GetTeamPlayBool(float t);
-Gametype MapInfo_Type(int t);
-float MapInfo_Type_FromString(string t);
-string MapInfo_Type_Description(float t);
-string MapInfo_Type_ToString(float t);
-string MapInfo_Type_ToText(float t);
-void MapInfo_SwitchGameType(int t);
+string _MapInfo_GetDefaultEx(Gametype t);
+float _MapInfo_GetTeamPlayBool(Gametype t);
+Gametype MapInfo_Type_FromString(string t, bool dowarn);
+string MapInfo_Type_Description(Gametype t);
+string MapInfo_Type_ToString(Gametype t);
+string MapInfo_Type_ToText(Gametype t);
+void MapInfo_SwitchGameType(Gametype t);
 
 // to be called from worldspawn to set up cvars
 void MapInfo_LoadMapSettings(string s);
-float MapInfo_LoadedGametype; // game type that was active during map load
+Gametype MapInfo_LoadedGametype; // game type that was active during map load
 
 void MapInfo_Cache_Destroy(); // disable caching
 void MapInfo_Cache_Create(); // enable caching
 void MapInfo_Cache_Invalidate(); // delete cache if any, but keep enabled
+
+void _MapInfo_Parse_Settemp(string pFilename, string acl, float type, string s, float recurse);
 
 void MapInfo_ClearTemps(); // call this when done with mapinfo for this frame
 
@@ -259,4 +197,3 @@ void MapInfo_Shutdown(); // call this in the shutdown handler
 
 #define MAPINFO_SETTEMP_ACL_USER cvar_string("g_mapinfo_settemp_acl")
 #define MAPINFO_SETTEMP_ACL_SYSTEM "-g_mapinfo_* -rcon_* -_* -g_ban* +*"
-#endif

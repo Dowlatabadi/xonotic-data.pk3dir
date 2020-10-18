@@ -1,21 +1,7 @@
-#ifndef CLIENT_MAIN_H
-#define CLIENT_MAIN_H
+#pragma once
 
-#include "../common/constants.qh"
-#include "../common/weapons/all.qh"
-
-// --------------------------------------------------------------------------
-// MENU Functionality
-
-const float DATABUF_PING = 0;
-#define DATABUF_CAPTURES (1*maxclients)
-#define DATABUF_DEATHS (2*maxclients)
-#define DATABUF_RETURNS (3*maxclients)
-
-#define DATABUF_NEXT (5*maxclients)
-
-// --------------------------------------------------------------------------
-// Onslaught
+#include <common/constants.qh>
+#include <common/weapons/_all.qh>
 
 // Map coordinate base calculations need these
 vector mi_center;
@@ -23,111 +9,109 @@ vector mi_scale;
 // Minimap
 string minimapname;
 
-// --------------------------------------------------------------------------
-// General stuff
-
-float postinit;
-float gametype;
-
-//float sorted_players;
-//float sorted_teams;
-
-// Defs
-//.float ctf_state;
-//.float health;
+bool postinit;
+entity gametype;
+// temporary hack
+#define ISGAMETYPE(NAME) (gametype == MAPINFO_TYPE_##NAME)
 
 float FONT_USER = 8;
 
-// --------------------------------------------------------------------------
-// Scoreboard stuff
 
-const int MAX_HUD_FIELDS = 16;
+void PostInit();
 
-const int SP_END = -1;
+void Ent_Remove(entity this);
 
-const int SP_PING = -2;
-const int SP_NAME = -3;
-const int SP_KDRATIO = -4;
-const int SP_CLRATIO = -5;
-const int SP_PL = -6;
-const int SP_FRAGS = -7;
-const int SP_SUM = -8;
+void Gamemode_Init();
 
-const int SP_SEPARATOR = -100;
+entity players;
+entity teams;
+float team_count; // real teams
 
-float hud_field[MAX_HUD_FIELDS + 1];
-float hud_size[MAX_HUD_FIELDS + 1];
-string hud_title[MAX_HUD_FIELDS + 1];
-int hud_num_fields;
+void AuditLists();
 
-string scores_label[MAX_SCORE];
-int scores_flags[MAX_SCORE];
-string teamscores_label[MAX_SCORE];
-int teamscores_flags[MAX_SCORE];
-.int scores[MAX_SCORE];
-.float teamscores[MAX_TEAMSCORE];
+float RegisterPlayer(entity player);
 
-#define IS_INCREASING(x) ( (x)&SFL_LOWER_IS_BETTER )
-#define IS_DECREASING(x) ( !((x)&SFL_LOWER_IS_BETTER) )
+void RemovePlayer(entity player);
 
+void MoveToLast(entity e);
+
+float RegisterTeam(entity Team);
+
+void RemoveTeam(entity Team);
+
+entity GetTeam(int Team, bool add);
+
+bool SetTeam(entity pl, int Team);
 
 vector hud_fontsize;
 
 float RANKINGS_RECEIVED_CNT;
+float RANKINGS_DISPLAY_CNT;
 string grecordholder[RANKINGS_CNT];
 float grecordtime[RANKINGS_CNT];
-//float csqc_flags;
 
 entity playerslots[255]; // 255 is engine limit on maxclients
 entity teamslots[17];    // 17 teams (including "spectator team")
-.float gotscores;
+.bool gotscores;
 .entity owner;
-.float ready;
-.float eliminated;
+.bool ready;
+.bool eliminated;
+
+IntrusiveList g_drawables;
+IntrusiveList g_drawables_2d;
+IntrusiveList g_radarlinks;
+IntrusiveList g_radaricons;
+STATIC_INIT(main)
+{
+	g_drawables = IL_NEW();
+	g_drawables_2d = IL_NEW();
+	g_radarlinks = IL_NEW();
+	g_radaricons = IL_NEW();
+}
 
 .void(entity) draw;
 .void(entity) draw2d;
-.void() entremove;
+.void(entity) entremove;
 float drawframetime;
 vector view_origin, view_forward, view_right, view_up;
+
+.float renderflags; // engine field
 
 bool button_zoom;
 bool spectatorbutton_zoom;
 bool button_attack2;
 
-Weapon activeweapon;
-Weapon switchingweapon;
-Weapon switchweapon;
 float current_viewzoom;
 float zoomin_effect;
-float warmup_stage;
+bool warmup_stage;
 
 void Fog_Force();
 
-string getcommandkey(string text, string command);
+string _getcommandkey(string text, string command, bool forcename);
+#define getcommandkey(cmd_name, command) _getcommandkey(cmd_name, command, false)
+#define getcommandkey_forcename(cmd_name, command) _getcommandkey(cmd_name, command, true)
 
 string vote_called_vote;
-float ready_waiting;
-float ready_waiting_for_me;
-float vote_waiting;
-float vote_waiting_for_me;
+bool ready_waiting;
+bool ready_waiting_for_me;
+bool vote_waiting;
+bool vote_waiting_for_me;
 
 float current_zoomfraction;
 
-float cs_project_is_b0rked;
-float vid_width, vid_height, vid_pixelheight;
+int cs_project_is_b0rked;
+int vid_width, vid_height;
+float vid_pixelheight;
 
 float camera_active;		// Demo camera is active if set to true
 float chase_active_backup;
 float camera_roll;
 vector camera_direction;
 
-void centerprint_hud(string strMessage);
-void centerprint_generic(float new_id, string strMessage, float duration, float countdown_num);
-
 const float ALPHA_MIN_VISIBLE = 0.003;
 
 float armorblockpercent;
+float damagepush_speedfactor;
 
 //hooks
 int calledhooks;
@@ -138,9 +122,46 @@ const int HOOK_END =      2;
 
 float g_trueaim_minrange;
 
-float hud;
+int hud;
 float view_quality;
-int framecount;
-.float health;
 
-#endif
+int num_spectators;
+const int MAX_SPECTATORS = 7;
+int spectatorlist[MAX_SPECTATORS];
+
+int framecount;
+
+float GetSpeedUnitFactor(int speed_unit);
+string GetSpeedUnit(int speed_unit);
+
+.int enttype; // entity type sent from server
+.int sv_entnum; // entity number sent from server
+
+.int team;
+.int team_size;
+
+int binddb;
+
+// Spectating
+// -1 - observing
+// 0 - playing
+// >0 - id of spectated player
+float spectatee_status;
+float spectatee_status_changed_time;
+
+#define player_currententnum (spectatee_status > 0 ? spectatee_status : player_localnum + 1)
+
+// short mapname
+string shortmapname;
+
+// database for misc stuff
+int tempdb;
+int ClientProgsDB;
+vector hook_shotorigin[4]; // WEAPONTODO
+vector lightning_shotorigin[4]; // TODO: unused
+
+float serverprevtime, serverdeltatime;
+
+float ticrate;
+
+int serverflags;

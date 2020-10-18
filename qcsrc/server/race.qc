@@ -1,19 +1,74 @@
 #include "race.qh"
 
-#include "cl_client.qh"
-#include "portals.qh"
-#include "scores.qh"
-#include "spawnpoints.qh"
-#include "bot/waypoints.qh"
-#include "bot/navigation.qh"
-#include "command/getreplies.qh"
-#include "../common/deathtypes/all.qh"
-#include "../common/notifications.qh"
-#include "../common/mapinfo.qh"
-#include "../common/triggers/subs.qh"
-#include "../lib/warpzone/util_server.qh"
-#include "../lib/warpzone/common.qh"
-#include "../common/mutators/mutator/waypoints/waypointsprites.qh"
+#include <common/deathtypes/all.qh>
+#include <common/gamemodes/_mod.qh>
+#include <common/gamemodes/rules.qh>
+#include <common/mapobjects/subs.qh>
+#include <common/mapobjects/triggers.qh>
+#include <common/mutators/mutator/waypoints/waypointsprites.qh>
+#include <common/net_linked.qh>
+#include <common/notifications/all.qh>
+#include <common/state.qh>
+#include <common/stats.qh>
+#include <common/vehicles/sv_vehicles.qh>
+#include <common/weapons/_all.qh>
+#include <common/weapons/weapon/porto.qh>
+#include <lib/warpzone/common.qh>
+#include <lib/warpzone/util_server.qh>
+#include <server/bot/api.qh>
+#include <server/cheats.qh>
+#include <server/client.qh>
+#include <server/command/getreplies.qh>
+#include <server/damage.qh>
+#include <server/gamelog.qh>
+#include <server/intermission.qh>
+#include <server/main.qh>
+#include <server/mutators/_mod.qh>
+#include <server/portals.qh>
+#include <server/scores.qh>
+#include <server/spawnpoints.qh>
+#include <server/weapons/common.qh>
+#include <server/world.qh>
+
+string uid2name(string myuid)
+{
+	string s = db_get(ServerProgsDB, strcat("/uid2name/", myuid));
+
+	// FIXME remove this later after 0.6 release
+	// convert old style broken records to correct style
+	if(s == "")
+	{
+		s = db_get(ServerProgsDB, strcat("uid2name", myuid));
+		if(s != "")
+		{
+			db_put(ServerProgsDB, strcat("/uid2name/", myuid), s);
+			db_remove(ServerProgsDB, strcat("uid2name", myuid));
+		}
+	}
+
+	if(s == "")
+		s = "^1Unregistered Player";
+	return s;
+}
+
+void write_recordmarker(entity pl, float tstart, float dt)
+{
+    GameLogEcho(strcat(":recordset:", ftos(pl.playerid), ":", ftos(dt)));
+
+    // also write a marker into demo files for demotc-race-record-extractor to find
+    stuffcmd(pl,
+             strcat(
+                 strcat("//", strconv(2, 0, 0, GetGametype()), " RECORD SET ", TIME_ENCODED_TOSTRING(TIME_ENCODE(dt))),
+                 " ", ftos(tstart), " ", ftos(dt), "\n"));
+}
+
+IntrusiveList g_race_targets;
+IntrusiveList g_racecheckpoints;
+STATIC_INIT(g_race)
+{
+	g_race_targets = IL_NEW();
+	g_racecheckpoints = IL_NEW();
+}
 
 void race_InitSpectator()
 {
@@ -22,35 +77,35 @@ void race_InitSpectator()
 			race_SendNextCheckpoint(msg_entity.enemy, 1);
 }
 
-void W_Porto_Fail(float failhard);
-
 float race_readTime(string map, float pos)
 {
-	string rr = (g_cts) ? CTS_RECORD : RACE_RECORD;
+	string rr = ((g_cts) ? CTS_RECORD : ((g_ctf) ? CTF_RECORD : RACE_RECORD));
 
 	return stof(db_get(ServerProgsDB, strcat(map, rr, "time", ftos(pos))));
 }
 
 string race_readUID(string map, float pos)
 {
-	string rr = (g_cts) ? CTS_RECORD : RACE_RECORD;
+	string rr = ((g_cts) ? CTS_RECORD : ((g_ctf) ? CTF_RECORD : RACE_RECORD));
 
 	return db_get(ServerProgsDB, strcat(map, rr, "crypto_idfp", ftos(pos)));
 }
 
 float race_readPos(string map, float t)
 {
-	float i;
-	for (i = 1; i <= RANKINGS_CNT; ++i)
-	if (race_readTime(map, i) == 0 || race_readTime(map, i) > t)
-		return i;
+	for(int i = 1; i <= RANKINGS_CNT; ++i)
+	{
+		int mytime = race_readTime(map, i);
+		if(!mytime || mytime > t)
+			return i;
+	}
 
 	return 0; // pos is zero if unranked
 }
 
 void race_writeTime(string map, float t, string myuid)
 {
-	string rr = (g_cts) ? CTS_RECORD : RACE_RECORD;
+	string rr = ((g_cts) ? CTS_RECORD : ((g_ctf) ? CTF_RECORD : RACE_RECORD));
 
 	float newpos;
 	newpos = race_readPos(map, t);
@@ -75,8 +130,11 @@ void race_writeTime(string map, float t, string myuid)
 		// player has no ranked record yet
 		for (i = RANKINGS_CNT; i > newpos; --i)
 		{
-			db_put(ServerProgsDB, strcat(map, rr, "time", ftos(i)), ftos(race_readTime(map, i - 1)));
-			db_put(ServerProgsDB, strcat(map, rr, "crypto_idfp", ftos(i)), race_readUID(map, i - 1));
+			float other_time = race_readTime(map, i - 1);
+			if (other_time) {
+				db_put(ServerProgsDB, strcat(map, rr, "time", ftos(i)), ftos(other_time));
+				db_put(ServerProgsDB, strcat(map, rr, "crypto_idfp", ftos(i)), race_readUID(map, i - 1));
+			}
 		}
 	}
 
@@ -87,15 +145,13 @@ void race_writeTime(string map, float t, string myuid)
 
 string race_readName(string map, float pos)
 {
-	string rr = (g_cts) ? CTS_RECORD : RACE_RECORD;
+	string rr = ((g_cts) ? CTS_RECORD : ((g_ctf) ? CTF_RECORD : RACE_RECORD));
 
 	return uid2name(db_get(ServerProgsDB, strcat(map, rr, "crypto_idfp", ftos(pos))));
 }
 
 
 const float MAX_CHECKPOINTS = 255;
-
-spawnfunc(target_checkpoint);
 
 .float race_penalty;
 .float race_penalty_accumulator;
@@ -110,6 +166,8 @@ string race_checkpoint_recordholders[MAX_CHECKPOINTS];
 float race_checkpoint_lasttimes[MAX_CHECKPOINTS];
 float race_checkpoint_lastlaps[MAX_CHECKPOINTS];
 entity race_checkpoint_lastplayers[MAX_CHECKPOINTS];
+
+.float race_checkpoint_record[MAX_CHECKPOINTS];
 
 float race_highest_checkpoint;
 float race_timed_checkpoint;
@@ -153,16 +211,13 @@ float race_CheckpointNetworkID(float f)
 
 void race_SendNextCheckpoint(entity e, float spec) // qualifying only
 {
-	float recordtime;
-	string recordholder;
-	float cp;
-
 	if(!e.race_laptime)
 		return;
 
-	cp = e.race_checkpoint;
-	recordtime = race_checkpoint_records[cp];
-	recordholder = race_checkpoint_recordholders[cp];
+	int cp = e.race_checkpoint;
+	float recordtime = race_checkpoint_records[cp];
+	float myrecordtime = e.race_checkpoint_record[cp];
+	string recordholder = race_checkpoint_recordholders[cp];
 	if(recordholder == e.netname)
 		recordholder = "";
 
@@ -171,7 +226,7 @@ void race_SendNextCheckpoint(entity e, float spec) // qualifying only
 
 	if(!spec)
 		msg_entity = e;
-	WRITESPECTATABLE_MSG_ONE({
+	WRITESPECTATABLE_MSG_ONE(msg_entity, {
 		WriteHeader(MSG_ONE, TE_CSQC_RACE);
 		if(spec)
 		{
@@ -183,6 +238,8 @@ void race_SendNextCheckpoint(entity e, float spec) // qualifying only
 			WriteByte(MSG_ONE, RACE_NET_CHECKPOINT_NEXT_QUALIFYING);
 		WriteByte(MSG_ONE, race_CheckpointNetworkID(cp)); // checkpoint the player will be at next
 		WriteInt24_t(MSG_ONE, recordtime);
+		if(!spec)
+			WriteInt24_t(MSG_ONE, myrecordtime);
 		WriteString(MSG_ONE, recordholder);
 	});
 }
@@ -214,6 +271,14 @@ void race_send_speedaward_alltimebest(float msg)
 	WriteString(msg, speedaward_alltimebest_holder);
 }
 
+void race_send_rankings_cnt(float msg)
+{
+	WriteHeader(msg, TE_CSQC_RACE);
+	WriteByte(msg, RACE_NET_RANKINGS_CNT);
+	int m = min(RANKINGS_CNT, autocvar_g_cts_send_rankings_cnt);
+	WriteByte(msg, m);
+}
+
 void race_SendRankings(float pos, float prevpos, float del, float msg)
 {
 	WriteHeader(msg, TE_CSQC_RACE);
@@ -236,7 +301,7 @@ void race_SendStatus(float id, entity e)
 	else
 		msg = MSG_ALL;
 	msg_entity = e;
-	WRITESPECTATABLE_MSG_ONE_VARNAME(dummy3, {
+	WRITESPECTATABLE_MSG_ONE(msg_entity, {
 		WriteHeader(msg, TE_CSQC_RACE);
 		WriteByte(msg, RACE_NET_SERVER_STATUS);
 		WriteShort(msg, id);
@@ -244,15 +309,13 @@ void race_SendStatus(float id, entity e)
 	});
 }
 
-void race_setTime(string map, float t, string myuid, string mynetname, entity e)
+void race_setTime(string map, float t, string myuid, string mynetname, entity e, bool showmessage)
 {
 	// netname only used TEMPORARILY for printing
-	float newpos, player_prevpos;
-	newpos = race_readPos(map, t);
+	int newpos = race_readPos(map, t);
 
-	float i;
-	player_prevpos = 0;
-	for(i = 1; i <= RANKINGS_CNT; ++i)
+	int player_prevpos = 0;
+	for(int i = 1; i <= RANKINGS_CNT; ++i)
 	{
 		if(race_readUID(map, i) == myuid)
 			player_prevpos = i;
@@ -264,7 +327,8 @@ void race_setTime(string map, float t, string myuid, string mynetname, entity e)
 	{
 		oldrec = race_readTime(GetMapname(), player_prevpos);
 		race_SendStatus(0, e); // "fail"
-		Send_Notification(NOTIF_ALL, world, MSG_INFO, INFO_RACE_FAIL_RANKED, mynetname, player_prevpos, t, oldrec);
+		if(showmessage)
+			Send_Notification(NOTIF_ALL, NULL, MSG_INFO, INFO_RACE_FAIL_RANKED, mynetname, player_prevpos, t, oldrec);
 		return;
 	}
 	else if (!newpos)
@@ -272,7 +336,8 @@ void race_setTime(string map, float t, string myuid, string mynetname, entity e)
 		// no ranking, time worse than the worst ranked
 		oldrec = race_readTime(GetMapname(), RANKINGS_CNT);
 		race_SendStatus(0, e); // "fail"
-		Send_Notification(NOTIF_ALL, world, MSG_INFO, INFO_RACE_FAIL_UNRANKED, mynetname, RANKINGS_CNT, t, oldrec);
+		if(showmessage)
+			Send_Notification(NOTIF_ALL, NULL, MSG_INFO, INFO_RACE_FAIL_UNRANKED, mynetname, RANKINGS_CNT, t, oldrec);
 		return;
 	}
 
@@ -281,7 +346,15 @@ void race_setTime(string map, float t, string myuid, string mynetname, entity e)
 	// if the player does not have a UID we can unfortunately not store the record, as the rankings system relies on UIDs
 	if(myuid == "")
 	{
-		Send_Notification(NOTIF_ALL, world, MSG_INFO, INFO_RACE_NEW_MISSING_UID, mynetname, t);
+		if(showmessage)
+			Send_Notification(NOTIF_ALL, NULL, MSG_INFO, INFO_RACE_NEW_MISSING_UID, mynetname, t);
+		return;
+	}
+
+	if(uid2name(myuid) == "^1Unregistered Player")
+	{
+		if(showmessage)
+			Send_Notification(NOTIF_ALL, NULL, MSG_INFO, INFO_RACE_NEW_MISSING_NAME, mynetname, t);
 		return;
 	}
 
@@ -291,32 +364,33 @@ void race_setTime(string map, float t, string myuid, string mynetname, entity e)
 	// store new ranking
 	race_writeTime(GetMapname(), t, myuid);
 
-	if (newpos == 1)
+	if (newpos == 1 && showmessage)
 	{
 		write_recordmarker(e, time - TIME_DECODE(t), TIME_DECODE(t));
 		race_send_recordtime(MSG_ALL);
 	}
 
 	race_SendRankings(newpos, player_prevpos, 0, MSG_ALL);
-	if(rankings_reply)
-		strunzone(rankings_reply);
-	rankings_reply = strzone(getrankings());
+	strcpy(rankings_reply, getrankings());
 
 	if(newpos == player_prevpos)
 	{
-		Send_Notification(NOTIF_ALL, world, MSG_INFO, INFO_RACE_NEW_IMPROVED, mynetname, newpos, t, oldrec);
+		if(showmessage)
+			Send_Notification(NOTIF_ALL, NULL, MSG_INFO, INFO_RACE_NEW_IMPROVED, mynetname, newpos, t, oldrec);
 		if(newpos == 1) { race_SendStatus(3, e); } // "new server record"
 		else { race_SendStatus(1, e); } // "new time"
 	}
 	else if(oldrec == 0)
 	{
-		Send_Notification(NOTIF_ALL, world, MSG_INFO, INFO_RACE_NEW_SET, mynetname, newpos, t);
+		if(showmessage)
+			Send_Notification(NOTIF_ALL, NULL, MSG_INFO, INFO_RACE_NEW_SET, mynetname, newpos, t);
 		if(newpos == 1) { race_SendStatus(3, e); } // "new server record"
 		else { race_SendStatus(2, e); } // "new rank"
 	}
 	else
 	{
-		Send_Notification(NOTIF_ALL, world, MSG_INFO, INFO_RACE_NEW_BROKEN, mynetname, oldrec_holder, newpos, t, oldrec);
+		if(showmessage)
+			Send_Notification(NOTIF_ALL, NULL, MSG_INFO, INFO_RACE_NEW_BROKEN, mynetname, oldrec_holder, newpos, t, oldrec);
 		if(newpos == 1) { race_SendStatus(3, e); } // "new server record"
 		else { race_SendStatus(2, e); } // "new rank"
 	}
@@ -324,24 +398,20 @@ void race_setTime(string map, float t, string myuid, string mynetname, entity e)
 
 void race_deleteTime(string map, float pos)
 {
-	string rr;
-	if(g_cts)
-		rr = CTS_RECORD;
-	else
-		rr = RACE_RECORD;
+	string rr = ((g_cts) ? CTS_RECORD : ((g_ctf) ? CTF_RECORD : RACE_RECORD));
 
-	float i;
-	for (i = pos; i <= RANKINGS_CNT; ++i)
+	for(int i = pos; i <= RANKINGS_CNT; ++i)
 	{
+		string therank = ftos(i);
 		if (i == RANKINGS_CNT)
 		{
-			db_remove(ServerProgsDB, strcat(map, rr, "time", ftos(i)));
-			db_remove(ServerProgsDB, strcat(map, rr, "crypto_idfp", ftos(i)));
+			db_remove(ServerProgsDB, strcat(map, rr, "time", therank));
+			db_remove(ServerProgsDB, strcat(map, rr, "crypto_idfp", therank));
 		}
 		else
 		{
-			db_put(ServerProgsDB, strcat(map, rr, "time", ftos(i)), ftos(race_readTime(GetMapname(), i+1)));
-			db_put(ServerProgsDB, strcat(map, rr, "crypto_idfp", ftos(i)), race_readUID(GetMapname(), i+1));
+			db_put(ServerProgsDB, strcat(map, rr, "time", therank), ftos(race_readTime(GetMapname(), i+1)));
+			db_put(ServerProgsDB, strcat(map, rr, "crypto_idfp", therank), race_readUID(GetMapname(), i+1));
 		}
 	}
 
@@ -349,43 +419,39 @@ void race_deleteTime(string map, float pos)
 	if(pos == 1)
 		race_send_recordtime(MSG_ALL);
 
-	if(rankings_reply)
-		strunzone(rankings_reply);
-	rankings_reply = strzone(getrankings());
+	strcpy(rankings_reply, getrankings());
 }
 
 void race_SendTime(entity e, float cp, float t, float tvalid)
 {
 	float snew, l;
-	entity p;
 
 	if(g_race_qualifying)
 		t += e.race_penalty_accumulator;
 
 	t = TIME_ENCODE(t); // make integer
-	// adding just 0.4 so it rounds down in the .5 case (matching the timer display)
 
 	if(tvalid)
 	if(cp == race_timed_checkpoint) // finish line
-	if (!e.race_completed)
+	if (!CS(e).race_completed)
 	{
 		float s;
 		if(g_race_qualifying)
 		{
-			s = PlayerScore_Add(e, SP_RACE_FASTEST, 0);
+			s = GameRules_scoring_add(e, RACE_FASTEST, 0);
 			if(!s || t < s)
-				PlayerScore_Add(e, SP_RACE_FASTEST, t - s);
+				GameRules_scoring_add(e, RACE_FASTEST, t - s);
 		}
 		else
 		{
-			s = PlayerScore_Add(e, SP_RACE_FASTEST, 0);
+			s = GameRules_scoring_add(e, RACE_FASTEST, 0);
 			if(!s || t < s)
-				PlayerScore_Add(e, SP_RACE_FASTEST, t - s);
+				GameRules_scoring_add(e, RACE_FASTEST, t - s);
 
-			s = PlayerScore_Add(e, SP_RACE_TIME, 0);
+			s = GameRules_scoring_add(e, RACE_TIME, 0);
 			snew = TIME_ENCODE(time - game_starttime);
-			PlayerScore_Add(e, SP_RACE_TIME, snew - s);
-			l = PlayerTeamScore_Add(e, SP_RACE_LAPS, ST_RACE_LAPS, 1);
+			GameRules_scoring_add(e, RACE_TIME, snew - s);
+			l = GameRules_scoring_add_team(e, RACE_LAPS, 1);
 
 			if(autocvar_fraglimit)
 				if(l >= autocvar_fraglimit)
@@ -393,21 +459,23 @@ void race_SendTime(entity e, float cp, float t, float tvalid)
 
 			if(race_completing)
 			{
-				e.race_completed = 1;
+				CS(e).race_completed = 1;
 				MAKE_INDEPENDENT_PLAYER(e);
-				Send_Notification(NOTIF_ALL, world, MSG_INFO, INFO_RACE_FINISHED, e.netname);
+				Send_Notification(NOTIF_ALL, NULL, MSG_INFO, INFO_RACE_FINISHED, e.netname);
 				ClientData_Touch(e);
 			}
 		}
 	}
 
-	float recordtime;
-	string recordholder;
 	if(g_race_qualifying)
 	{
+		float recordtime;
+		string recordholder;
+
 		if(tvalid)
 		{
 			recordtime = race_checkpoint_records[cp];
+			float myrecordtime = e.race_checkpoint_record[cp];
 			recordholder = strcat1(race_checkpoint_recordholders[cp]); // make a tempstring copy, as we'll possibly strunzone it!
 			if(recordholder == e.netname)
 				recordholder = "";
@@ -416,22 +484,20 @@ void race_SendTime(entity e, float cp, float t, float tvalid)
 			{
 				if(cp == race_timed_checkpoint)
 				{
-					race_setTime(GetMapname(), t, e.crypto_idfp, e.netname, e);
+					race_setTime(GetMapname(), t, e.crypto_idfp, e.netname, e, true);
 					MUTATOR_CALLHOOK(Race_FinalCheckpoint, e);
 				}
+				if(t < myrecordtime || myrecordtime == 0)
+					e.race_checkpoint_record[cp] = t; // resending done below
+
 				if(t < recordtime || recordtime == 0)
 				{
 					race_checkpoint_records[cp] = t;
-					if(race_checkpoint_recordholders[cp])
-						strunzone(race_checkpoint_recordholders[cp]);
-					race_checkpoint_recordholders[cp] = strzone(e.netname);
+					strcpy(race_checkpoint_recordholders[cp], e.netname);
 					if(g_race_qualifying)
-					{
-						FOR_EACH_REALPLAYER(p)
-							if(p.race_checkpoint == cp)
-								race_SendNextCheckpoint(p, 0);
-					}
+						FOREACH_CLIENT(IS_PLAYER(it) && IS_REAL_CLIENT(it) && it.race_checkpoint == cp, { race_SendNextCheckpoint(it, 0); });
 				}
+
 			}
 		}
 		else
@@ -444,38 +510,42 @@ void race_SendTime(entity e, float cp, float t, float tvalid)
 
 		if(IS_REAL_CLIENT(e))
 		{
-			msg_entity = e;
 			if(g_race_qualifying)
 			{
-				WRITESPECTATABLE_MSG_ONE_VARNAME(dummy1, {
-					WriteHeader(MSG_ONE, TE_CSQC_RACE);
-					WriteByte(MSG_ONE, RACE_NET_CHECKPOINT_HIT_QUALIFYING);
-					WriteByte(MSG_ONE, race_CheckpointNetworkID(cp)); // checkpoint the player now is at
-					WriteInt24_t(MSG_ONE, t); // time to that intermediate
-					WriteInt24_t(MSG_ONE, recordtime); // previously best time
-					WriteString(MSG_ONE, recordholder); // record holder
+				FOREACH_CLIENT(IS_REAL_CLIENT(it),
+				{
+					if(it == e || (IS_SPEC(it) && it.enemy == e))
+					{
+						msg_entity = it;
+						WriteHeader(MSG_ONE, TE_CSQC_RACE);
+						WriteByte(MSG_ONE, RACE_NET_CHECKPOINT_HIT_QUALIFYING);
+						WriteByte(MSG_ONE, race_CheckpointNetworkID(cp)); // checkpoint the player now is at
+						WriteInt24_t(MSG_ONE, t); // time to that intermediate
+						WriteInt24_t(MSG_ONE, recordtime); // previously best time
+						WriteInt24_t(MSG_ONE, ((tvalid) ? it.race_checkpoint_record[cp] : 0)); // previously best time
+						WriteString(MSG_ONE, recordholder); // record holder
+					}
 				});
 			}
 		}
 	}
 	else // RACE! Not Qualifying
 	{
-		float lself, lother, othtime;
-		entity oth;
-		oth = race_checkpoint_lastplayers[cp];
+		float mylaps, lother, othtime;
+		entity oth = race_checkpoint_lastplayers[cp];
 		if(oth)
 		{
-			lself = PlayerScore_Add(e, SP_RACE_LAPS, 0);
+			mylaps = GameRules_scoring_add(e, RACE_LAPS, 0);
 			lother = race_checkpoint_lastlaps[cp];
 			othtime = race_checkpoint_lasttimes[cp];
 		}
 		else
-			lself = lother = othtime = 0;
+			mylaps = lother = othtime = 0;
 
 		if(IS_REAL_CLIENT(e))
 		{
 			msg_entity = e;
-			WRITESPECTATABLE_MSG_ONE_VARNAME(dummy2, {
+			WRITESPECTATABLE_MSG_ONE(msg_entity, {
 				WriteHeader(MSG_ONE, TE_CSQC_RACE);
 				WriteByte(MSG_ONE, RACE_NET_CHECKPOINT_HIT_RACE);
 				WriteByte(MSG_ONE, race_CheckpointNetworkID(cp)); // checkpoint the player now is at
@@ -483,25 +553,25 @@ void race_SendTime(entity e, float cp, float t, float tvalid)
 				{
 					WriteInt24_t(MSG_ONE, 0);
 					WriteByte(MSG_ONE, 0);
-					WriteString(MSG_ONE, "");
+					WriteByte(MSG_ONE, 0);
 				}
 				else
 				{
 					WriteInt24_t(MSG_ONE, TIME_ENCODE(time - race_checkpoint_lasttimes[cp]));
-					WriteByte(MSG_ONE, lself - lother);
-					WriteString(MSG_ONE, oth.netname); // record holder
+					WriteByte(MSG_ONE, mylaps - lother);
+					WriteByte(MSG_ONE, etof(oth)); // record holder
 				}
 			});
 		}
 
 		race_checkpoint_lastplayers[cp] = e;
 		race_checkpoint_lasttimes[cp] = time;
-		race_checkpoint_lastlaps[cp] = lself;
+		race_checkpoint_lastlaps[cp] = mylaps;
 
 		if(IS_REAL_CLIENT(oth))
 		{
 			msg_entity = oth;
-			WRITESPECTATABLE_MSG_ONE_VARNAME(dummy3, {
+			WRITESPECTATABLE_MSG_ONE(msg_entity, {
 				WriteHeader(MSG_ONE, TE_CSQC_RACE);
 				WriteByte(MSG_ONE, RACE_NET_CHECKPOINT_HIT_RACE_BY_OPPONENT);
 				WriteByte(MSG_ONE, race_CheckpointNetworkID(cp)); // checkpoint the player now is at
@@ -509,13 +579,13 @@ void race_SendTime(entity e, float cp, float t, float tvalid)
 				{
 					WriteInt24_t(MSG_ONE, 0);
 					WriteByte(MSG_ONE, 0);
-					WriteString(MSG_ONE, "");
+					WriteByte(MSG_ONE, 0);
 				}
 				else
 				{
 					WriteInt24_t(MSG_ONE, TIME_ENCODE(time - othtime));
-					WriteByte(MSG_ONE, lother - lself);
-					WriteString(MSG_ONE, e.netname); // record holder
+					WriteByte(MSG_ONE, lother - mylaps);
+					WriteByte(MSG_ONE, etof(e) - 1); // record holder
 				}
 			});
 		}
@@ -528,268 +598,249 @@ void race_ClearTime(entity e)
 	e.race_laptime = 0;
 	e.race_movetime = e.race_movetime_frac = e.race_movetime_count = 0;
 	e.race_penalty_accumulator = 0;
-	e.race_lastpenalty = world;
+	e.race_lastpenalty = NULL;
 
 	if(!IS_REAL_CLIENT(e))
 		return;
 
 	msg_entity = e;
-	WRITESPECTATABLE_MSG_ONE({
+	WRITESPECTATABLE_MSG_ONE(msg_entity, {
 		WriteHeader(MSG_ONE, TE_CSQC_RACE);
 		WriteByte(MSG_ONE, RACE_NET_CHECKPOINT_CLEAR); // next
 	});
 }
 
-void dumpsurface(entity e)
+void checkpoint_passed(entity this, entity player)
 {
-	float n, si, ni;
-	vector norm, vec;
-	LOG_INFO("Surfaces of ", etos(e), ":\n");
+	if(IS_VEHICLE(player) && player.owner)
+		player = player.owner;
 
-	LOG_INFO("TEST = ", ftos(getsurfacenearpoint(e, '0 0 0')), "\n");
+	if(player.personal && autocvar_g_allow_checkpoints)
+		return; // practice mode!
 
-	for(si = 0; ; ++si)
-	{
-		n = getsurfacenumpoints(e, si);
-		if(n <= 0)
-			break;
-		LOG_INFO("  Surface ", ftos(si), ":\n");
-		norm = getsurfacenormal(e, si);
-		LOG_INFO("    Normal = ", vtos(norm), "\n");
-		for(ni = 0; ni < n; ++ni)
-		{
-			vec = getsurfacepoint(e, si, ni);
-			LOG_INFO("    Point ", ftos(ni), " = ", vtos(vec), " (", ftos(norm * vec), ")\n");
-		}
-	}
-}
-
-void checkpoint_passed()
-{SELFPARAM();
-	string oldmsg;
-	entity cp;
-
-	if(other.classname == "porto")
+	if(player.classname == "porto")
 	{
 		// do not allow portalling through checkpoints
-		trace_plane_normal = normalize(-1 * other.velocity);
-		setself(other);
-		W_Porto_Fail(0);
+		trace_plane_normal = normalize(-1 * player.velocity);
+		W_Porto_Fail(player, 0);
 		return;
 	}
+
+	string oldmsg; // used twice
 
 	/*
 	 * Trigger targets
 	 */
-	if (!((self.spawnflags & 2) && (IS_PLAYER(other))))
+	if (!((this.spawnflags & 2) && (IS_PLAYER(player))))
 	{
-		activator = other;
-		oldmsg = self.message;
-		self.message = "";
-		SUB_UseTargets();
-		self.message = oldmsg;
+		oldmsg = this.message;
+		this.message = "";
+		SUB_UseTargets(this, player, player);
+		this.message = oldmsg;
 	}
 
-	if (!IS_PLAYER(other))
+	if (!IS_PLAYER(player))
 		return;
 
 	/*
 	 * Remove unauthorized equipment
 	 */
-	Portal_ClearAll(other);
+	Portal_ClearAll(player);
 
-	other.porto_forbidden = 2; // decreased by 1 each StartFrame
+	player.porto_forbidden = 2; // decreased by 1 each StartFrame
 
 	if(defrag_ents)
 	{
-		if(self.race_checkpoint == -2)
+		if(this.race_checkpoint == -2)
 		{
-			self.race_checkpoint = other.race_checkpoint;
+			this.race_checkpoint = player.race_checkpoint;
 		}
 
-		float largest_cp_id = 0;
-		float cp_amount = 0;
-		for(cp = world; (cp = find(cp, classname, "target_checkpoint"));)
+		int cp_amount = 0, largest_cp_id = 0;
+		IL_EACH(g_race_targets, it.classname == "target_checkpoint",
 		{
 			cp_amount += 1;
-			if(cp.race_checkpoint > largest_cp_id) // update the finish id if someone hit a new checkpoint
+			if(it.race_checkpoint > largest_cp_id) // update the finish id if someone hit a new checkpoint
 			{
-				largest_cp_id = cp.race_checkpoint;
-				for(cp = world; (cp = find(cp, classname, "target_stopTimer"));)
-					cp.race_checkpoint = largest_cp_id + 1; // finish line
+				if(!largest_cp_id)
+				{
+					IL_EACH(g_race_targets, it.classname == "target_checkpoint",
+					{
+						if(it.race_checkpoint == -2) // set defragcpexists to -1 so that the cp id file will be rewritten when someone finishes
+							defragcpexists = -1;
+					});
+				}
+
+				largest_cp_id = it.race_checkpoint;
+				IL_EACH(g_race_targets, it.classname == "target_stopTimer",
+				{
+					it.race_checkpoint = largest_cp_id + 1; // finish line
+				});
 				race_highest_checkpoint = largest_cp_id + 1;
 				race_timed_checkpoint = largest_cp_id + 1;
-
-				for(cp = world; (cp = find(cp, classname, "target_checkpoint"));)
-				{
-					if(cp.race_checkpoint == -2) // set defragcpexists to -1 so that the cp id file will be rewritten when someone finishes
-						defragcpexists = -1;
-				}
 			}
-		}
-		if(cp_amount == 0)
+		});
+
+		if(!cp_amount)
 		{
-			for(cp = world; (cp = find(cp, classname, "target_stopTimer"));)
-				cp.race_checkpoint = 1;
+			IL_EACH(g_race_targets, it.classname == "target_stopTimer",
+			{
+				it.race_checkpoint = 1;
+			});
 			race_highest_checkpoint = 1;
 			race_timed_checkpoint = 1;
 		}
 	}
 
-	if((other.race_checkpoint == -1 && self.race_checkpoint == 0) || (other.race_checkpoint == self.race_checkpoint))
+	if((player.race_checkpoint == -1 && this.race_checkpoint == 0) || (player.race_checkpoint == this.race_checkpoint))
 	{
-		if(self.race_penalty)
+		if(this.race_penalty)
 		{
-			if(other.race_lastpenalty != self)
+			if(player.race_lastpenalty != this)
 			{
-				other.race_lastpenalty = self;
-				race_ImposePenaltyTime(other, self.race_penalty, self.race_penalty_reason);
+				player.race_lastpenalty = this;
+				race_ImposePenaltyTime(player, this.race_penalty, this.race_penalty_reason);
 			}
 		}
 
-		if(other.race_penalty)
+		if(player.race_penalty)
 			return;
 
 		/*
 		 * Trigger targets
 		 */
-		if(self.spawnflags & 2)
+		if(this.spawnflags & 2)
 		{
-			activator = other;
-			oldmsg = self.message;
-			self.message = "";
-			SUB_UseTargets();
-			self.message = oldmsg;
+			oldmsg = this.message;
+			this.message = "";
+			SUB_UseTargets(this, player, player); // TODO: should we be using other for the trigger here?
+			this.message = oldmsg;
 		}
 
-		if(other.race_respawn_checkpoint != self.race_checkpoint || !other.race_started)
-			other.race_respawn_spotref = self; // this is not a spot but a CP, but spawnpoint selection will deal with that
-		other.race_respawn_checkpoint = self.race_checkpoint;
-		other.race_checkpoint = race_NextCheckpoint(self.race_checkpoint);
-		other.race_started = 1;
+		if(player.race_respawn_checkpoint != this.race_checkpoint || !player.race_started)
+			player.race_respawn_spotref = this; // this is not a spot but a CP, but spawnpoint selection will deal with that
+		player.race_respawn_checkpoint = this.race_checkpoint;
+		player.race_checkpoint = race_NextCheckpoint(this.race_checkpoint);
+		player.race_started = 1;
 
-		race_SendTime(other, self.race_checkpoint, other.race_movetime, boolean(other.race_laptime));
+		race_SendTime(player, this.race_checkpoint, player.race_movetime, boolean(player.race_laptime));
 
-		if(!self.race_checkpoint) // start line
+		if(!this.race_checkpoint) // start line
 		{
-			other.race_laptime = time;
-			other.race_movetime = other.race_movetime_frac = other.race_movetime_count = 0;
-			other.race_penalty_accumulator = 0;
-			other.race_lastpenalty = world;
+			player.race_laptime = time;
+			player.race_movetime = player.race_movetime_frac = player.race_movetime_count = 0;
+			player.race_penalty_accumulator = 0;
+			player.race_lastpenalty = NULL;
 		}
 
 		if(g_race_qualifying)
-			race_SendNextCheckpoint(other, 0);
+			race_SendNextCheckpoint(player, 0);
 
-		if(defrag_ents && defragcpexists < 0 && self.classname == "target_stopTimer")
+		if(defrag_ents && defragcpexists < 0 && this.classname == "target_stopTimer")
 		{
 			float fh;
 			defragcpexists = fh = fopen(strcat("maps/", GetMapname(), ".defragcp"), FILE_WRITE);
 			if(fh >= 0)
 			{
-				for(cp = world; (cp = find(cp, classname, "target_checkpoint"));)
-				fputs(fh, strcat(cp.targetname, " ", ftos(cp.race_checkpoint), "\n"));
+				IL_EACH(g_race_targets, it.classname == "target_checkpoint",
+				{
+					fputs(fh, strcat(it.targetname, " ", ftos(it.race_checkpoint), "\n"));
+				});
 			}
 			fclose(fh);
 		}
 	}
-	else if(other.race_checkpoint == race_NextCheckpoint(self.race_checkpoint))
+	else if(player.race_checkpoint == race_NextCheckpoint(this.race_checkpoint))
 	{
 		// ignored
 	}
 	else
 	{
-		if(self.spawnflags & 4)
-			Damage (other, self, self, 10000, DEATH_HURTTRIGGER.m_id, other.origin, '0 0 0');
+		if(this.spawnflags & 4)
+			Damage (player, this, this, 10000, DEATH_HURTTRIGGER.m_id, DMG_NOWEP, player.origin, '0 0 0');
 	}
 }
 
-void checkpoint_touch()
+void checkpoint_touch(entity this, entity toucher)
 {
-	EXACTTRIGGER_TOUCH;
-	checkpoint_passed();
+	EXACTTRIGGER_TOUCH(this, toucher);
+	checkpoint_passed(this, toucher);
 }
 
-void checkpoint_use()
+void checkpoint_use(entity this, entity actor, entity trigger)
 {
-	if(other.classname == "info_player_deathmatch") // a spawn, a spawn
+	if(trigger.classname == "info_player_deathmatch") // a spawn, a spawn
 		return;
 
-	other = activator;
-	checkpoint_passed();
+	checkpoint_passed(this, actor);
 }
 
-float race_waypointsprite_visible_for_player(entity e)
-{SELFPARAM();
-	if(e.race_checkpoint == -1 || self.owner.race_checkpoint == -2)
+bool race_waypointsprite_visible_for_player(entity this, entity player, entity view)
+{
+	entity own = this.owner;
+	if(this.realowner)
+		own = this.realowner; // target support
+
+	if(view.race_checkpoint == -1 || own.race_checkpoint == -2)
 		return true;
-	else if(e.race_checkpoint == self.owner.race_checkpoint)
+	else if(view.race_checkpoint == own.race_checkpoint)
 		return true;
 	else
 		return false;
 }
 
-float have_verified;
-void trigger_race_checkpoint_verify()
-{SELFPARAM();
-	entity cp;
-	float i, p;
-	float qual;
+void trigger_race_checkpoint_verify(entity this)
+{
+    static bool have_verified;
+	if (have_verified) return;
+	have_verified = true;
 
-	if(have_verified)
-		return;
-	have_verified = 1;
+	bool qual = g_race_qualifying;
 
-	qual = g_race_qualifying;
+	int pl_race_checkpoint = 0;
+	int pl_race_place = 0;
 
-	setself(spawn());
-	self.classname = STR_PLAYER;
-
-	if(g_race)
-	{
-		for(i = 0; i <= race_highest_checkpoint; ++i)
-		{
-			self.race_checkpoint = race_NextCheckpoint(i);
+	if (g_race) {
+		for (int i = 0; i <= race_highest_checkpoint; ++i) {
+			pl_race_checkpoint = race_NextCheckpoint(i);
 
 			// race only (middle of the race)
-			g_race_qualifying = 0;
-			self.race_place = 0;
-			if(!Spawn_FilterOutBadSpots(findchain(classname, "info_player_deathmatch"), 0, false))
-				error(strcat("Checkpoint ", ftos(i), " misses a spawnpoint with race_place==", ftos(self.race_place), " (used for respawning in race) - bailing out"));
+			g_race_qualifying = false;
+			pl_race_place = 0;
+			if (!Spawn_FilterOutBadSpots(this, findchain(classname, "info_player_deathmatch"), 0, false, true)) {
+				error(strcat("Checkpoint ", ftos(i), " misses a spawnpoint with race_place==", ftos(pl_race_place), " (used for respawning in race) - bailing out"));
+            }
 
-			if(i == 0)
-			{
+			if (i == 0) {
 				// qualifying only
 				g_race_qualifying = 1;
-				self.race_place = race_lowest_place_spawn;
-				if(!Spawn_FilterOutBadSpots(findchain(classname, "info_player_deathmatch"), 0, false))
-					error(strcat("Checkpoint ", ftos(i), " misses a spawnpoint with race_place==", ftos(self.race_place), " (used for qualifying) - bailing out"));
+				pl_race_place = race_lowest_place_spawn;
+				if (!Spawn_FilterOutBadSpots(this, findchain(classname, "info_player_deathmatch"), 0, false, true)) {
+					error(strcat("Checkpoint ", ftos(i), " misses a spawnpoint with race_place==", ftos(pl_race_place), " (used for qualifying) - bailing out"));
+                }
 
 				// race only (initial spawn)
 				g_race_qualifying = 0;
-				for(p = 1; p <= race_highest_place_spawn; ++p)
-				{
-					self.race_place = p;
-					if(!Spawn_FilterOutBadSpots(findchain(classname, "info_player_deathmatch"), 0, false))
-						error(strcat("Checkpoint ", ftos(i), " misses a spawnpoint with race_place==", ftos(self.race_place), " (used for initially spawning in race) - bailing out"));
+				for (int p = 1; p <= race_highest_place_spawn; ++p) {
+					pl_race_place = p;
+					if (!Spawn_FilterOutBadSpots(this, findchain(classname, "info_player_deathmatch"), 0, false, true)) {
+						error(strcat("Checkpoint ", ftos(i), " misses a spawnpoint with race_place==", ftos(pl_race_place), " (used for initially spawning in race) - bailing out"));
+                    }
 				}
 			}
 		}
-	}
-	else if(!defrag_ents)
-	{
+	} else if (!defrag_ents) {
 		// qualifying only
-		self.race_checkpoint = race_NextCheckpoint(0);
+		pl_race_checkpoint = race_NextCheckpoint(0);
 		g_race_qualifying = 1;
-		self.race_place = race_lowest_place_spawn;
-		if(!Spawn_FilterOutBadSpots(findchain(classname, "info_player_deathmatch"), 0, false))
-			error(strcat("Checkpoint 0 misses a spawnpoint with race_place==", ftos(self.race_place), " (used for qualifying) - bailing out"));
-	}
-	else
-	{
-		self.race_checkpoint = race_NextCheckpoint(0);
+		pl_race_place = race_lowest_place_spawn;
+		if (!Spawn_FilterOutBadSpots(this, findchain(classname, "info_player_deathmatch"), 0, false, true)) {
+			error(strcat("Checkpoint 0 misses a spawnpoint with race_place==", ftos(pl_race_place), " (used for qualifying) - bailing out"));
+        }
+	} else {
+		pl_race_checkpoint = race_NextCheckpoint(0);
 		g_race_qualifying = 1;
-		self.race_place = 0; // there's only one spawn on defrag maps
+		pl_race_place = 0; // there's only one spawn on defrag maps
 
 		// check if a defragcp file already exists, then read it and apply the checkpoint order
 		float fh;
@@ -797,19 +848,18 @@ void trigger_race_checkpoint_verify()
 		string l;
 
 		defragcpexists = fh = fopen(strcat("maps/", GetMapname(), ".defragcp"), FILE_READ);
-		if(fh >= 0)
-		{
-			while((l = fgets(fh)))
-			{
+		if (fh >= 0) {
+			while ((l = fgets(fh))) {
 				len = tokenize_console(l);
-				if(len != 2)
-				{
+				if (len != 2) {
 					defragcpexists = -1; // something's wrong in the defrag cp file, set defragcpexists to -1 so that it will be rewritten when someone finishes
 					continue;
 				}
-				for(cp = world; (cp = find(cp, classname, "target_checkpoint"));)
-					if(argv(0) == cp.targetname)
+				for (entity cp = NULL; (cp = find(cp, classname, "target_checkpoint"));) {
+					if (argv(0) == cp.targetname) {
 						cp.race_checkpoint = stof(argv(1));
+                    }
+                }
 			}
 			fclose(fh);
 		}
@@ -817,60 +867,77 @@ void trigger_race_checkpoint_verify()
 
 	g_race_qualifying = qual;
 
-	if(race_timed_checkpoint)
+	IL_EACH(g_race_targets, it.classname == "target_checkpoint" || it.classname == "target_startTimer" || it.classname == "target_stopTimer",
 	{
-		if(defrag_ents)
+		if(it.targetname == "" || !it.targetname) // somehow this is a case...
+			continue;
+		entity cpt = it;
+		FOREACH_ENTITY_STRING(target, cpt.targetname,
 		{
-			for(cp = world; (cp = find(cp, classname, "target_startTimer"));)
-				WaypointSprite_UpdateSprites(cp.sprite, WP_RaceStart, WP_Null, WP_Null);
-			for(cp = world; (cp = find(cp, classname, "target_stopTimer"));)
-				WaypointSprite_UpdateSprites(cp.sprite, WP_RaceFinish, WP_Null, WP_Null);
+			vector org = (it.absmin + it.absmax) * 0.5;
+			if(cpt.race_checkpoint == 0)
+				WaypointSprite_SpawnFixed(WP_RaceStart, org, it, sprite, RADARICON_NONE);
+			else
+				WaypointSprite_SpawnFixed(WP_RaceCheckpoint, org, it, sprite, RADARICON_NONE);
 
-			for(cp = world; (cp = find(cp, classname, "target_checkpoint"));)
-			{
-				if(cp.race_checkpoint == -2) // something's wrong with the defrag cp file or it has not been written yet, set defragcpexists to -1 so that it will be rewritten when someone finishes
-					defragcpexists = -1;
-			}
+			it.sprite.realowner = cpt;
+			it.sprite.waypointsprite_visible_for_player = race_waypointsprite_visible_for_player;
+		});
+	});
 
-			if(defragcpexists != -1)
+	if (race_timed_checkpoint) {
+		if (defrag_ents) {
+			IL_EACH(g_race_targets, it.classname == "target_checkpoint" || it.classname == "target_startTimer" || it.classname == "target_stopTimer",
 			{
+				entity cpt = it;
+				if(it.classname == "target_startTimer" || it.classname == "target_stopTimer") {
+					if(it.targetname == "" || !it.targetname) // somehow this is a case...
+						continue;
+					FOREACH_ENTITY_STRING(target, cpt.targetname, {
+						if(it.sprite)
+							WaypointSprite_UpdateSprites(it.sprite, ((cpt.classname == "target_startTimer") ? WP_RaceStart : WP_RaceFinish), WP_Null, WP_Null);
+					});
+				}
+				if(it.classname == "target_checkpoint") {
+					if(it.race_checkpoint == -2)
+						defragcpexists = -1; // something's wrong with the defrag cp file or it has not been written yet, set defragcpexists to -1 so that it will be rewritten when someone finishes
+				}
+			});
+			if (defragcpexists != -1) {
 				float largest_cp_id = 0;
-				for(cp = world; (cp = find(cp, classname, "target_checkpoint"));)
-					if(cp.race_checkpoint > largest_cp_id)
+				for (entity cp = NULL; (cp = find(cp, classname, "target_checkpoint"));) {
+					if (cp.race_checkpoint > largest_cp_id) {
 						largest_cp_id = cp.race_checkpoint;
-				for(cp = world; (cp = find(cp, classname, "target_stopTimer"));)
+                    }
+                }
+				for (entity cp = NULL; (cp = find(cp, classname, "target_stopTimer"));) {
 					cp.race_checkpoint = largest_cp_id + 1; // finish line
+                }
 				race_highest_checkpoint = largest_cp_id + 1;
 				race_timed_checkpoint = largest_cp_id + 1;
-			}
-			else
-			{
-				for(cp = world; (cp = find(cp, classname, "target_stopTimer"));)
+			} else {
+				for (entity cp = NULL; (cp = find(cp, classname, "target_stopTimer"));) {
 					cp.race_checkpoint = 255; // finish line
+                }
 				race_highest_checkpoint = 255;
 				race_timed_checkpoint = 255;
 			}
-		}
-		else
-		{
-			for(cp = world; (cp = find(cp, classname, "trigger_race_checkpoint")); )
-				if(cp.sprite)
-				{
-					if(cp.race_checkpoint == 0)
-						WaypointSprite_UpdateSprites(cp.sprite, WP_RaceStart, WP_Null, WP_Null);
-					else if(cp.race_checkpoint == race_timed_checkpoint)
-						WaypointSprite_UpdateSprites(cp.sprite, WP_RaceFinish, WP_Null, WP_Null);
+		} else {
+			IL_EACH(g_racecheckpoints, it.sprite,
+			{
+				if (it.race_checkpoint == 0) {
+					WaypointSprite_UpdateSprites(it.sprite, WP_RaceStart, WP_Null, WP_Null);
+                } else if (it.race_checkpoint == race_timed_checkpoint) {
+					WaypointSprite_UpdateSprites(it.sprite, WP_RaceFinish, WP_Null, WP_Null);
 				}
+            });
 		}
 	}
 
-	if(defrag_ents)
-	{
-		entity trigger, targ;
-		for(trigger = world; (trigger = find(trigger, classname, "trigger_multiple")); )
-			for(targ = world; (targ = find(targ, targetname, trigger.target)); )
-				if (targ.classname == "target_checkpoint" || targ.classname == "target_startTimer" || targ.classname == "target_stopTimer")
-				{
+	if (defrag_ents) {
+		for (entity trigger = NULL; (trigger = find(trigger, classname, "trigger_multiple")); ) {
+			for (entity targ = NULL; (targ = find(targ, targetname, trigger.target)); ) {
+				if (targ.classname == "target_checkpoint" || targ.classname == "target_startTimer" || targ.classname == "target_stopTimer") {
 					trigger.wait = 0;
 					trigger.delay = 0;
 					targ.wait = 0;
@@ -888,32 +955,31 @@ void trigger_race_checkpoint_verify()
 					//setorigin(targ, trigger.origin);
 					//remove(trigger);
 				}
+            }
+        }
 	}
-	remove(self);
-	setself(this);
 }
 
-vector trigger_race_checkpoint_spawn_evalfunc(entity player, entity spot, vector current)
-{SELFPARAM();
+vector trigger_race_checkpoint_spawn_evalfunc(entity this, entity player, entity spot, vector current)
+{
 	if(g_race_qualifying)
 	{
 		// spawn at first
-		if(self.race_checkpoint != 0)
+		if(this.race_checkpoint != 0)
 			return '-1 0 0';
 		if(spot.race_place != race_lowest_place_spawn)
 			return '-1 0 0';
 	}
 	else
 	{
-		if(self.race_checkpoint != player.race_respawn_checkpoint)
+		if(this.race_checkpoint != player.race_respawn_checkpoint)
 			return '-1 0 0';
 		// try reusing the previous spawn
-		if(self == player.race_respawn_spotref || spot == player.race_respawn_spotref)
+		if(this == player.race_respawn_spotref || spot == player.race_respawn_spotref)
 			current.x += SPAWN_PRIO_RACE_PREVIOUS_SPAWN;
-		if(self.race_checkpoint == 0)
+		if(this.race_checkpoint == 0)
 		{
-			float pl;
-			pl = player.race_place;
+			int pl = player.race_place;
 			if(pl > race_highest_place_spawn)
 				pl = 0;
 			if(pl == 0 && !player.race_started)
@@ -928,90 +994,96 @@ vector trigger_race_checkpoint_spawn_evalfunc(entity player, entity spot, vector
 spawnfunc(trigger_race_checkpoint)
 {
 	vector o;
-	if(!g_race && !g_cts) { remove(self); return; }
+	if(!g_race && !g_cts) { delete(this); return; }
 
 	EXACTTRIGGER_INIT;
 
-	self.use = checkpoint_use;
-	if (!(self.spawnflags & 1))
-		self.touch = checkpoint_touch;
+	this.use = checkpoint_use;
+	if (!(this.spawnflags & 1))
+		settouch(this, checkpoint_touch);
 
-	o = (self.absmin + self.absmax) * 0.5;
-	tracebox(o, PL_MIN, PL_MAX, o - '0 0 1' * (o.z - self.absmin.z), MOVE_NORMAL, self);
-	waypoint_spawnforitem_force(self, trace_endpos);
-	self.nearestwaypointtimeout = time + 1000000000;
+	o = (this.absmin + this.absmax) * 0.5;
+	tracebox(o, PL_MIN_CONST, PL_MAX_CONST, o - '0 0 1' * (o.z - this.absmin.z), MOVE_NORMAL, this);
+	waypoint_spawnforitem_force(this, trace_endpos);
+	this.nearestwaypointtimeout = -1;
 
-	if(self.message == "")
-		self.message = "went backwards";
-	if (self.message2 == "")
-		self.message2 = "was pushed backwards by";
-	if (self.race_penalty_reason == "")
-		self.race_penalty_reason = "missing a checkpoint";
+	if(this.message == "")
+		this.message = "went backwards";
+	if (this.message2 == "")
+		this.message2 = "was pushed backwards by";
+	if (this.race_penalty_reason == "")
+		this.race_penalty_reason = "missing a checkpoint";
 
-	self.race_checkpoint = self.cnt;
+	this.race_checkpoint = this.cnt;
 
-	if(self.race_checkpoint > race_highest_checkpoint)
+	if(this.race_checkpoint > race_highest_checkpoint)
 	{
-		race_highest_checkpoint = self.race_checkpoint;
-		if(self.spawnflags & 8)
-			race_timed_checkpoint = self.race_checkpoint;
+		race_highest_checkpoint = this.race_checkpoint;
+		if(this.spawnflags & 8)
+			race_timed_checkpoint = this.race_checkpoint;
 		else
 			race_timed_checkpoint = 0;
 	}
 
-	if(!self.race_penalty)
+	if(!this.race_penalty)
 	{
-		if(self.race_checkpoint)
-			WaypointSprite_SpawnFixed(WP_RaceCheckpoint, o, self, sprite, RADARICON_NONE);
+		if(this.race_checkpoint)
+			WaypointSprite_SpawnFixed(WP_RaceCheckpoint, o, this, sprite, RADARICON_NONE);
 		else
-			WaypointSprite_SpawnFixed(WP_RaceStartFinish, o, self, sprite, RADARICON_NONE);
+			WaypointSprite_SpawnFixed(WP_RaceStartFinish, o, this, sprite, RADARICON_NONE);
 	}
 
-	self.sprite.waypointsprite_visible_for_player = race_waypointsprite_visible_for_player;
-	self.spawn_evalfunc = trigger_race_checkpoint_spawn_evalfunc;
+	this.sprite.waypointsprite_visible_for_player = race_waypointsprite_visible_for_player;
+	this.spawn_evalfunc = trigger_race_checkpoint_spawn_evalfunc;
 
-	InitializeEntity(self, trigger_race_checkpoint_verify, INITPRIO_FINDTARGET);
+	IL_PUSH(g_racecheckpoints, this);
+
+	InitializeEntity(this, trigger_race_checkpoint_verify, INITPRIO_FINDTARGET);
 }
 
 spawnfunc(target_checkpoint) // defrag entity
 {
-	vector o;
-	if(!g_race && !g_cts) { remove(self); return; }
+	if(!g_race && !g_cts) { delete(this); return; }
 	defrag_ents = 1;
 
-	EXACTTRIGGER_INIT;
+	// if this is targeted, then it probably isn't a trigger
+	bool is_trigger = this.targetname == "";
 
-	self.use = checkpoint_use;
-	if (!(self.spawnflags & 1))
-		self.touch = checkpoint_touch;
+	if(is_trigger)
+		EXACTTRIGGER_INIT;
 
-	o = (self.absmin + self.absmax) * 0.5;
-	tracebox(o, PL_MIN, PL_MAX, o - '0 0 1' * (o.z - self.absmin.z), MOVE_NORMAL, self);
-	waypoint_spawnforitem_force(self, trace_endpos);
-	self.nearestwaypointtimeout = time + 1000000000;
+	this.use = checkpoint_use;
+	if (is_trigger && !(this.spawnflags & 1))
+		settouch(this, checkpoint_touch);
 
-	if(self.message == "")
-		self.message = "went backwards";
-	if (self.message2 == "")
-		self.message2 = "was pushed backwards by";
-	if (self.race_penalty_reason == "")
-		self.race_penalty_reason = "missing a checkpoint";
+	vector org = this.origin;
 
-	if(self.classname == "target_startTimer")
-		self.race_checkpoint = 0;
+	// bots should only pathfind to this if it is a valid touchable trigger
+	if(is_trigger)
+	{
+		org = (this.absmin + this.absmax) * 0.5;
+		tracebox(org, PL_MIN_CONST, PL_MAX_CONST, org - '0 0 1' * (org.z - this.absmin.z), MOVE_NORMAL, this);
+		waypoint_spawnforitem_force(this, trace_endpos);
+		this.nearestwaypointtimeout = -1;
+	}
+
+	if(this.message == "")
+		this.message = "went backwards";
+	if (this.message2 == "")
+		this.message2 = "was pushed backwards by";
+	if (this.race_penalty_reason == "")
+		this.race_penalty_reason = "missing a checkpoint";
+
+	if(this.classname == "target_startTimer")
+		this.race_checkpoint = 0;
 	else
-		self.race_checkpoint = -2;
+		this.race_checkpoint = -2;
 
 	race_timed_checkpoint = 1;
 
-	if(self.race_checkpoint == 0)
-		WaypointSprite_SpawnFixed(WP_RaceStart, o, self, sprite, RADARICON_NONE);
-	else
-		WaypointSprite_SpawnFixed(WP_RaceCheckpoint, o, self, sprite, RADARICON_NONE);
+	IL_PUSH(g_race_targets, this);
 
-	self.sprite.waypointsprite_visible_for_player = race_waypointsprite_visible_for_player;
-
-	InitializeEntity(self, trigger_race_checkpoint_verify, INITPRIO_FINDTARGET);
+	InitializeEntity(this, trigger_race_checkpoint_verify, INITPRIO_FINDTARGET);
 }
 
 spawnfunc(target_startTimer) { spawnfunc_target_checkpoint(this); }
@@ -1019,73 +1091,64 @@ spawnfunc(target_stopTimer) { spawnfunc_target_checkpoint(this); }
 
 void race_AbandonRaceCheck(entity p)
 {
-	if(race_completing && !p.race_completed)
+	if(race_completing && !CS(p).race_completed)
 	{
-		p.race_completed = 1;
+		CS(p).race_completed = 1;
 		MAKE_INDEPENDENT_PLAYER(p);
-		Send_Notification(NOTIF_ALL, world, MSG_INFO, INFO_RACE_ABANDONED, p.netname);
+		Send_Notification(NOTIF_ALL, NULL, MSG_INFO, INFO_RACE_ABANDONED, p.netname);
 		ClientData_Touch(p);
 	}
 }
 
 void race_StartCompleting()
 {
-	entity p;
 	race_completing = 1;
-	FOR_EACH_PLAYER(p)
-		if(p.deadflag != DEAD_NO)
-			race_AbandonRaceCheck(p);
+	FOREACH_CLIENT(IS_PLAYER(it) && IS_DEAD(it), { race_AbandonRaceCheck(it); });
 }
 
-void race_PreparePlayer()
-{SELFPARAM();
-	race_ClearTime(self);
-	self.race_place = 0;
-	self.race_started = 0;
-	self.race_respawn_checkpoint = 0;
-	self.race_respawn_spotref = world;
+void race_PreparePlayer(entity this)
+{
+	race_ClearTime(this);
+	this.race_place = 0;
+	this.race_started = 0;
+	this.race_respawn_checkpoint = 0;
+	this.race_respawn_spotref = NULL;
 }
 
-void race_RetractPlayer()
-{SELFPARAM();
+void race_RetractPlayer(entity this)
+{
 	if(!g_race && !g_cts)
 		return;
-	if(self.race_respawn_checkpoint == 0 || self.race_respawn_checkpoint == race_timed_checkpoint)
-		race_ClearTime(self);
-	self.race_checkpoint = self.race_respawn_checkpoint;
+	if(this.race_respawn_checkpoint == 0 || this.race_respawn_checkpoint == race_timed_checkpoint)
+		race_ClearTime(this);
+	this.race_checkpoint = this.race_respawn_checkpoint;
 }
 
 spawnfunc(info_player_race)
 {
-	if(!g_race && !g_cts) { remove(self); return; }
+	if(!g_race && !g_cts) { delete(this); return; }
 	++race_spawns;
 	spawnfunc_info_player_deathmatch(this);
 
-	if(self.race_place > race_highest_place_spawn)
-		race_highest_place_spawn = self.race_place;
-	if(self.race_place < race_lowest_place_spawn)
-		race_lowest_place_spawn = self.race_place;
+	if(this.race_place > race_highest_place_spawn)
+		race_highest_place_spawn = this.race_place;
+	if(this.race_place < race_lowest_place_spawn)
+		race_lowest_place_spawn = this.race_place;
 }
 
 void race_ClearRecords()
-{SELFPARAM();
-	float i;
-
-	for(i = 0; i < MAX_CHECKPOINTS; ++i)
+{
+	for(int j = 0; j < MAX_CHECKPOINTS; ++j)
 	{
-		race_checkpoint_records[i] = 0;
-		if(race_checkpoint_recordholders[i])
-			strunzone(race_checkpoint_recordholders[i]);
-		race_checkpoint_recordholders[i] = string_null;
+		race_checkpoint_records[j] = 0;
+		strfree(race_checkpoint_recordholders[j]);
 	}
 
-	entity e;
-	FOR_EACH_CLIENT(e)
-	{
-		float p = e.race_place;
-		WITH(entity, self, e, race_PreparePlayer());
-		e.race_place = p;
-	}
+	FOREACH_CLIENT(true, {
+		float p = it.race_place;
+		race_PreparePlayer(it);
+		it.race_place = p;
+	});
 }
 
 void race_ImposePenaltyTime(entity pl, float penalty, string reason)
@@ -1096,7 +1159,7 @@ void race_ImposePenaltyTime(entity pl, float penalty, string reason)
 		if(IS_REAL_CLIENT(pl))
 		{
 			msg_entity = pl;
-			WRITESPECTATABLE_MSG_ONE({
+			WRITESPECTATABLE_MSG_ONE(msg_entity, {
 				WriteHeader(MSG_ONE, TE_CSQC_RACE);
 				WriteByte(MSG_ONE, RACE_NET_PENALTY_QUALIFYING);
 				WriteShort(MSG_ONE, TIME_ENCODE(penalty));
@@ -1110,7 +1173,7 @@ void race_ImposePenaltyTime(entity pl, float penalty, string reason)
 		if(IS_REAL_CLIENT(pl))
 		{
 			msg_entity = pl;
-			WRITESPECTATABLE_MSG_ONE_VARNAME(dummy, {
+			WRITESPECTATABLE_MSG_ONE(msg_entity, {
 				WriteHeader(MSG_ONE, TE_CSQC_RACE);
 				WriteByte(MSG_ONE, RACE_NET_PENALTY_RACE);
 				WriteShort(MSG_ONE, TIME_ENCODE(penalty));
@@ -1120,36 +1183,36 @@ void race_ImposePenaltyTime(entity pl, float penalty, string reason)
 	}
 }
 
-void penalty_touch()
-{SELFPARAM();
-	EXACTTRIGGER_TOUCH;
-	if(other.race_lastpenalty != self)
+void penalty_touch(entity this, entity toucher)
+{
+	EXACTTRIGGER_TOUCH(this, toucher);
+	if(toucher.race_lastpenalty != this)
 	{
-		other.race_lastpenalty = self;
-		race_ImposePenaltyTime(other, self.race_penalty, self.race_penalty_reason);
+		toucher.race_lastpenalty = this;
+		race_ImposePenaltyTime(toucher, this.race_penalty, this.race_penalty_reason);
 	}
 }
 
-void penalty_use()
-{SELFPARAM();
-	race_ImposePenaltyTime(activator, self.race_penalty, self.race_penalty_reason);
+void penalty_use(entity this, entity actor, entity trigger)
+{
+	race_ImposePenaltyTime(actor, this.race_penalty, this.race_penalty_reason);
 }
 
 spawnfunc(trigger_race_penalty)
 {
 	// TODO: find out why this wasnt done:
-	//if(!g_cts && !g_race) { remove(self); return; }
+	//if(!g_cts && !g_race) { remove(this); return; }
 
 	EXACTTRIGGER_INIT;
 
-	self.use = penalty_use;
-	if (!(self.spawnflags & 1))
-		self.touch = penalty_touch;
+	this.use = penalty_use;
+	if (!(this.spawnflags & 1))
+		settouch(this, penalty_touch);
 
-	if (self.race_penalty_reason == "")
-		self.race_penalty_reason = "missing a checkpoint";
-	if (!self.race_penalty)
-		self.race_penalty = 5;
+	if (this.race_penalty_reason == "")
+		this.race_penalty_reason = "missing a checkpoint";
+	if (!this.race_penalty)
+		this.race_penalty = 5;
 }
 
 float race_GetFractionalLapCount(entity e)
@@ -1165,13 +1228,13 @@ float race_GetFractionalLapCount(entity e)
 	// links on CP entities)
 
 	float l;
-	l = PlayerScore_Add(e, SP_RACE_LAPS, 0);
-	if(e.race_completed)
+	l = GameRules_scoring_add(e, RACE_LAPS, 0);
+	if(CS(e).race_completed)
 		return l; // not fractional
 
 	vector o0, o1;
 	float bestfraction, fraction;
-	entity lastcp, cp0, cp1;
+	entity lastcp;
 	float nextcpindex, lastcpindex;
 
 	nextcpindex = max(e.race_checkpoint, 0);
@@ -1182,26 +1245,26 @@ float race_GetFractionalLapCount(entity e)
 		return l; // finish
 
 	bestfraction = 1;
-	for(cp0 = world; (cp0 = find(cp0, classname, "trigger_race_checkpoint")); )
+	IL_EACH(g_racecheckpoints, true,
 	{
-		if(cp0.race_checkpoint != lastcpindex)
+		if(it.race_checkpoint != lastcpindex)
 			continue;
 		if(lastcp)
-			if(cp0 != lastcp)
+			if(it != lastcp)
 				continue;
-		o0 = (cp0.absmin + cp0.absmax) * 0.5;
-		for(cp1 = world; (cp1 = find(cp1, classname, "trigger_race_checkpoint")); )
+		o0 = (it.absmin + it.absmax) * 0.5;
+		IL_EACH(g_racecheckpoints, true,
 		{
-			if(cp1.race_checkpoint != nextcpindex)
+			if(it.race_checkpoint != nextcpindex)
 				continue;
-			o1 = (cp1.absmin + cp1.absmax) * 0.5;
+			o1 = (it.absmin + it.absmax) * 0.5;
 			if(o0 == o1)
 				continue;
 			fraction = bound(0.0001, vlen(e.origin - o1) / vlen(o0 - o1), 1);
 			if(fraction < bestfraction)
 				bestfraction = fraction;
-		}
-	}
+		});
+	});
 
 	// we are at CP "nextcpindex - bestfraction"
 	// race_timed_checkpoint == 4: then nextcp==4 means 0.9999x, nextcp==0 means 0.0000x

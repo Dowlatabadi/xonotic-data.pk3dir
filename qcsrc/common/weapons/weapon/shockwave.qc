@@ -1,105 +1,20 @@
-#ifndef IMPLEMENTATION
-CLASS(Shockwave, Weapon)
-/* ammotype  */ //ATTRIB(Shockwave, ammo_field, .int, ammo_none)
-/* impulse   */ ATTRIB(Shockwave, impulse, int, 2)
-/* flags     */ ATTRIB(Shockwave, spawnflags, int, WEP_FLAG_NORMAL | WEP_TYPE_HITSCAN | WEP_FLAG_CANCLIMB | WEP_FLAG_MUTATORBLOCKED);
-/* rating    */ ATTRIB(Shockwave, bot_pickupbasevalue, float, BOT_PICKUP_RATING_LOW);
-/* color     */ ATTRIB(Shockwave, wpcolor, vector, '0.5 0.25 0');
-/* modelname */ ATTRIB(Shockwave, mdl, string, "shotgun");
-#ifndef MENUQC
-/* model     */ ATTRIB(Shockwave, m_model, Model, MDL_SHOCKWAVE_ITEM);
-#endif
-/* crosshair */ ATTRIB(Shockwave, w_crosshair, string, "gfx/crosshairshotgun");
-/* crosshair */ ATTRIB(Shockwave, w_crosshair_size, float, 0.7);
-/* wepimg    */ ATTRIB(Shockwave, model2, string, "weaponshotgun");
-/* refname   */ ATTRIB(Shockwave, netname, string, "shockwave");
-/* wepname   */ ATTRIB(Shockwave, m_name, string, _("Shockwave"));
-
-#define X(BEGIN, P, END, class, prefix) \
-	BEGIN(class) \
-		P(class, prefix, blast_animtime, float, NONE) \
-		P(class, prefix, blast_damage, float, NONE) \
-		P(class, prefix, blast_distance, float, NONE) \
-		P(class, prefix, blast_edgedamage, float, NONE) \
-		P(class, prefix, blast_force, float, NONE) \
-		P(class, prefix, blast_force_forwardbias, float, NONE) \
-		P(class, prefix, blast_force_zscale, float, NONE) \
-		P(class, prefix, blast_jump_damage, float, NONE) \
-		P(class, prefix, blast_jump_edgedamage, float, NONE) \
-		P(class, prefix, blast_jump_force, float, NONE) \
-		P(class, prefix, blast_jump_force_velocitybias, float, NONE) \
-		P(class, prefix, blast_jump_force_zscale, float, NONE) \
-		P(class, prefix, blast_jump_multiplier_accuracy, float, NONE) \
-		P(class, prefix, blast_jump_multiplier_distance, float, NONE) \
-		P(class, prefix, blast_jump_multiplier_min, float, NONE) \
-		P(class, prefix, blast_jump_radius, float, NONE) \
-		P(class, prefix, blast_multiplier_accuracy, float, NONE) \
-		P(class, prefix, blast_multiplier_distance, float, NONE) \
-		P(class, prefix, blast_multiplier_min, float, NONE) \
-		P(class, prefix, blast_refire, float, NONE) \
-		P(class, prefix, blast_splash_damage, float, NONE) \
-		P(class, prefix, blast_splash_edgedamage, float, NONE) \
-		P(class, prefix, blast_splash_force, float, NONE) \
-		P(class, prefix, blast_splash_force_forwardbias, float, NONE) \
-		P(class, prefix, blast_splash_multiplier_accuracy, float, NONE) \
-		P(class, prefix, blast_splash_multiplier_distance, float, NONE) \
-		P(class, prefix, blast_splash_multiplier_min, float, NONE) \
-		P(class, prefix, blast_splash_radius, float, NONE) \
-		P(class, prefix, blast_spread_max, float, NONE) \
-		P(class, prefix, blast_spread_min, float, NONE) \
-		P(class, prefix, melee_animtime, float, NONE) \
-		P(class, prefix, melee_damage, float, NONE) \
-		P(class, prefix, melee_delay, float, NONE) \
-		P(class, prefix, melee_force, float, NONE) \
-		P(class, prefix, melee_multihit, float, NONE) \
-		P(class, prefix, melee_no_doubleslap, float, NONE) \
-		P(class, prefix, melee_nonplayerdamage, float, NONE) \
-		P(class, prefix, melee_range, float, NONE) \
-		P(class, prefix, melee_refire, float, NONE) \
-		P(class, prefix, melee_swing_side, float, NONE) \
-		P(class, prefix, melee_swing_up, float, NONE) \
-		P(class, prefix, melee_time, float, NONE) \
-		P(class, prefix, melee_traces, float, NONE) \
-		P(class, prefix, switchdelay_raise, float, NONE) \
-        P(class, prefix, switchdelay_drop, float, NONE) \
-        P(class, prefix, weaponreplace, string, NONE) \
-        P(class, prefix, weaponstart, float, NONE) \
-        P(class, prefix, weaponstartoverride, float, NONE) \
-        P(class, prefix, weaponthrowable, float, NONE) \
-	END()
-    W_PROPS(X, Shockwave, shockwave)
-#undef X
-
-ENDCLASS(Shockwave)
-REGISTER_WEAPON(SHOCKWAVE, shockwave, NEW(Shockwave));
-
-
-#ifdef CSQC
-void Net_ReadShockwaveParticle();
-.vector sw_shotorg;
-.vector sw_shotdir;
-.float sw_distance;
-.float sw_spread_max;
-.float sw_spread_min;
-.float sw_time;
-#endif
-#endif
-#ifdef IMPLEMENTATION
+#include "shockwave.qh"
 
 REGISTER_NET_TEMP(TE_CSQC_SHOCKWAVEPARTICLE)
 
 #ifdef SVQC
-spawnfunc(weapon_shockwave)
+// enable when shockwave replaces shotgun
+#if 0
+METHOD(Shockwave, m_spawnfunc_hookreplace, Weapon(Shockwave this, entity e))
 {
 	//if(autocvar_sv_q3acompat_machineshockwaveswap) // WEAPONTODO
-	if(autocvar_sv_q3acompat_machineshotgunswap)
-	if(self.classname != "droppedweapon")
+	if (autocvar_sv_q3acompat_machineshotgunswap && !Item_IsLoot(e))
 	{
-		weapon_defaultspawnfunc(this, WEP_MACHINEGUN);
-		return;
+		return WEP_MACHINEGUN;
 	}
-	weapon_defaultspawnfunc(this, WEP_SHOCKWAVE);
+	return this;
 }
+#endif
 
 const float MAX_SHOCKWAVE_HITS = 10;
 //#define DEBUG_SHOCKWAVE
@@ -112,65 +27,65 @@ float shockwave_hit_damage[MAX_SHOCKWAVE_HITS];
 vector shockwave_hit_force[MAX_SHOCKWAVE_HITS];
 
 // MELEE ATTACK MODE
-void W_Shockwave_Melee_Think()
-{SELFPARAM();
+void W_Shockwave_Melee_Think(entity this)
+{
 	// declarations
 	float i, f, swing, swing_factor, swing_damage, meleetime, is_player;
 	entity target_victim;
 	vector targpos;
 
 	// check to see if we can still continue, otherwise give up now
-	if((self.realowner.deadflag != DEAD_NO) && WEP_CVAR(shockwave, melee_no_doubleslap))
+	if(IS_DEAD(this.realowner) && WEP_CVAR(shockwave, melee_no_doubleslap))
 	{
-		remove(self);
+		delete(this);
 		return;
 	}
 
 	// set start time of melee
-	if(!self.cnt)
+	if(!this.cnt)
 	{
-		self.cnt = time;
-		W_PlayStrengthSound(self.realowner);
+		this.cnt = time;
+		W_PlayStrengthSound(this.realowner);
 	}
 
 	// update values for v_* vectors
-	makevectors(self.realowner.v_angle);
+	makevectors(this.realowner.v_angle);
 
 	// calculate swing percentage based on time
-	meleetime = WEP_CVAR(shockwave, melee_time) * W_WeaponRateFactor();
-	swing = bound(0, (self.cnt + meleetime - time) / meleetime, 10);
+	meleetime = WEP_CVAR(shockwave, melee_time) * W_WeaponRateFactor(this.realowner);
+	swing = bound(0, (this.cnt + meleetime - time) / meleetime, 10);
 	f = ((1 - swing) * WEP_CVAR(shockwave, melee_traces));
 
 	// perform the traces needed for this frame
-	for(i=self.swing_prev; i < f; ++i)
+	for(i=this.swing_prev; i < f; ++i)
 	{
 		swing_factor = ((1 - (i / WEP_CVAR(shockwave, melee_traces))) * 2 - 1);
 
-		targpos = (self.realowner.origin + self.realowner.view_ofs
+		targpos = (this.realowner.origin + this.realowner.view_ofs
 			+ (v_forward * WEP_CVAR(shockwave, melee_range))
 			+ (v_up * swing_factor * WEP_CVAR(shockwave, melee_swing_up))
 			+ (v_right * swing_factor * WEP_CVAR(shockwave, melee_swing_side)));
 
 		WarpZone_traceline_antilag(
-			self.realowner,
-			(self.realowner.origin + self.realowner.view_ofs),
+			this.realowner,
+			(this.realowner.origin + this.realowner.view_ofs),
 			targpos,
 			false,
-			self.realowner,
-			ANTILAG_LATENCY(self.realowner)
+			this.realowner,
+			ANTILAG_LATENCY(this.realowner)
 		);
 
 		// draw lightning beams for debugging
 #ifdef DEBUG_SHOCKWAVE
-		te_lightning2(world, targpos, self.realowner.origin + self.realowner.view_ofs + v_forward * 5 - v_up * 5);
+		te_lightning2(NULL, targpos, this.realowner.origin + this.realowner.view_ofs + v_forward * 5 - v_up * 5);
 		te_customflash(targpos, 40,  2, '1 1 1');
 #endif
 
 		is_player = (IS_PLAYER(trace_ent) || trace_ent.classname == "body" || IS_MONSTER(trace_ent));
 
-		if((trace_fraction < 1) // if trace is good, apply the damage and remove self if necessary
+		if((trace_fraction < 1) // if trace is good, apply the damage and remove this if necessary
 			&& (trace_ent.takedamage == DAMAGE_AIM)
-			&& (trace_ent != self.swing_alreadyhit)
+			&& (trace_ent != this.swing_alreadyhit)
 			&& (is_player || WEP_CVAR(shockwave, melee_nonplayerdamage)))
 		{
 			target_victim = trace_ent; // so it persists through other calls
@@ -183,54 +98,55 @@ void W_Shockwave_Melee_Think()
 			// trigger damage with this calculated info
 			Damage(
 				target_victim,
-				self.realowner,
-				self.realowner,
+				this.realowner,
+				this.realowner,
 				swing_damage,
 				(WEP_SHOCKWAVE.m_id | HITTYPE_SECONDARY),
-				(self.realowner.origin + self.realowner.view_ofs),
+				this.weaponentity_fld,
+				(this.realowner.origin + this.realowner.view_ofs),
 				(v_forward * WEP_CVAR(shockwave, melee_force))
 			);
 
 			// handle accuracy
-			if(accuracy_isgooddamage(self.realowner, target_victim))
-				{ accuracy_add(self.realowner, WEP_SHOCKWAVE.m_id, 0, swing_damage); }
+			if(accuracy_isgooddamage(this.realowner, target_victim))
+				{ accuracy_add(this.realowner, WEP_SHOCKWAVE, 0, swing_damage); }
 
 			#ifdef DEBUG_SHOCKWAVE
-			LOG_INFO(sprintf(
-				"MELEE: %s hitting %s with %f damage (factor: %f) at %f time.\n",
-				self.realowner.netname,
+			LOG_INFOF(
+				"MELEE: %s hitting %s with %f damage (factor: %f) at %f time.",
+				this.realowner.netname,
 				target_victim.netname,
 				swing_damage,
 				swing_factor,
 				time
-			));
+			);
 			#endif
 
 			// allow multiple hits with one swing, but not against the same player twice
 			if(WEP_CVAR(shockwave, melee_multihit))
 			{
-				self.swing_alreadyhit = target_victim;
+				this.swing_alreadyhit = target_victim;
 				continue; // move along to next trace
 			}
 			else
 			{
-				remove(self);
+				delete(this);
 				return;
 			}
 		}
 	}
 
-	if(time >= self.cnt + meleetime)
+	if(time >= this.cnt + meleetime)
 	{
 		// melee is finished
-		remove(self);
+		delete(this);
 		return;
 	}
 	else
 	{
 		// set up next frame
-		self.swing_prev = i;
-		self.nextthink = time;
+		this.swing_prev = i;
+		this.nextthink = time;
 	}
 }
 
@@ -239,12 +155,12 @@ void W_Shockwave_Melee(Weapon thiswep, entity actor, .entity weaponentity, int f
 	sound(actor, CH_WEAPON_A, SND_SHOTGUN_MELEE, VOL_BASE, ATTN_NORM);
 	weapon_thinkf(actor, weaponentity, WFRAME_FIRE2, WEP_CVAR(shockwave, melee_animtime), w_ready);
 
-	entity meleetemp = new(meleetemp);
-	make_pure(meleetemp);
+	entity meleetemp = new_pure(meleetemp);
 	meleetemp.owner = meleetemp.realowner = actor;
-	meleetemp.think = W_Shockwave_Melee_Think;
-	meleetemp.nextthink = time + WEP_CVAR(shockwave, melee_delay) * W_WeaponRateFactor();
-	W_SetupShot_Range(actor, true, 0, "", 0, WEP_CVAR(shockwave, melee_damage), WEP_CVAR(shockwave, melee_range));
+	setthink(meleetemp, W_Shockwave_Melee_Think);
+	meleetemp.nextthink = time + WEP_CVAR(shockwave, melee_delay) * W_WeaponRateFactor(actor);
+	meleetemp.weaponentity_fld = weaponentity;
+	W_SetupShot_Range(actor, weaponentity, true, 0, SND_Null, 0, WEP_CVAR(shockwave, melee_damage), WEP_CVAR(shockwave, melee_range), thiswep.m_id | HITTYPE_SECONDARY);
 }
 
 // SHOCKWAVE ATTACK MODE
@@ -277,11 +193,12 @@ float W_Shockwave_Attack_CheckSpread(
 }
 
 float W_Shockwave_Attack_IsVisible(
+	entity actor,
 	entity head,
 	vector nearest_on_line,
 	vector sw_shotorg,
 	vector attack_endpos)
-{SELFPARAM();
+{
 	vector nearest_to_attacker = head.WarpZone_findradius_nearest;
 	vector center = (head.origin + (head.mins + head.maxs) * 0.5);
 	vector corner;
@@ -290,14 +207,14 @@ float W_Shockwave_Attack_IsVisible(
 	// STEP ONE: Check if the nearest point is clear
 	if(W_Shockwave_Attack_CheckSpread(nearest_to_attacker, nearest_on_line, sw_shotorg, attack_endpos))
 	{
-		WarpZone_TraceLine(sw_shotorg, nearest_to_attacker, MOVE_NOMONSTERS, self);
+		WarpZone_TraceLine(sw_shotorg, nearest_to_attacker, MOVE_NOMONSTERS, actor);
 		if(trace_fraction == 1) { return true; } // yes, the nearest point is clear and we can allow the damage
 	}
 
 	// STEP TWO: Check if shotorg to center point is clear
 	if(W_Shockwave_Attack_CheckSpread(center, nearest_on_line, sw_shotorg, attack_endpos))
 	{
-		WarpZone_TraceLine(sw_shotorg, center, MOVE_NOMONSTERS, self);
+		WarpZone_TraceLine(sw_shotorg, center, MOVE_NOMONSTERS, actor);
 		if(trace_fraction == 1) { return true; } // yes, the center point is clear and we can allow the damage
 	}
 
@@ -307,7 +224,7 @@ float W_Shockwave_Attack_IsVisible(
 		corner = get_corner_position(head, i);
 		if(W_Shockwave_Attack_CheckSpread(corner, nearest_on_line, sw_shotorg, attack_endpos))
 		{
-			WarpZone_TraceLine(sw_shotorg, corner, MOVE_NOMONSTERS, self);
+			WarpZone_TraceLine(sw_shotorg, corner, MOVE_NOMONSTERS, actor);
 			if(trace_fraction == 1) { return true; } // yes, this corner is clear and we can allow the damage
 		}
 	}
@@ -328,7 +245,7 @@ float W_Shockwave_Attack_CheckHit(
 	{
 		if(shockwave_hit[i] == head)
 		{
-			if(vlen(final_force) > vlen(shockwave_hit_force[i])) { shockwave_hit_force[i] = final_force; }
+			if(vlen2(final_force) > vlen2(shockwave_hit_force[i])) { shockwave_hit_force[i] = final_force; }
 			if(final_damage > shockwave_hit_damage[i]) { shockwave_hit_damage[i] = final_damage; }
 			return false;
 		}
@@ -340,23 +257,19 @@ float W_Shockwave_Attack_CheckHit(
 	return true;
 }
 
-void W_Shockwave_Send()
-{SELFPARAM();
+void W_Shockwave_Send(entity actor)
+{
 	WriteHeader(MSG_BROADCAST, TE_CSQC_SHOCKWAVEPARTICLE);
-	WriteCoord(MSG_BROADCAST, w_shotorg.x);
-	WriteCoord(MSG_BROADCAST, w_shotorg.y);
-	WriteCoord(MSG_BROADCAST, w_shotorg.z);
-	WriteCoord(MSG_BROADCAST, w_shotdir.x);
-	WriteCoord(MSG_BROADCAST, w_shotdir.y);
-	WriteCoord(MSG_BROADCAST, w_shotdir.z);
+	WriteVector(MSG_BROADCAST, w_shotorg);
+	WriteVector(MSG_BROADCAST, w_shotdir);
 	WriteShort(MSG_BROADCAST, WEP_CVAR(shockwave, blast_distance));
 	WriteByte(MSG_BROADCAST, bound(0, WEP_CVAR(shockwave, blast_spread_max), 255));
 	WriteByte(MSG_BROADCAST, bound(0, WEP_CVAR(shockwave, blast_spread_min), 255));
-	WriteByte(MSG_BROADCAST, etof(self));
+	WriteByte(MSG_BROADCAST, etof(actor));
 }
 
-void W_Shockwave_Attack()
-{SELFPARAM();
+void W_Shockwave_Attack(Weapon thiswep, entity actor, .entity weaponentity)
+{
 	// declarations
 	float multiplier, multiplier_from_accuracy, multiplier_from_distance;
 	float final_damage;
@@ -366,25 +279,25 @@ void W_Shockwave_Attack()
 	float i, queue = 0;
 
 	// set up the shot direction
-	W_SetupShot(self, false, 3, SND(LASERGUN_FIRE), CH_WEAPON_B, WEP_CVAR(shockwave, blast_damage));
+	W_SetupShot(actor, weaponentity, true, 3, SND_LASERGUN_FIRE, CH_WEAPON_B, WEP_CVAR(shockwave, blast_damage), thiswep.m_id);
 	vector attack_endpos = (w_shotorg + (w_shotdir * WEP_CVAR(shockwave, blast_distance)));
-	WarpZone_TraceLine(w_shotorg, attack_endpos, MOVE_NOMONSTERS, self);
+	WarpZone_TraceLine(w_shotorg, attack_endpos, MOVE_NOMONSTERS, actor);
 	vector attack_hitpos = trace_endpos;
 	float distance_to_end = vlen(w_shotorg - attack_endpos);
 	float distance_to_hit = vlen(w_shotorg - attack_hitpos);
 	//entity transform = WarpZone_trace_transform;
 
 	// do the firing effect now
-	W_Shockwave_Send();
+	W_Shockwave_Send(actor);
 	Damage_DamageInfo(
 		attack_hitpos,
 		WEP_CVAR(shockwave, blast_splash_damage),
 		WEP_CVAR(shockwave, blast_splash_edgedamage),
 		WEP_CVAR(shockwave, blast_splash_radius),
 		w_shotdir * WEP_CVAR(shockwave, blast_splash_force),
-		WEP_SHOCKWAVE.m_id,
+		thiswep.m_id,
 		0,
-		self
+		actor
 	);
 
 	// splash damage/jumping trace
@@ -397,13 +310,22 @@ void W_Shockwave_Attack()
 		false
 	);
 
+	float lag = ((IS_REAL_CLIENT(actor)) ? ANTILAG_LATENCY(actor) : 0);
+	bool noantilag = ((IS_CLIENT(actor)) ? CS(actor).cvar_cl_noantilag : false);
+	if(lag < 0.001)
+		lag = 0;
+	if(autocvar_g_antilag == 0 || noantilag)
+		lag = 0; // only do hitscan, but no antilag
+	if(lag)
+		antilag_takeback_all(actor, lag);
+
 	while(head)
 	{
 		if(head.takedamage)
 		{
 			float distance_to_head = vlen(attack_hitpos - head.WarpZone_findradius_nearest);
 
-			if((head == self) && (distance_to_head <= WEP_CVAR(shockwave, blast_jump_radius)))
+			if((head == actor) && (distance_to_head <= WEP_CVAR(shockwave, blast_jump_radius)))
 			{
 				// ========================
 				//  BLAST JUMP CALCULATION
@@ -443,7 +365,7 @@ void W_Shockwave_Attack()
 					);
 
 				// figure out the direction of force
-				vel = normalize(vec3(head.velocity.x, head.velocity.y, 0));
+				vel = normalize(vec2(head.velocity));
 				vel *=
 					(
 						bound(0, (vlen(vel) / autocvar_sv_maxspeed), 1)
@@ -459,24 +381,25 @@ void W_Shockwave_Attack()
 				// trigger damage with this calculated info
 				Damage(
 					head,
-					self,
-					self,
+					actor,
+					actor,
 					final_damage,
-					WEP_SHOCKWAVE.m_id,
+					thiswep.m_id,
+					weaponentity,
 					head.origin,
 					final_force
 				);
 
 				#ifdef DEBUG_SHOCKWAVE
-				LOG_INFO(sprintf(
+				LOG_INFOF(
 					"SELF HIT: multiplier = %f, damage = %f, force = %f... "
-					"multiplier_from_accuracy = %f, multiplier_from_distance = %f.\n",
+					"multiplier_from_accuracy = %f, multiplier_from_distance = %f.",
 					multiplier,
 					final_damage,
 					vlen(final_force),
 					multiplier_from_accuracy,
 					multiplier_from_distance
-				));
+				);
 				#endif
 			}
 			else if(distance_to_head <= WEP_CVAR(shockwave, blast_splash_radius))
@@ -521,7 +444,7 @@ void W_Shockwave_Attack()
 				// figure out the direction of force
 				final_force = (w_shotdir * WEP_CVAR(shockwave, blast_splash_force_forwardbias));
 				final_force = normalize(CENTER_OR_VIEWOFS(head) - (attack_hitpos - final_force));
-				//te_lightning2(world, attack_hitpos, (attack_hitpos + (final_force * 200)));
+				//te_lightning2(NULL, attack_hitpos, (attack_hitpos + (final_force * 200)));
 
 				// now multiply the direction by force units
 				final_force *= (WEP_CVAR(shockwave, blast_splash_force) * multiplier);
@@ -531,15 +454,15 @@ void W_Shockwave_Attack()
 				if(W_Shockwave_Attack_CheckHit(queue, head, final_force, final_damage)) { queue = min(queue + 1, MAX_SHOCKWAVE_HITS); }
 
 				#ifdef DEBUG_SHOCKWAVE
-				LOG_INFO(sprintf(
+				LOG_INFOF(
 					"SPLASH HIT: multiplier = %f, damage = %f, force = %f... "
-					"multiplier_from_accuracy = %f, multiplier_from_distance = %f.\n",
+					"multiplier_from_accuracy = %f, multiplier_from_distance = %f.",
 					multiplier,
 					final_damage,
 					vlen(final_force),
 					multiplier_from_accuracy,
 					multiplier_from_distance
-				));
+				);
 				#endif
 			}
 		}
@@ -550,28 +473,28 @@ void W_Shockwave_Attack()
 	head = WarpZone_FindRadius(w_shotorg, WEP_CVAR(shockwave, blast_distance), false);
 	while(head)
 	{
-		if((head != self) && head.takedamage)
+		if((head != actor) && head.takedamage)
 		{
 			// ========================
 			//  BLAST CONE CALCULATION
 			// ========================
 
-			// if it's a player, use the view origin as reference (stolen from RadiusDamage functions in g_damage.qc)
+			// if it's a player, use the view origin as reference (stolen from RadiusDamage functions in damage.qc)
 			center = CENTER_OR_VIEWOFS(head);
 
 			// find the closest point on the enemy to the center of the attack
 			float h; // hypotenuse, which is the distance between attacker to head
 			float a; // adjacent side, which is the distance between attacker and the point on w_shotdir that is closest to head.origin
 
-			h = vlen(center - self.origin);
-			a = h * (normalize(center - self.origin) * w_shotdir);
+			h = vlen(center - actor.origin);
+			a = h * (normalize(center - actor.origin) * w_shotdir);
 			// WEAPONTODO: replace with simpler method
 
 			vector nearest_on_line = (w_shotorg + a * w_shotdir);
 			vector nearest_to_attacker = WarpZoneLib_NearestPointOnBox(center + head.mins, center + head.maxs, nearest_on_line);
 
-			if((vlen(head.WarpZone_findradius_dist) <= WEP_CVAR(shockwave, blast_distance))
-				&& (W_Shockwave_Attack_IsVisible(head, nearest_on_line, w_shotorg, attack_endpos)))
+			if((vdist(head.WarpZone_findradius_dist, <=, WEP_CVAR(shockwave, blast_distance)))
+				&& (W_Shockwave_Attack_IsVisible(actor, head, nearest_on_line, w_shotorg, attack_endpos)))
 			{
 				// calculate importance of distance and accuracy for this attack
 				multiplier_from_accuracy = (1 -
@@ -610,7 +533,7 @@ void W_Shockwave_Attack()
 				// figure out the direction of force
 				final_force = (w_shotdir * WEP_CVAR(shockwave, blast_force_forwardbias));
 				final_force = normalize(center - (nearest_on_line - final_force));
-				//te_lightning2(world, nearest_on_line, (attack_hitpos + (final_force * 200)));
+				//te_lightning2(NULL, nearest_on_line, (attack_hitpos + (final_force * 200)));
 
 				// now multiply the direction by force units
 				final_force *= (WEP_CVAR(shockwave, blast_force) * multiplier);
@@ -620,15 +543,15 @@ void W_Shockwave_Attack()
 				if(W_Shockwave_Attack_CheckHit(queue, head, final_force, final_damage)) { queue = min(queue + 1, MAX_SHOCKWAVE_HITS); }
 
 				#ifdef DEBUG_SHOCKWAVE
-				LOG_INFO(sprintf(
+				LOG_INFOF(
 					"BLAST HIT: multiplier = %f, damage = %f, force = %f... "
-					"multiplier_from_accuracy = %f, multiplier_from_distance = %f.\n",
+					"multiplier_from_accuracy = %f, multiplier_from_distance = %f.",
 					multiplier,
 					final_damage,
 					vlen(final_force),
 					multiplier_from_accuracy,
 					multiplier_from_distance
-				));
+				);
 				#endif
 			}
 		}
@@ -643,87 +566,87 @@ void W_Shockwave_Attack()
 
 		Damage(
 			head,
-			self,
-			self,
+			actor,
+			actor,
 			final_damage,
-			WEP_SHOCKWAVE.m_id,
+			thiswep.m_id,
+			weaponentity,
 			head.origin,
 			final_force
 		);
 
-		if(accuracy_isgooddamage(self.realowner, head))
-		{
-			LOG_INFO("wtf\n");
-			accuracy_add(self.realowner, WEP_SHOCKWAVE.m_id, 0, final_damage);
-		}
+		if(accuracy_isgooddamage(actor, head))
+			accuracy_add(actor, thiswep, 0, final_damage);
 
 		#ifdef DEBUG_SHOCKWAVE
-		LOG_INFO(sprintf(
-			"SHOCKWAVE by %s: damage = %f, force = %f.\n",
-			self.netname,
+		LOG_INFOF(
+			"SHOCKWAVE by %s: damage = %f, force = %f.",
+			actor.netname,
 			final_damage,
 			vlen(final_force)
-		));
+		);
 		#endif
 
-		shockwave_hit[i-1] = world;
+		shockwave_hit[i-1] = NULL;
 		shockwave_hit_force[i-1] = '0 0 0';
 		shockwave_hit_damage[i-1] = 0;
 	}
+
+	if(lag)
+		antilag_restore_all(actor);
 }
 
-		METHOD(Shockwave, wr_aim, void(entity thiswep))
-		{
-			if(vlen(self.origin - self.enemy.origin) <= WEP_CVAR(shockwave, melee_range))
-				{ self.BUTTON_ATCK2 = bot_aim(1000000, 0, 0.001, false); }
-			else
-				{ self.BUTTON_ATCK = bot_aim(1000000, 0, 0.001, false); }
-		}
-		METHOD(Shockwave, wr_think, void(entity thiswep, entity actor, .entity weaponentity, int fire))
-		{
-			if(fire & 1)
-			{
-				if(time >= actor.shockwave_blasttime) // handle refire separately so the secondary can be fired straight after a primary
-				{
-					if(weapon_prepareattack(thiswep, actor, weaponentity, false, WEP_CVAR(shockwave, blast_animtime)))
-					{
-						W_Shockwave_Attack();
-						actor.shockwave_blasttime = time + WEP_CVAR(shockwave, blast_refire) * W_WeaponRateFactor();
-						weapon_thinkf(actor, weaponentity, WFRAME_FIRE1, WEP_CVAR(shockwave, blast_animtime), w_ready);
-					}
-				}
-			}
-			else if(fire & 2)
-			{
-				//if(actor.clip_load >= 0) // we are not currently reloading
-				if(!actor.crouch) // no crouchmelee please
-				if(weapon_prepareattack(thiswep, actor, weaponentity, true, WEP_CVAR(shockwave, melee_refire)))
-				{
-					// attempt forcing playback of the anim by switching to another anim (that we never play) here...
-					weapon_thinkf(actor, weaponentity, WFRAME_FIRE1, 0, W_Shockwave_Melee);
-				}
-			}
-		}
-		METHOD(Shockwave, wr_checkammo1, bool(entity thiswep))
-		{
-			return true; // infinite ammo
-		}
-		METHOD(Shockwave, wr_checkammo2, bool(entity thiswep))
-		{
-			// shockwave has infinite ammo
-			return true;
-		}
-		METHOD(Shockwave, wr_suicidemessage, int(entity thiswep))
-		{
-			return WEAPON_THINKING_WITH_PORTALS;
-		}
-		METHOD(Shockwave, wr_killmessage, int(entity thiswep))
-		{
-			if(w_deathtype & HITTYPE_SECONDARY)
-				return WEAPON_SHOCKWAVE_MURDER_SLAP;
-			else
-				return WEAPON_SHOCKWAVE_MURDER;
-		}
+METHOD(Shockwave, wr_aim, void(entity thiswep, entity actor, .entity weaponentity))
+{
+    if(vdist(actor.origin - actor.enemy.origin, <=, WEP_CVAR(shockwave, melee_range)))
+        { PHYS_INPUT_BUTTON_ATCK2(actor) = bot_aim(actor, weaponentity, 1000000, 0, 0.001, false); }
+    else
+        { PHYS_INPUT_BUTTON_ATCK(actor) = bot_aim(actor, weaponentity, 1000000, 0, 0.001, false); }
+}
+METHOD(Shockwave, wr_think, void(entity thiswep, entity actor, .entity weaponentity, int fire))
+{
+    if(fire & 1)
+    {
+        if(time >= actor.(weaponentity).shockwave_blasttime) // handle refire separately so the secondary can be fired straight after a primary
+        {
+            if(weapon_prepareattack(thiswep, actor, weaponentity, false, WEP_CVAR(shockwave, blast_animtime)))
+            {
+                W_Shockwave_Attack(thiswep, actor, weaponentity);
+                actor.(weaponentity).shockwave_blasttime = time + WEP_CVAR(shockwave, blast_refire) * W_WeaponRateFactor(actor);
+                weapon_thinkf(actor, weaponentity, WFRAME_FIRE1, WEP_CVAR(shockwave, blast_animtime), w_ready);
+            }
+        }
+    }
+    else if(fire & 2)
+    {
+        //if(actor.clip_load >= 0) // we are not currently reloading
+        if(weapon_prepareattack(thiswep, actor, weaponentity, true, WEP_CVAR(shockwave, melee_refire)))
+        {
+            // attempt forcing playback of the anim by switching to another anim (that we never play) here...
+            weapon_thinkf(actor, weaponentity, WFRAME_FIRE1, 0, W_Shockwave_Melee);
+        }
+    }
+}
+METHOD(Shockwave, wr_checkammo1, bool(entity thiswep, entity actor, .entity weaponentity))
+{
+    return true; // infinite ammo
+}
+METHOD(Shockwave, wr_checkammo2, bool(entity thiswep, entity actor, .entity weaponentity))
+{
+    // shockwave has infinite ammo
+    return true;
+}
+METHOD(Shockwave, wr_suicidemessage, Notification(entity thiswep))
+{
+    return WEAPON_THINKING_WITH_PORTALS;
+}
+METHOD(Shockwave, wr_killmessage, Notification(entity thiswep))
+{
+    if(w_deathtype & HITTYPE_SECONDARY)
+        return WEAPON_SHOCKWAVE_MURDER_SLAP;
+    else
+        return WEAPON_SHOCKWAVE_MURDER;
+}
 
 #endif
 #ifdef CSQC
@@ -734,24 +657,23 @@ const float SW_DISTTOMIN = 200;
 void Draw_Shockwave(entity this)
 {
 	// fading/removal control
-	float a = bound(0, (SW_MAXALPHA - ((time - self.sw_time) / SW_FADETIME)), SW_MAXALPHA);
-	if(a < ALPHA_MIN_VISIBLE) { remove(self); }
+	float a = bound(0, (SW_MAXALPHA - ((time - this.sw_time) / SW_FADETIME)), SW_MAXALPHA);
+	if(a < ALPHA_MIN_VISIBLE) { delete(this); }
 
 	// WEAPONTODO: save this only once when creating the entity
-	vector sw_color = entcs_GetColor(self.sv_entnum - 1); // GetTeamRGB(entcs_GetTeam(self.sv_entnum));
+	vector sw_color = entcs_GetColor(this.sv_entnum - 1); // Team_ColorRGB(entcs_GetTeam(this.sv_entnum));
 
 	// WEAPONTODO: trace to find what we actually hit
-	vector endpos = (self.sw_shotorg + (self.sw_shotdir * self.sw_distance));
+	vector endpos = (this.sw_shotorg + (this.sw_shotdir * this.sw_distance));
 
-	vectorvectors(self.sw_shotdir);
-	vector right = v_right; // save this for when we do makevectors later
-	vector up = v_up; // save this for when we do makevectors later
+	vector _forward, right, up;
+	VECTOR_VECTORS(this.sw_shotdir, _forward, right, up);
 
 	// WEAPONTODO: combine and simplify these calculations
-	vector min_end = ((self.sw_shotorg + (self.sw_shotdir * SW_DISTTOMIN)) + (up * self.sw_spread_min));
-	vector max_end = (endpos + (up * self.sw_spread_max));
-	float spread_to_min = vlen(normalize(min_end - self.sw_shotorg) - self.sw_shotdir);
-	float spread_to_max = vlen(normalize(max_end - min_end) - self.sw_shotdir);
+	vector min_end = ((this.sw_shotorg + (this.sw_shotdir * SW_DISTTOMIN)) + (up * this.sw_spread_min));
+	vector max_end = (endpos + (up * this.sw_spread_max));
+	float spread_to_min = vlen(normalize(min_end - this.sw_shotorg) - this.sw_shotdir);
+	float spread_to_max = vlen(normalize(max_end - min_end) - this.sw_shotdir);
 
 	vector first_min_end = '0 0 0', prev_min_end = '0 0 0', new_min_end = '0 0 0';
 	vector first_max_end = '0 0 0', prev_max_end = '0 0 0', new_max_end = '0 0 0';
@@ -768,17 +690,17 @@ void Draw_Shockwave(entity this)
 
 		// first do the spread_to_min effect
 		deviation = angle * spread_to_min;
-		deviation = ((self.sw_shotdir + (right * deviation.y) + (up * deviation.z)));
+		deviation = ((this.sw_shotdir + (right * deviation.y) + (up * deviation.z)));
 		new_min_dist = SW_DISTTOMIN;
-		new_min_end = (self.sw_shotorg + (deviation * new_min_dist));
-		//te_lightning2(world, new_min_end, self.sw_shotorg);
+		new_min_end = (this.sw_shotorg + (deviation * new_min_dist));
+		//te_lightning2(NULL, new_min_end, this.sw_shotorg);
 
 		// then calculate spread_to_max effect
 		deviation = angle * spread_to_max;
-		deviation = ((self.sw_shotdir + (right * deviation.y) + (up * deviation.z)));
+		deviation = ((this.sw_shotdir + (right * deviation.y) + (up * deviation.z)));
 		new_max_dist = vlen(new_min_end - endpos);
 		new_max_end = (new_min_end + (deviation * new_max_dist));
-		//te_lightning2(world, new_end, prev_min_end);
+		//te_lightning2(NULL, new_end, prev_min_end);
 
 
 		if(counter == 0)
@@ -790,14 +712,14 @@ void Draw_Shockwave(entity this)
 		if(counter >= 1)
 		{
 			// draw from shot origin to min spread radius
-			R_BeginPolygon("", DRAWFLAG_NORMAL);
+			R_BeginPolygon("", DRAWFLAG_NORMAL, false);
 			R_PolygonVertex(prev_min_end, '0 0 0', sw_color, a);
 			R_PolygonVertex(new_min_end, '0 0 0', sw_color, a);
-			R_PolygonVertex(self.sw_shotorg, '0 0 0', sw_color, a);
+			R_PolygonVertex(this.sw_shotorg, '0 0 0', sw_color, a);
 			R_EndPolygon();
 
 			// draw from min spread radius to max spread radius
-			R_BeginPolygon("", DRAWFLAG_NORMAL);
+			R_BeginPolygon("", DRAWFLAG_NORMAL, false);
 			R_PolygonVertex(new_min_end, '0 0 0', sw_color, a);
 			R_PolygonVertex(prev_min_end, '0 0 0', sw_color, a);
 			R_PolygonVertex(prev_max_end, '0 0 0', sw_color, a);
@@ -812,14 +734,14 @@ void Draw_Shockwave(entity this)
 		if((counter + 1) == divisions)
 		{
 			// draw from shot origin to min spread radius
-			R_BeginPolygon("", DRAWFLAG_NORMAL);
+			R_BeginPolygon("", DRAWFLAG_NORMAL, false);
 			R_PolygonVertex(prev_min_end, '0 0 0', sw_color, a);
 			R_PolygonVertex(first_min_end, '0 0 0', sw_color, a);
-			R_PolygonVertex(self.sw_shotorg, '0 0 0', sw_color, a);
+			R_PolygonVertex(this.sw_shotorg, '0 0 0', sw_color, a);
 			R_EndPolygon();
 
 			// draw from min spread radius to max spread radius
-			R_BeginPolygon("", DRAWFLAG_NORMAL);
+			R_BeginPolygon("", DRAWFLAG_NORMAL, false);
 			R_PolygonVertex(first_min_end, '0 0 0', sw_color, a);
 			R_PolygonVertex(prev_min_end, '0 0 0', sw_color, a);
 			R_PolygonVertex(prev_max_end, '0 0 0', sw_color, a);
@@ -837,12 +759,12 @@ NET_HANDLE(TE_CSQC_SHOCKWAVEPARTICLE, bool isNew)
 
 void Net_ReadShockwaveParticle()
 {
-	entity shockwave;
-	shockwave = spawn();
+	entity shockwave = new(shockwave_cone);
 	shockwave.draw = Draw_Shockwave;
+	IL_PUSH(g_drawables, shockwave);
 
-	shockwave.sw_shotorg_x = ReadCoord(); shockwave.sw_shotorg_y = ReadCoord(); shockwave.sw_shotorg_z = ReadCoord();
-	shockwave.sw_shotdir_x = ReadCoord(); shockwave.sw_shotdir_y = ReadCoord(); shockwave.sw_shotdir_z = ReadCoord();
+	shockwave.sw_shotorg = ReadVector();
+	shockwave.sw_shotdir = ReadVector();
 
 	shockwave.sw_distance = ReadShort();
 	shockwave.sw_spread_max = ReadByte();
@@ -853,13 +775,12 @@ void Net_ReadShockwaveParticle()
 	shockwave.sw_time = time;
 }
 
-		METHOD(Shockwave, wr_impacteffect, void(entity thiswep))
-		{
-			// handled by Net_ReadShockwaveParticle
-			//vector org2;
-			//org2 = w_org + w_backoff * 2;
-			//pointparticles(EFFECT_BLASTER_IMPACT, org2, w_backoff * 1000, 1);
-		}
+METHOD(Shockwave, wr_impacteffect, void(entity thiswep, entity actor))
+{
+    // handled by Net_ReadShockwaveParticle
+    //vector org2;
+    //org2 = w_org + w_backoff * 2;
+    //pointparticles(EFFECT_BLASTER_IMPACT, org2, w_backoff * 1000, 1);
+}
 
-#endif
 #endif

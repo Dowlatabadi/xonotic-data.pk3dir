@@ -1,5 +1,4 @@
-#ifndef CAMPAIGN_COMMON_H
-#define CAMPAIGN_COMMON_H
+#pragma once
 
 #ifndef CAMPAIGN_MAX_ENTRIES
 #define CAMPAIGN_MAX_ENTRIES 64
@@ -12,8 +11,8 @@ string campaign_gametype[CAMPAIGN_MAX_ENTRIES];
 string campaign_mapname[CAMPAIGN_MAX_ENTRIES];
 float campaign_bots[CAMPAIGN_MAX_ENTRIES];
 float campaign_botskill[CAMPAIGN_MAX_ENTRIES];
-float campaign_fraglimit[CAMPAIGN_MAX_ENTRIES];
-float campaign_timelimit[CAMPAIGN_MAX_ENTRIES];
+string campaign_fraglimit[CAMPAIGN_MAX_ENTRIES];
+string campaign_timelimit[CAMPAIGN_MAX_ENTRIES];
 string campaign_mutators[CAMPAIGN_MAX_ENTRIES];
 string campaign_shortdesc[CAMPAIGN_MAX_ENTRIES];
 string campaign_longdesc[CAMPAIGN_MAX_ENTRIES];
@@ -30,5 +29,4 @@ void CampaignFile_Unload();
 
 // Sets up the campaign for the n-th array item (meaning: campaign_offset+nth
 // level) using localcmd()
-void CampaignSetup(float n);
-#endif
+void CampaignSetup(int n);

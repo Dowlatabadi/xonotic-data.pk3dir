@@ -1,92 +1,5 @@
-#ifndef ITEM_LISTBOX_H
-	#define ITEM_LISTBOX_H
-	#include "../item.qc"
-	CLASS(ListBox, Item)
-		METHOD(ListBox, resizeNotify, void(entity, vector, vector, vector, vector));
-		METHOD(ListBox, configureListBox, void(entity, float, float));
-		METHOD(ListBox, draw, void(entity));
-		METHOD(ListBox, keyDown, float(entity, float, float, float));
-		METHOD(ListBox, mouseMove, float(entity, vector));
-		METHOD(ListBox, mousePress, float(entity, vector));
-		METHOD(ListBox, mouseDrag, float(entity, vector));
-		METHOD(ListBox, mouseRelease, float(entity, vector));
-		METHOD(ListBox, focusLeave, void(entity));
-		ATTRIB(ListBox, focusable, float, 1)
-		ATTRIB(ListBox, focusedItem, int, -1)
-		ATTRIB(ListBox, focusedItemAlpha, float, 0.3)
-		METHOD(ListBox, setFocusedItem, void(entity, int));
-		ATTRIB(ListBox, mouseMoveOffset, float, -1)  // let know where the cursor is when the list scrolls without moving the cursor
-		ATTRIB(ListBox, allowFocusSound, float, 1)
-		ATTRIB(ListBox, selectedItem, int, 0)
-		ATTRIB(ListBox, size, vector, '0 0 0')
-		ATTRIB(ListBox, origin, vector, '0 0 0')
-		ATTRIB(ListBox, scrollPos, float, 0)  // measured in window heights, fixed when needed
-		ATTRIB(ListBox, scrollPosTarget, float, 0)
-		METHOD(ListBox, isScrolling, bool(entity));
-		ATTRIB(ListBox, needScrollToItem, float, -1)
-		METHOD(ListBox, scrollToItem, void(entity, int));
-		ATTRIB(ListBox, previousValue, float, 0)
-		ATTRIB(ListBox, pressed, float, 0)  // 0 = normal, 1 = scrollbar dragging, 2 = item dragging, 3 = released
-		ATTRIB(ListBox, pressOffset, float, 0)
+#include "listbox.qh"
 
-		METHOD(ListBox, updateControlTopBottom, void(entity));
-		ATTRIB(ListBox, controlTop, float, 0)
-		ATTRIB(ListBox, controlBottom, float, 0)
-		ATTRIB(ListBox, controlWidth, float, 0)
-		ATTRIB(ListBox, dragScrollPos, vector, '0 0 0')
-		ATTRIB(ListBox, selectionDoesntMatter, bool, false) // improves scrolling by keys for lists that don't need to show an active selection
-
-		ATTRIB(ListBox, src, string, string_null)           // scrollbar
-		ATTRIB(ListBox, color, vector, '1 1 1')
-		ATTRIB(ListBox, color2, vector, '1 1 1')
-		ATTRIB(ListBox, colorC, vector, '1 1 1')
-		ATTRIB(ListBox, colorF, vector, '1 1 1')
-		ATTRIB(ListBox, tolerance, vector, '0 0 0') // drag tolerance
-		ATTRIB(ListBox, scrollbarWidth, float, 0)   // pixels
-		ATTRIB(ListBox, nItems, float, 42)
-		ATTRIB(ListBox, itemHeight, float, 0)
-		ATTRIB(ListBox, colorBG, vector, '0 0 0')
-		ATTRIB(ListBox, alphaBG, float, 0)
-
-		ATTRIB(ListBox, lastClickedItem, float, -1)
-		ATTRIB(ListBox, lastClickedTime, float, 0)
-
-		METHOD(ListBox, drawListBoxItem, void(entity, int, vector, bool, bool)); // item number, width/height, isSelected, isFocused
-		METHOD(ListBox, clickListBoxItem, void(entity, float, vector));          // item number, relative clickpos
-		METHOD(ListBox, doubleClickListBoxItem, void(entity, float, vector));    // item number, relative clickpos
-		METHOD(ListBox, setSelected, void(entity, float));
-		METHOD(ListBox, focusedItemChangeNotify, void(entity));
-
-		METHOD(ListBox, getLastFullyVisibleItemAtScrollPos, float(entity, float));
-		METHOD(ListBox, getFirstFullyVisibleItemAtScrollPos, float(entity, float));
-
-		// NOTE: override these four methods if you want variable sized list items
-		METHOD(ListBox, getTotalHeight, float(entity));
-		METHOD(ListBox, getItemAtPos, float(entity, float));
-		METHOD(ListBox, getItemStart, float(entity, float));
-		METHOD(ListBox, getItemHeight, float(entity, float));
-		// NOTE: if getItemAt* are overridden, it may make sense to cache the
-		// start and height of the last item returned by getItemAtPos and fast
-		// track returning their properties for getItemStart and getItemHeight.
-		// The "hot" code path calls getItemAtPos first, then will query
-		// getItemStart and getItemHeight on it soon.
-		// When overriding, the following consistency rules must hold:
-		// getTotalHeight() == SUM(getItemHeight(i), i, 0, me.nItems-1)
-		// getItemStart(i+1) == getItemStart(i) + getItemHeight(i)
-		//   for 0 <= i < me.nItems-1
-		// getItemStart(0) == 0
-		// getItemStart(getItemAtPos(p)) <= p
-		//   if p >= 0
-		// getItemAtPos(p) == 0
-		//   if p < 0
-		// getItemStart(getItemAtPos(p)) + getItemHeight(getItemAtPos(p)) > p
-		//   if p < getTotalHeigt()
-		// getItemAtPos(p) == me.nItems - 1
-		//   if p >= getTotalHeight()
-	ENDCLASS(ListBox)
-#endif
-
-#ifdef IMPLEMENTATION
 	bool ListBox_isScrolling(entity me)
 	{
 		return me.scrollPos != me.scrollPosTarget;
@@ -269,10 +182,10 @@
 		if (me.pressed == 1)
 		{
 			hit = 1;
-			if (pos.x < 1 - me.controlWidth - me.tolerance.y * me.controlWidth) hit = 0;
-			if (pos.y < 0 - me.tolerance.x) hit = 0;
-			if (pos.x >= 1 + me.tolerance.y * me.controlWidth) hit = 0;
-			if (pos.y >= 1 + me.tolerance.x) hit = 0;
+			if (pos.x < 1 - me.controlWidth - me.tolerance.x * me.controlWidth) hit = 0;
+			if (pos.y < 0 - me.tolerance.y) hit = 0;
+			if (pos.x >= 1 + me.tolerance.x * me.controlWidth) hit = 0;
+			if (pos.y >= 1 + me.tolerance.y) hit = 0;
 			if (hit)
 			{
 				// calculate new pos to v
@@ -295,43 +208,43 @@
 		}
 		return 1;
 	}
-	float ListBox_mousePress(entity me, vector pos)
+	METHOD(ListBox, mousePress, bool(ListBox this, vector pos))
 	{
-		if (pos.x < 0) return 0;
-		if (pos.y < 0) return 0;
-		if (pos.x >= 1) return 0;
-		if (pos.y >= 1) return 0;
-		me.dragScrollPos = pos;
-		me.updateControlTopBottom(me);
-		if (pos.x >= 1 - me.controlWidth)
+		if (pos.x < 0) return false;
+		if (pos.y < 0) return false;
+		if (pos.x >= 1) return false;
+		if (pos.y >= 1) return false;
+		this.dragScrollPos = pos;
+		this.updateControlTopBottom(this);
+		if (pos.x >= 1 - this.controlWidth)
 		{
-			// if hit, set me.pressed, otherwise scroll by one page
-			if (pos.y < me.controlTop)
+			// if hit, set this.pressed, otherwise scroll by one page
+			if (pos.y < this.controlTop)
 			{
 				// page up
-				me.scrollPosTarget = max(me.scrollPosTarget - 1, 0);
+				this.scrollPosTarget = max(this.scrollPosTarget - 1, 0);
 			}
-			else if (pos.y > me.controlBottom)
+			else if (pos.y > this.controlBottom)
 			{
 				// page down
-				me.scrollPosTarget = min(me.scrollPosTarget + 1, me.getTotalHeight(me) - 1);
+				this.scrollPosTarget = min(this.scrollPosTarget + 1, this.getTotalHeight(this) - 1);
 			}
 			else
 			{
-				me.pressed = 1;
-				me.pressOffset = pos.y;
-				me.previousValue = me.scrollPos;
+				this.pressed = 1;
+				this.pressOffset = pos.y;
+				this.previousValue = this.scrollPos;
 			}
 		}
 		else
 		{
 			// continue doing that while dragging (even when dragging outside). When releasing, forward the click to the then selected item.
-			me.pressed = 2;
+			this.pressed = 2;
 			// an item has been clicked. Select it, ...
-			me.setSelected(me, me.getItemAtPos(me, me.scrollPos + pos.y));
-			me.setFocusedItem(me, me.selectedItem);
+			this.setSelected(this, this.getItemAtPos(this, this.scrollPos + pos.y));
+			this.setFocusedItem(this, this.selectedItem);
 		}
-		return 1;
+		return true;
 	}
 	void ListBox_setFocusedItem(entity me, int item)
 	{
@@ -418,13 +331,11 @@
 		}
 	}
 	AUTOCVAR(menu_scroll_averaging_time, float, 0.16, "smooth scroll averaging time");
-// scroll faster while dragging the scrollbar
+	// scroll faster while dragging the scrollbar
 	AUTOCVAR(menu_scroll_averaging_time_pressed, float, 0.06, "smooth scroll averaging time when dragging the scrollbar");
 	void ListBox_draw(entity me)
 	{
-		float i;
-		vector absSize, fillSize = '0 0 0';
-		vector oldshift, oldscale;
+		vector fillSize = '0 0 0';
 
 		// we can't do this in mouseMove as the list can scroll without moving the cursor
 		if (me.mouseMoveOffset != -1) me.setFocusedItem(me, me.getItemAtPos(me, me.scrollPos + me.mouseMoveOffset));
@@ -437,7 +348,7 @@
 		if (me.scrollPos != me.scrollPosTarget)
 		{
 			float averaging_time = (me.pressed == 1)
-			    ? autocvar_menu_scroll_averaging_time_pressed
+				? autocvar_menu_scroll_averaging_time_pressed
 				: autocvar_menu_scroll_averaging_time;
 			// this formula works with whatever framerate
 			float f = averaging_time ? exp(-frametime / averaging_time) : 0;
@@ -463,17 +374,16 @@
 			}
 		}
 		draw_SetClip();
-		oldshift = draw_shift;
-		oldscale = draw_scale;
+		vector oldshift = draw_shift;
+		vector oldscale = draw_scale;
 
-		float y;
-		i = me.getItemAtPos(me, me.scrollPos);
-		y = me.getItemStart(me, i) - me.scrollPos;
+		int i = me.getItemAtPos(me, me.scrollPos);
+		float y = me.getItemStart(me, i) - me.scrollPos;
 		for ( ; i < me.nItems && y < 1; ++i)
 		{
 			draw_shift = boxToGlobal(eY * y, oldshift, oldscale);
 			vector relSize = eX * (1 - me.controlWidth) + eY * me.getItemHeight(me, i);
-			absSize = boxToGlobalSize(relSize, me.size);
+			vector absSize = boxToGlobalSize(relSize, me.size);
 			draw_scale = boxToGlobalSize(relSize, oldscale);
 			me.drawListBoxItem(me, i, absSize, (me.selectedItem == i), (me.focusedItem == i));
 			y += relSize.y;
@@ -502,4 +412,3 @@
 	{
 		draw_Text('0 0 0', sprintf(_("Item %d"), i), eX * (8 / absSize.x) + eY * (8 / absSize.y), (isSelected ? '0 1 0' : '1 1 1'), 1, 0);
 	}
-#endif

@@ -1,50 +1,37 @@
 #include "test.qh"
 
-int TEST_failed;
-bool TEST_ok;
-
-void TEST_Fail(string cond)
-{
-	LOG_INFOF("Assertion failed: ", cond);
-	// backtrace();
-	++TEST_failed;
-}
-
-void TEST_OK()
-{
-	TEST_ok = true;
-}
-
 int TEST_RunAll_accumulated(int init);
-bool TEST_RunAll()
+bool RUN_ALL_TESTS()
 {
 	int f = TEST_RunAll_accumulated(0);
 	if (f)
 	{
-		LOG_INFOF("%d tests failed\n", f);
+		LOG_INFOF("%d tests failed", f);
 		return true;
 	}
 	else
 	{
-		LOG_INFO("All tests OK\n");
+		LOG_INFO("All tests OK");
 		return false;
 	}
 }
 
 bool TEST_Run(string s)
 {
-	LOG_INFOF("%s: testing...\n", s);
+	LOG_INFOF("%s: testing...", s);
 	TEST_failed = 0;
+	TEST_fatal = 0;
 	TEST_ok = false;
-	callfunction(strcat("_TEST_", s));
+	string fn = strcat("_TEST_", s);
+	if (isfunction(fn)) callfunction(fn);
 	if (TEST_failed > 0)
 	{
-		LOG_INFOF("%s: %d items failed.\n", s, TEST_failed);
+		LOG_INFOF("%s: %d items failed.", s, TEST_failed);
 		return false;
 	}
 	else if (!TEST_ok)
 	{
-		LOG_INFOF("%s: did not complete.\n", s);
+		LOG_INFOF("%s: did not complete.", s);
 		return false;
 	}
 	return true;

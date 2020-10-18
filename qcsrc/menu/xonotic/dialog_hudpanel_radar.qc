@@ -1,19 +1,10 @@
-#ifndef DIALOG_HUDPANEL_RADAR_H
-#define DIALOG_HUDPANEL_RADAR_H
-#include "rootdialog.qc"
-CLASS(XonoticHUDRadarDialog, XonoticRootDialog)
-	METHOD(XonoticHUDRadarDialog, fill, void(entity));
-	ATTRIB(XonoticHUDRadarDialog, title, string, _("Radar Panel"))
-	ATTRIB(XonoticHUDRadarDialog, color, vector, SKINCOLOR_DIALOG_TEAMSELECT)
-	ATTRIB(XonoticHUDRadarDialog, intendedWidth, float, 0.4)
-	ATTRIB(XonoticHUDRadarDialog, rows, float, 15)
-	ATTRIB(XonoticHUDRadarDialog, columns, float, 4)
-	ATTRIB(XonoticHUDRadarDialog, name, string, "HUDradar")
-	ATTRIB(XonoticHUDRadarDialog, requiresConnection, float, true)
-ENDCLASS(XonoticHUDRadarDialog)
-#endif
+#include "dialog_hudpanel_radar.qh"
 
-#ifdef IMPLEMENTATION
+#include "checkbox.qh"
+#include "textslider.qh"
+#include "slider.qh"
+#include "textlabel.qh"
+
 void XonoticHUDRadarDialog_fill(entity me)
 {
 	entity e;
@@ -21,12 +12,12 @@ void XonoticHUDRadarDialog_fill(entity me)
 
 	me.TR(me);
 		me.TD(me, 1, 4, e = makeXonoticTextSlider("hud_panel_radar"));
-			e.addValue(e, _("Panel disabled"), "0");
-			e.addValue(e, _("Panel enabled in teamgames"), "1");
-			e.addValue(e, _("Panel always enabled"), "2");
+			e.addValue(e, _("Disable"), "0");
+			e.addValue(e, _("Enable in team games"), "1");
+			e.addValue(e, _("Always enable"), "2");
 			e.configureXonoticTextSliderValues(e);
 
-	DIALOG_HUDPANEL_COMMON_NOTOGGLE();
+	dialog_hudpanel_main_settings(me, panelname);
 
 	me.TR(me);
 		me.TD(me, 1, 4, e = makeXonoticTextLabel(0, _("Radar:")));
@@ -58,4 +49,3 @@ void XonoticHUDRadarDialog_fill(entity me)
 				e.addValue(e, _("Never zoomed"), "3");
 				e.configureXonoticTextSliderValues(e);
 }
-#endif

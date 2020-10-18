@@ -1,17 +1,12 @@
-#ifndef DIALOG_SETTINGS_AUDIO_H
-#define DIALOG_SETTINGS_AUDIO_H
-#include "tab.qc"
-CLASS(XonoticAudioSettingsTab, XonoticTab)
-	METHOD(XonoticAudioSettingsTab, fill, void(entity));
-	ATTRIB(XonoticAudioSettingsTab, intendedWidth, float, 0.9)
-	ATTRIB(XonoticAudioSettingsTab, rows, float, 15.5)
-	ATTRIB(XonoticAudioSettingsTab, columns, float, 6.2) // added extra .2 for center space
-	ATTRIB(XonoticAudioSettingsTab, hiddenMenuSoundsSlider, entity, NULL)
-ENDCLASS(XonoticAudioSettingsTab)
-entity makeXonoticAudioSettingsTab();
-#endif
+#include "dialog_settings_audio.qh"
 
-#ifdef IMPLEMENTATION
+#include "slider_decibels.qh"
+#include "commandbutton.qh"
+#include "textlabel.qh"
+#include "checkbox.qh"
+#include "textslider.qh"
+#include "checkbox_slider_invalid.qh"
+
 entity makeXonoticAudioSettingsTab()
 {
 	entity me;
@@ -22,7 +17,12 @@ entity makeXonoticAudioSettingsTab()
 
 void XonoticAudioSettingsTab_fill(entity me)
 {
-	entity e, s;
+	entity e, e2, s;
+	entity audioApplyButton = makeXonoticCommandButton(_("Apply immediately"), '0 0 0',
+		"snd_restart;"
+		"snd_attenuation_method_${menu_snd_attenuation_method};"
+		, COMMANDBUTTON_APPLY);
+	audioApplyButton.disableOnClick = true;
 
 	me.TR(me);
 		s = makeXonoticDecibelsSlider_T(-40, 0, 0.4, "mastervolume", "-");
@@ -96,7 +96,8 @@ void XonoticAudioSettingsTab_fill(entity me)
 		setDependentStringNotEqual(s, "mastervolume", "0");
 	me.TR(me);
 	me.TR(me);
-		me.TD(me, 1, 3, makeXonoticCheckBox(0, "menu_snd_attenuation_method", _("New style sound attenuation")));
+		me.TD(me, 1, 3, e = makeXonoticCheckBox(0, "menu_snd_attenuation_method", _("New style sound attenuation")));
+			e.applyButton = audioApplyButton;
 	me.TR(me);
 		me.TD(me, 1, 3, makeXonoticCheckBox(0, "snd_mutewhenidle", _("Mute sounds when not active")));
 
@@ -113,6 +114,7 @@ void XonoticAudioSettingsTab_fill(entity me)
 			e.addValue(e, _("44.1 kHz"), "44100");
 			e.addValue(e, _("48 kHz"), "48000");
 			e.configureXonoticTextSliderValues(e);
+			e.applyButton = audioApplyButton;
 	me.TR(me);
 		me.TD(me, 1, 1, makeXonoticTextLabel(0, _("Channels:")));
 		me.TD(me, 1, 2, e = makeXonoticTextSlider_T("snd_channels",
@@ -126,6 +128,7 @@ void XonoticAudioSettingsTab_fill(entity me)
 			e.addValue(e, _("6.1"), "7");
 			e.addValue(e, _("7.1"), "8");
 			e.configureXonoticTextSliderValues(e);
+			e.applyButton = audioApplyButton;
 	me.TR(me);
 	me.TR(me);
 		me.TD(me, 1, 3, e = makeXonoticCheckBox_T(0, "snd_swapstereo", _("Swap stereo output channels"),
@@ -143,13 +146,11 @@ void XonoticAudioSettingsTab_fill(entity me)
 	me.TR(me);
 		me.TD(me, 1, 3, makeXonoticCheckBox(0, "con_chatsound", _("Chat message sound")));
 	me.TR(me);
-		me.hiddenMenuSoundsSlider = makeXonoticSlider_T(1, 1, 1, "menu_sounds",
-			_("Play sounds when clicking or hovering over menu items"));
-		me.TD(me, 1, 1.2, e = makeXonoticSliderCheckBox(0, 1, me.hiddenMenuSoundsSlider, _("Menu sounds")));
-			e.tooltip = me.hiddenMenuSoundsSlider.tooltip;
-		me.TD(me, 1, 1.8, e = makeXonoticSliderCheckBox(2, 0, me.hiddenMenuSoundsSlider, _("Focus sounds")));
-			e.tooltip = me.hiddenMenuSoundsSlider.tooltip;
-		setDependent(e, "menu_sounds", 1, 2);
+		me.TD(me, 1, 1.2, e = makeXonoticCheckBox_T(0, "menu_sounds", _("Menu sounds"),
+			_("Play sounds when clicking menu items")));
+		me.TD(me, 1, 1.2, e.linkedCheckBox = e2 = makeXonoticCheckBoxEx_T(2, 1, "menu_sounds", _("Focus sounds"),
+			_("Play sounds when hovering over menu items too")));
+		setDependent(e2, "menu_sounds", 1, 2);
 	me.TR(me);
 	me.TR(me);
 		me.TD(me, 1, 1, makeXonoticTextLabel(0, _("Time announcer:")));
@@ -171,10 +172,9 @@ void XonoticAudioSettingsTab_fill(entity me)
 			e.sendCvars = true;
 	me.TR(me);
 	me.TR(me);
-		if(cvar("developer"))
+		if(cvar("developer") > 0)
 			me.TD(me, 1, 3, makeXonoticCheckBox(0, "showsound", _("Debug info about sounds")));
 
 	me.gotoRC(me, me.rows - 1, 0);
-		me.TD(me, 1, me.columns, makeXonoticCommandButton(_("Apply immediately"), '0 0 0', "snd_restart; snd_attenuation_method_${menu_snd_attenuation_method}", COMMANDBUTTON_APPLY));
+		me.TD(me, 1, me.columns, audioApplyButton);
 }
-#endif

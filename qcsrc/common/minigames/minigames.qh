@@ -1,5 +1,4 @@
-#ifndef MINIGAMES_H
-#define MINIGAMES_H
+#pragma once
 
 // previous node in a doubly linked list
 .entity list_prev;
@@ -115,11 +114,9 @@ const int MINIG_SF_ALL     = 0xff; // use to resend everything
 
 // Spawn linked entity on the server or local entity on the client
 // This entity will be removed automatically when the minigame ends
-entity msle_spawn(entity minigame_session, string class_name);
+entity msle_spawn(entity minigame_session, entity e);
 
 #include "minigame/all.qh"
 
 int msle_id(string class_name);
 string msle_classname(int id);
-
-#endif

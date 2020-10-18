@@ -1,34 +1,5 @@
-#ifndef ITEM_IMAGE_H
-	#define ITEM_IMAGE_H
-	#include "../item.qc"
-	CLASS(Image, Item)
-		METHOD(Image, configureImage, void(entity, string));
-		METHOD(Image, draw, void(entity));
-		METHOD(Image, toString, string(entity));
-		METHOD(Image, resizeNotify, void(entity, vector, vector, vector, vector));
-		METHOD(Image, updateAspect, void(entity));
-		METHOD(Image, initZoom, void(entity));
-		METHOD(Image, setZoom, void(entity, float, float));
-		METHOD(Image, drag_setStartPos, float(entity, vector));
-		METHOD(Image, drag, float(entity, vector));
-		ATTRIB(Image, src, string, string_null)
-		ATTRIB(Image, color, vector, '1 1 1')
-		ATTRIB(Image, forcedAspect, float, 0)        // special values: -1 keep image aspect ratio, -2 keep image size but bound to the containing box, -3 always keep image size
-		ATTRIB(Image, zoomBox, float, 0)             // used by forcedAspect -2 when the image is larger than the containing box
-		ATTRIB(Image, zoomFactor, float, 1)
-		ATTRIB(Image, zoomOffset, vector, '0.5 0.5 0')
-		ATTRIB(Image, zoomSnapToTheBox, float, 1)    // snap the zoomed in image to the box borders when zooming/dragging it
-		ATTRIB(Image, zoomTime, float, 0)
-		ATTRIB(Image, zoomLimitedByTheBox, float, 0) // forbids zoom if image would be larger than the containing box
-		ATTRIB(Image, zoomMax, float, 0)
-		ATTRIB(Image, start_zoomOffset, vector, '0 0 0')
-		ATTRIB(Image, start_coords, vector, '0 0 0')
-		ATTRIB(Image, imgOrigin, vector, '0 0 0')
-		ATTRIB(Image, imgSize, vector, '0 0 0')
-	ENDCLASS(Image)
-#endif
+#include "image.qh"
 
-#ifdef IMPLEMENTATION
 	string Image_toString(entity me)
 	{
 		return me.src;
@@ -47,9 +18,10 @@
 
 	void Image_draw(entity me)
 	{
-		if (me.imgSize.x > 1 || me.imgSize.y > 1) draw_SetClip();
+		bool willClip = me.imgSize.x > 1 || me.imgSize.y > 1;
+		if (willClip) draw_SetClip();
 		draw_Picture(me.imgOrigin, me.src, me.imgSize, me.color, 1);
-		if (me.imgSize.x > 1 || me.imgSize.y > 1) draw_ClearClip();
+		if (willClip) draw_ClearClip();
 		SUPER(Image).draw(me);
 	}
 	void Image_updateAspect(entity me)
@@ -166,13 +138,13 @@
 		}
 		return 1;
 	}
-	void Image_setZoom(entity me, float z, float atMousePosition)
+	void Image_setZoom(entity me, float newzoom, float atMousePosition)
 	{
 		float prev_zoomFactor;
 		prev_zoomFactor = me.zoomFactor;
-		if (z < 0)  // multiply by the current zoomFactor (but can also snap to real dimensions or to box)
+		if (newzoom < 0)  // multiply by the current zoomFactor (but can also snap to real dimensions or to box)
 		{
-			me.zoomFactor *= -z;
+			me.zoomFactor *= -newzoom;
 			float realSize_in_the_middle, boxSize_in_the_middle;
 			realSize_in_the_middle = ((prev_zoomFactor - 1) * (me.zoomFactor - 1) < 0);
 			boxSize_in_the_middle = (me.zoomBox > 0 && (prev_zoomFactor - me.zoomBox) * (me.zoomFactor - me.zoomBox) < 0);
@@ -191,14 +163,14 @@
 				me.zoomFactor = me.zoomBox; // snap to box
 			}
 		}
-		else if (z == 0)                    // reset (no zoom)
+		else if (newzoom == 0)                    // reset (no zoom)
 		{
 			if (me.zoomBox > 0) me.zoomFactor = me.zoomBox;
 			else me.zoomFactor = 1;
 		}
 		else  // directly set
 		{
-			me.zoomFactor = z;
+			me.zoomFactor = newzoom;
 		}
 		me.zoomFactor = bound(1 / 16, me.zoomFactor, 16);
 		if (me.zoomMax > 0 && me.zoomFactor > me.zoomMax) me.zoomFactor = me.zoomMax;
@@ -221,4 +193,3 @@
 		SUPER(Image).resizeNotify(me, relOrigin, relSize, absOrigin, absSize);
 		me.updateAspect(me);
 	}
-#endif

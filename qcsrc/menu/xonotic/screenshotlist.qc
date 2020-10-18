@@ -1,51 +1,9 @@
-#ifndef SCREENSHOTLIST_H
-#define SCREENSHOTLIST_H
-#include "listbox.qc"
-CLASS(XonoticScreenshotList, XonoticListBox)
-	METHOD(XonoticScreenshotList, configureXonoticScreenshotList, void(entity));
-	ATTRIB(XonoticScreenshotList, rowsPerItem, float, 1)
-	METHOD(XonoticScreenshotList, resizeNotify, void(entity, vector, vector, vector, vector));
-	METHOD(XonoticScreenshotList, setSelected, void(entity, float));
-	METHOD(XonoticScreenshotList, draw, void(entity));
-	METHOD(XonoticScreenshotList, drawListBoxItem, void(entity, int, vector, bool, bool));
-	METHOD(XonoticScreenshotList, getScreenshots, void(entity));
-	METHOD(XonoticScreenshotList, previewScreenshot, void(entity));
-	METHOD(XonoticScreenshotList, startScreenshot, void(entity));
-	METHOD(XonoticScreenshotList, screenshotName, string(entity, float));
-	METHOD(XonoticScreenshotList, doubleClickListBoxItem, void(entity, float, vector));
-	METHOD(XonoticScreenshotList, keyDown, float(entity, float, float, float));
-	METHOD(XonoticScreenshotList, destroy, void(entity));
-	METHOD(XonoticScreenshotList, showNotify, void(entity));
-	ATTRIB(XonoticScreenshotList, listScreenshot, float, -1)
-	ATTRIB(XonoticScreenshotList, realFontSize, vector, '0 0 0')
-	ATTRIB(XonoticScreenshotList, columnNameOrigin, float, 0)
-	ATTRIB(XonoticScreenshotList, columnNameSize, float, 0)
-	ATTRIB(XonoticScreenshotList, realUpperMargin, float, 0)
-	ATTRIB(XonoticScreenshotList, origin, vector, '0 0 0')
-	ATTRIB(XonoticScreenshotList, itemAbsSize, vector, '0 0 0')
-	ATTRIB(XonoticScreenshotList, filterString, string, string_null)
-	ATTRIB(XonoticScreenshotList, filterBox, entity, NULL)
-	ATTRIB(XonoticScreenshotList, filterTime, float, 0)
+#include "screenshotlist.qh"
 
-	ATTRIB(XonoticScreenshotList, newScreenshotTime, float, 0)
-	ATTRIB(XonoticScreenshotList, newSlideShowScreenshotTime, float, 0)
-
-	ATTRIB(XonoticScreenshotList, screenshotBrowserDialog, entity, NULL)
-	ATTRIB(XonoticScreenshotList, screenshotPreview, entity, NULL)
-	ATTRIB(XonoticScreenshotList, screenshotViewerDialog, entity, NULL)
-	METHOD(XonoticScreenshotList, goScreenshot, void(entity, float));
-	METHOD(XonoticScreenshotList, startSlideShow, void(entity));
-	METHOD(XonoticScreenshotList, stopSlideShow, void(entity));
-ENDCLASS(XonoticScreenshotList)
-
-entity makeXonoticScreenshotList();
-void StartScreenshot_Click(entity btn, entity me);
-void ScreenshotList_Refresh_Click(entity btn, entity me);
-void ScreenshotList_Filter_Would_Change(entity box, entity me);
-void ScreenshotList_Filter_Change(entity box, entity me);
-#endif
-
-#ifdef IMPLEMENTATION
+#include "dialog_multiplayer_media_screenshot.qh"
+#include "dialog_multiplayer_media_screenshot_viewer.qh"
+#include "inputbox.qh"
+#include "../item/modalcontroller.qh"
 
 entity makeXonoticScreenshotList()
 {
@@ -58,7 +16,7 @@ entity makeXonoticScreenshotList()
 void XonoticScreenshotList_configureXonoticScreenshotList(entity me)
 {
 	me.configureXonoticListBox(me);
-	me.getScreenshots(me);
+	me.nItems = 0;
 }
 
 string XonoticScreenshotList_screenshotName(entity me, float i)
@@ -139,8 +97,10 @@ void XonoticScreenshotList_resizeNotify(entity me, vector relOrigin, vector relS
 	me.itemAbsSize = '0 0 0';
 	SUPER(XonoticScreenshotList).resizeNotify(me, relOrigin, relSize, absOrigin, absSize);
 
-	me.realFontSize_y = me.fontSize / (me.itemAbsSize_y = (absSize.y * me.itemHeight));
-	me.realFontSize_x = me.fontSize / (me.itemAbsSize_x = (absSize.x * (1 - me.controlWidth)));
+	me.itemAbsSize.y = absSize.y * me.itemHeight;
+	me.itemAbsSize.x = absSize.x * (1 - me.controlWidth);
+	me.realFontSize.y = me.fontSize / me.itemAbsSize.y;
+	me.realFontSize.x = me.fontSize / me.itemAbsSize.x;
 	me.realUpperMargin = 0.5 * (1 - me.realFontSize.y);
 
 	me.columnNameOrigin = me.realFontSize.x;
@@ -195,8 +155,7 @@ void ScreenshotList_Refresh_Click(entity btn, entity me)
 
 void ScreenshotList_Filter_Change(entity box, entity me)
 {
-	if(me.filterString)
-		strunzone(me.filterString);
+	strfree(me.filterString);
 
 	if(box.text != "")
 	{
@@ -205,8 +164,6 @@ void ScreenshotList_Filter_Change(entity box, entity me)
 		else
 			me.filterString = strzone(strcat("*", box.text, "*"));
 	}
-	else
-		me.filterString = string_null;
 
 	ScreenshotList_Refresh_Click(NULL, me);
 }
@@ -296,4 +253,3 @@ float XonoticScreenshotList_keyDown(entity me, float scan, float ascii, float sh
 	}
 	return SUPER(XonoticScreenshotList).keyDown(me, scan, ascii, shift);
 }
-#endif

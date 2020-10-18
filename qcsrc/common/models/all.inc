@@ -88,6 +88,8 @@ MODEL(PROJECTILE_HOOKBOMB,              "models/grenademodel.md3");
 MODEL(PROJECTILE_HAGAR,                 "models/hagarmissile.mdl");
 MODEL(PROJECTILE_HAGAR_BOUNCING,        "models/hagarmissile.mdl");
 
+MODEL(PROJECTILE_ARC_BOLT,              "models/arctrail.mdl");
+
 // napalm grenade
 MODEL(PROJECTILE_NAPALM_FOUNTAIN,       "null");
 // fireball primary
@@ -123,7 +125,7 @@ MODEL(PROJECTILE_ROCKETMINSTA_LASER,    "models/elaser.mdl");
 MODEL(PROJECTILE_NADE,                  W_Model("v_ok_grenade.md3"));
 MODEL(NADE_VIEW,                        W_Model("h_ok_grenade.iqm"));
 MODEL(NADE_TIMER,                       "models/ok_nade_counter/ok_nade_counter.md3");
-MODEL(NADE_HEAL,                        "models/ctf/shield.md3");
+MODEL(NADE_ORB,                         "models/ctf/shield.md3");
 
 MODEL(GIB_CHUNK,                        "models/gibs/chunk.mdl");
 MODEL(GIB_LEG1,                         "models/gibs/leg1.md3");
@@ -145,7 +147,7 @@ MODEL(GIB_ROBO_7,                       "models/gibs/robo7.md3");
 MODEL(GIB_ROBO_8,                       "models/gibs/robo8.md3");
 Model MDL_GIB_ROBO_RANDOM() {
     int i = floor(random() * 8);
-    return Models_from(MDL_GIB_ROBO_1.m_id + i);
+    return REGISTRY_GET(Models, MDL_GIB_ROBO_1.m_id + i);
 }
 
 MODEL(CASING_SHELL,                     "models/casing_shell.mdl");
@@ -333,6 +335,7 @@ MODEL(VEH_SPIDERBOT_TOP,                "models/vehicles/spiderbot_top.dpm");
 MODEL(VEH_SPIDERBOT_VIEW,               "models/vehicles/spiderbot_cockpit.dpm");
 
 MODEL(CHAT,                             "models/misc/chatbubble.spr");
+MODEL(CHAT_MINIGAME,                    "models/sprites/minigame_busy.iqm");
 
 MODEL(0,                                "models/sprites/0.spr32");
 MODEL(1,                                "models/sprites/1.spr32");
@@ -347,7 +350,7 @@ MODEL(9,                                "models/sprites/9.spr32");
 MODEL(10,                               "models/sprites/10.spr32");
 Model MDL_NUM(int i) {
     if ((i >= 0 && i <= 10))
-        return Models_from(MDL_0.m_id + i);
+        return REGISTRY_GET(Models, MDL_0.m_id + i);
     return MDL_Null;
 }
 

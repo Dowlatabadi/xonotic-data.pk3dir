@@ -1,39 +1,4 @@
-#ifndef SKINLIST_H
-#define SKINLIST_H
-#include "listbox.qc"
-CLASS(XonoticSkinList, XonoticListBox)
-	METHOD(XonoticSkinList, configureXonoticSkinList, void(entity));
-	ATTRIB(XonoticSkinList, rowsPerItem, float, 4)
-	METHOD(XonoticSkinList, resizeNotify, void(entity, vector, vector, vector, vector));
-	METHOD(XonoticSkinList, drawListBoxItem, void(entity, int, vector, bool, bool));
-	METHOD(XonoticSkinList, getSkins, void(entity));
-	METHOD(XonoticSkinList, setSkin, void(entity));
-	METHOD(XonoticSkinList, loadCvars, void(entity));
-	METHOD(XonoticSkinList, saveCvars, void(entity));
-	METHOD(XonoticSkinList, skinParameter, string(entity, float, float));
-	METHOD(XonoticSkinList, doubleClickListBoxItem, void(entity, float, vector));
-	METHOD(XonoticSkinList, keyDown, float(entity, float, float, float));
-	METHOD(XonoticSkinList, destroy, void(entity));
-
-	ATTRIB(XonoticSkinList, skinlist, float, -1)
-	ATTRIB(XonoticSkinList, realFontSize, vector, '0 0 0')
-	ATTRIB(XonoticSkinList, columnPreviewOrigin, float, 0)
-	ATTRIB(XonoticSkinList, columnPreviewSize, float, 0)
-	ATTRIB(XonoticSkinList, columnNameOrigin, float, 0)
-	ATTRIB(XonoticSkinList, columnNameSize, float, 0)
-	ATTRIB(XonoticSkinList, realUpperMargin1, float, 0)
-	ATTRIB(XonoticSkinList, realUpperMargin2, float, 0)
-	ATTRIB(XonoticSkinList, origin, vector, '0 0 0')
-	ATTRIB(XonoticSkinList, itemAbsSize, vector, '0 0 0')
-
-	ATTRIB(XonoticSkinList, name, string, "skinselector")
-ENDCLASS(XonoticSkinList)
-
-entity makeXonoticSkinList();
-void SetSkin_Click(entity btn, entity me);
-#endif
-
-#ifdef IMPLEMENTATION
+#include "skinlist.qh"
 
 const float SKINPARM_NAME = 0;
 const float SKINPARM_TITLE = 1;
@@ -111,7 +76,7 @@ void XonoticSkinList_getSkins(entity me)
 		fh = fopen(s, FILE_READ);
 		if(fh < 0)
 		{
-			LOG_INFO("Warning: can't open skinvalues.txt file\n");
+			LOG_INFO("Warning: can't open skinvalues.txt file");
 			continue;
 		}
 		while((s = fgets(fh)))
@@ -146,8 +111,10 @@ void XonoticSkinList_resizeNotify(entity me, vector relOrigin, vector relSize, v
 	me.itemAbsSize = '0 0 0';
 	SUPER(XonoticSkinList).resizeNotify(me, relOrigin, relSize, absOrigin, absSize);
 
-	me.realFontSize_y = me.fontSize / (me.itemAbsSize_y = (absSize.y * me.itemHeight));
-	me.realFontSize_x = me.fontSize / (me.itemAbsSize_x = (absSize.x * (1 - me.controlWidth)));
+	me.itemAbsSize.y = absSize.y * me.itemHeight;
+	me.itemAbsSize.x = absSize.x * (1 - me.controlWidth);
+	me.realFontSize.y = me.fontSize / me.itemAbsSize.y;
+	me.realFontSize.x = me.fontSize / me.itemAbsSize.x;
 	me.realUpperMargin1 = 0.5 * (1 - 2.5 * me.realFontSize.y);
 	me.realUpperMargin2 = me.realUpperMargin1 + 1.5 * me.realFontSize.y;
 
@@ -209,4 +176,3 @@ float XonoticSkinList_keyDown(entity me, float scan, float ascii, float shift)
 	else
 		return SUPER(XonoticSkinList).keyDown(me, scan, ascii, shift);
 }
-#endif

@@ -1,10 +1,9 @@
 #include "teamradar.qh"
 
-#include "hud/all.qh"
-
-#include "../common/mutators/mutator/waypoints/all.qh"
-
-#include "../lib/csqcmodel/interpolate.qh"
+#include <client/autocvars.qh>
+#include <client/hud/_mod.qh>
+#include <common/mutators/mutator/waypoints/all.qh>
+#include <lib/csqcmodel/interpolate.qh>
 
 vector teamradar_3dcoord_to_texcoord(vector in)
 {
@@ -20,7 +19,7 @@ vector teamradar_texcoord_to_2dcoord(vector in)
 	vector out;
 	in -= teamradar_origin3d_in_texcoord;
 
-	out = rotate(in, teamradar_angle * DEG2RAD);
+	out = Rotate(in, teamradar_angle * DEG2RAD);
 	out.y = - out.y; // screen space is reversed
 
 	out = out * teamradar_size;
@@ -42,19 +41,19 @@ vector teamradar_2dcoord_to_texcoord(vector in)
 	out = out / teamradar_size;
 
 	out_y = - out_y; // screen space is reversed
-	out = rotate(out, -teamradar_angle * DEG2RAD);
+	out = Rotate(out, -teamradar_angle * DEG2RAD);
 
 	out += teamradar_origin3d_in_texcoord;
 
 	return out;
 }
 
-vector teamradar_texcoord_to_3dcoord(vector in,float z)
+vector teamradar_texcoord_to_3dcoord(vector in,float oz)
 {
 	vector out;
 	out_x = in_x * (mi_picmax_x - mi_picmin_x) + mi_picmin_x;
 	out_y = in_y * (mi_picmax_y - mi_picmin_y) + mi_picmin_y;
-	out_z = z;
+	out_z = oz;
 	return out;
 }
 
@@ -67,7 +66,7 @@ void draw_teamradar_background(float fg)
 	{
 		fga = 1;
 		fgc = '1 1 1' * fg;
-		R_BeginPolygon(minimapname, DRAWFLAG_SCREEN | DRAWFLAG_MIPMAP);
+		R_BeginPolygon(minimapname, DRAWFLAG_SCREEN | DRAWFLAG_MIPMAP, true);
 		if(v_flipped)
 		{
 			R_PolygonVertex(teamradar_texcoord_to_2dcoord(mi_pictexcoord3), yinvert(mi_pictexcoord3), fgc, fga);
@@ -92,43 +91,44 @@ void draw_teamradar_player(vector coord3d, vector pangles, vector rgb)
 
 	coord = teamradar_texcoord_to_2dcoord(teamradar_3dcoord_to_texcoord(coord3d));
 
-	makevectors(pangles - '0 1 0' * teamradar_angle);
+	vector forward, right, up;
+	MAKE_VECTORS(pangles - '0 1 0' * teamradar_angle, forward, right, up);
 	if(v_flipped)
 	{
-		v_forward.x = -v_forward.x;
-		v_right.x = -v_right.x;
-		v_up.x = -v_up.x;
+		forward.x = -forward.x;
+		right.x = -right.x;
+		up.x = -up.x; // TODO: unused!
 	}
-	v_forward.z = 0;
-	v_forward = normalize(v_forward);
-	v_forward.y *= -1.0;
-	v_right.x = -v_forward.y;
-	v_right.y = v_forward.x;
+	forward.z = 0;
+	forward = normalize(forward);
+	forward.y *= -1.0;
+	right.x = -forward.y;
+	right.y = forward.x;
 
 	if(rgb == '1 1 1')
 		rgb2 = '0 0 0';
 	else
 		rgb2 = '1 1 1';
 
-	R_BeginPolygon("", 0);
-	R_PolygonVertex(coord+v_forward*3, '0 0 0', rgb2, panel_fg_alpha);
-	R_PolygonVertex(coord+v_right*4-v_forward*2.5, '0 1 0', rgb2, panel_fg_alpha);
-	R_PolygonVertex(coord-v_forward*2, '1 0 0', rgb2, panel_fg_alpha);
-	R_PolygonVertex(coord-v_right*4-v_forward*2.5, '1 1 0', rgb2, panel_fg_alpha);
+	R_BeginPolygon("", 0, true);
+	R_PolygonVertex(coord+forward*3, '0 0 0', rgb2, panel_fg_alpha);
+	R_PolygonVertex(coord+right*4-forward*2.5, '0 1 0', rgb2, panel_fg_alpha);
+	R_PolygonVertex(coord-forward*2, '1 0 0', rgb2, panel_fg_alpha);
+	R_PolygonVertex(coord-right*4-forward*2.5, '1 1 0', rgb2, panel_fg_alpha);
 	R_EndPolygon();
 
-	R_BeginPolygon("", 0);
-	R_PolygonVertex(coord+v_forward*2, '0 0 0', rgb, panel_fg_alpha);
-	R_PolygonVertex(coord+v_right*3-v_forward*2, '0 1 0', rgb, panel_fg_alpha);
-	R_PolygonVertex(coord-v_forward, '1 0 0', rgb, panel_fg_alpha);
-	R_PolygonVertex(coord-v_right*3-v_forward*2, '1 1 0', rgb, panel_fg_alpha);
+	R_BeginPolygon("", 0, true);
+	R_PolygonVertex(coord+forward*2, '0 0 0', rgb, panel_fg_alpha);
+	R_PolygonVertex(coord+right*3-forward*2, '0 1 0', rgb, panel_fg_alpha);
+	R_PolygonVertex(coord-forward, '1 0 0', rgb, panel_fg_alpha);
+	R_PolygonVertex(coord-right*3-forward*2, '1 1 0', rgb, panel_fg_alpha);
 	R_EndPolygon();
 }
 
 void draw_teamradar_icon(vector coord, entity icon, entity pingdata, vector rgb, float a)
 {
 	coord = teamradar_texcoord_to_2dcoord(teamradar_3dcoord_to_texcoord(coord));
-	drawpic(coord - '4 4 0', strcat("gfx/teamradar_icon_", ftos(icon.m_radaricon)), '8 8 0', rgb, a, 0);
+	drawpic_builtin(coord - '4 4 0', strcat("gfx/teamradar_icon_", ftos(icon.m_radaricon)), '8 8 0', rgb, a, 0);
 
 	if(pingdata)
 	{
@@ -141,13 +141,14 @@ void draw_teamradar_icon(vector coord, entity icon, entity pingdata, vector rgb,
 			if(dt >= 1 || dt <= 0)
 				continue;
 			vector v = '2 2 0' * teamradar_size * dt;
-			drawpic(coord - 0.5 * v, "gfx/teamradar_ping", v, '1 1 1', (1 - dt) * a, DRAWFLAG_ADDITIVE);
+			drawpic_builtin(coord - 0.5 * v, "gfx/teamradar_ping", v, '1 1 1', (1 - dt) * a, DRAWFLAG_ADDITIVE);
 		}
 	}
 }
 
 void draw_teamradar_link(vector start, vector end, int colors)
 {
+	TC(int, colors);
 	vector c0, c1, norm;
 
 	start = teamradar_texcoord_to_2dcoord(teamradar_3dcoord_to_texcoord(start));
@@ -161,7 +162,7 @@ void draw_teamradar_link(vector start, vector end, int colors)
 	c0 = colormapPaletteColor(colors & 0x0F, false);
 	c1 = colormapPaletteColor((colors & 0xF0) / 0x10, false);
 
-	R_BeginPolygon("", 0);
+	R_BeginPolygon("", 0, true);
 	R_PolygonVertex(start - norm, '0 0 0', c0, panel_fg_alpha);
 	R_PolygonVertex(start + norm, '0 1 0', c0, panel_fg_alpha);
 	R_PolygonVertex(end + norm, '1 1 0', c1, panel_fg_alpha);
@@ -185,7 +186,7 @@ void teamradar_loadcvars()
 	hud_panel_radar_maximized_zoommode = autocvar_hud_panel_radar_maximized_zoommode;
 
 	// others default to 0
-	// match this to defaultXonotic.cfg!
+	// match this to default hud cfg file!
 	if(!hud_panel_radar_scale) hud_panel_radar_scale = 4096;
 	if(!hud_panel_radar_foreground_alpha) hud_panel_radar_foreground_alpha = 0.8 * panel_fg_alpha;
 	if(!hud_panel_radar_size.x) hud_panel_radar_size.x = 128;
@@ -198,29 +199,25 @@ NET_HANDLE(ENT_CLIENT_RADARLINK, bool isnew)
 {
 	int sendflags = ReadByte();
 
-	InterpolateOrigin_Undo(self);
+	InterpolateOrigin_Undo(this);
 
-	self.iflags = IFLAG_VELOCITY | IFLAG_ORIGIN;
-	self.classname = "radarlink";
+	this.iflags = IFLAG_VELOCITY | IFLAG_ORIGIN;
+	if (isnew) IL_PUSH(g_radarlinks, this);
 
 	if(sendflags & 1)
 	{
-		self.origin_x = ReadCoord();
-		self.origin_y = ReadCoord();
-		self.origin_z = ReadCoord();
-		setorigin(self, self.origin);
+		this.origin = ReadVector();
+		setorigin(this, this.origin);
 	}
 
 	if(sendflags & 2)
 	{
-		self.velocity_x = ReadCoord();
-		self.velocity_y = ReadCoord();
-		self.velocity_z = ReadCoord();
+		this.velocity = ReadVector();
 	}
 
 	if(sendflags & 4)
 	{
-		self.team = ReadByte();
+		this.team = ReadByte();
 	}
 
 	return = true;

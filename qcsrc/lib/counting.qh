@@ -1,5 +1,4 @@
-#ifndef COUNTING_H
-#define COUNTING_H
+#pragma once
 
 #include "i18n.qh"
 
@@ -10,83 +9,83 @@
 #define count_years_decs(time, decs) sprintf(CTX(_("CI_DEC^%s years")), ftos_decimals(time, decs))
 #define count_years(time) \
 	count_fill(time, \
-	CTX(_("CI_ZER^%d years")), /* zeroth */ \
-	CTX(_("CI_FIR^%d year")),  /* first */ \
-	CTX(_("CI_SEC^%d years")), /* year */ \
-	CTX(_("CI_THI^%d years")), /* third */ \
-	CTX(_("CI_MUL^%d years"))) /* multi */
+	_("CI_ZER^%d years"), /* zeroth */ \
+	_("CI_FIR^%d year"),  /* first */ \
+	_("CI_SEC^%d years"), /* year */ \
+	_("CI_THI^%d years"), /* third */ \
+	_("CI_MUL^%d years")) /* multi */
 
 #define count_weeks_decs(time, decs) sprintf(CTX(_("CI_DEC^%s weeks")), ftos_decimals(time, decs))
 #define count_weeks(time) \
 	count_fill(time, \
-	CTX(_("CI_ZER^%d weeks")), /* zeroth */ \
-	CTX(_("CI_FIR^%d week")),  /* first */ \
-	CTX(_("CI_SEC^%d weeks")), /* week */ \
-	CTX(_("CI_THI^%d weeks")), /* third */ \
-	CTX(_("CI_MUL^%d weeks"))) /* multi */
+	_("CI_ZER^%d weeks"), /* zeroth */ \
+	_("CI_FIR^%d week"),  /* first */ \
+	_("CI_SEC^%d weeks"), /* week */ \
+	_("CI_THI^%d weeks"), /* third */ \
+	_("CI_MUL^%d weeks")) /* multi */
 
 #define count_days_decs(time, decs) sprintf(CTX(_("CI_DEC^%s days")), ftos_decimals(time, decs))
 #define count_days(time) \
 	count_fill(time, \
-	CTX(_("CI_ZER^%d days")), /* zeroth */ \
-	CTX(_("CI_FIR^%d day")),  /* first */ \
-	CTX(_("CI_SEC^%d days")), /* day */ \
-	CTX(_("CI_THI^%d days")), /* third */ \
-	CTX(_("CI_MUL^%d days"))) /* multi */
+	_("CI_ZER^%d days"), /* zeroth */ \
+	_("CI_FIR^%d day"),  /* first */ \
+	_("CI_SEC^%d days"), /* day */ \
+	_("CI_THI^%d days"), /* third */ \
+	_("CI_MUL^%d days")) /* multi */
 
 #define count_hours_decs(time, decs) sprintf(CTX(_("CI_DEC^%s hours")), ftos_decimals(time, decs))
 #define count_hours(time) \
 	count_fill(time, \
-	CTX(_("CI_ZER^%d hours")), /* zeroth */ \
-	CTX(_("CI_FIR^%d hour")),  /* first */ \
-	CTX(_("CI_SEC^%d hours")), /* hour */ \
-	CTX(_("CI_THI^%d hours")), /* third */ \
-	CTX(_("CI_MUL^%d hours"))) /* multi */
+	_("CI_ZER^%d hours"), /* zeroth */ \
+	_("CI_FIR^%d hour"),  /* first */ \
+	_("CI_SEC^%d hours"), /* hour */ \
+	_("CI_THI^%d hours"), /* third */ \
+	_("CI_MUL^%d hours")) /* multi */
 
 
 #define count_minutes_decs(time, decs) sprintf(CTX(_("CI_DEC^%s minutes")), ftos_decimals(time, decs))
 #define count_minutes(time) \
 	count_fill(time, \
-	CTX(_("CI_ZER^%d minutes")), /* zeroth */ \
-	CTX(_("CI_FIR^%d minute")),  /* first */ \
-	CTX(_("CI_SEC^%d minutes")), /* minute */ \
-	CTX(_("CI_THI^%d minutes")), /* third */ \
-	CTX(_("CI_MUL^%d minutes"))) /* multi */
+	_("CI_ZER^%d minutes"), /* zeroth */ \
+	_("CI_FIR^%d minute"),  /* first */ \
+	_("CI_SEC^%d minutes"), /* minute */ \
+	_("CI_THI^%d minutes"), /* third */ \
+	_("CI_MUL^%d minutes")) /* multi */
 
 #define count_seconds_decs(time, decs) sprintf(CTX(_("CI_DEC^%s seconds")), ftos_decimals(time, decs))
 #define count_seconds(time) \
 	count_fill(time, \
-	CTX(_("CI_ZER^%d seconds")), /* zeroth */ \
-	CTX(_("CI_FIR^%d second")),  /* first */ \
-	CTX(_("CI_SEC^%d seconds")), /* second */ \
-	CTX(_("CI_THI^%d seconds")), /* third */ \
-	CTX(_("CI_MUL^%d seconds"))) /* multi */
+	_("CI_ZER^%d seconds"), /* zeroth */ \
+	_("CI_FIR^%d second"),  /* first */ \
+	_("CI_SEC^%d seconds"), /* second */ \
+	_("CI_THI^%d seconds"), /* third */ \
+	_("CI_MUL^%d seconds")) /* multi */
 
+// returns 1st, 2nd, 3rd, nth ordinal number from a cardinal number (integer)
+ERASEABLE
 string count_ordinal(int interval)
 {
 	// This function is designed primarily for the English language, it's impossible
 	// to accomodate all languages unless we do a specific function for each one...
 	// and since that's not technically feasible/practical, this is all we've got folks.
 
-	// Basically, it just allows you to represent a number or count in different ways
-	// depending on the number... like, with count_ordinal you can provide integers
-	// and retrieve 1st, 2nd, 3rd, nth ordinal numbers in a clean and simple way.
-	if (floor((interval % 100) / 10) * 10 != 10)  // examples: 12th, 111th, 213th will not execute this block
+	int last2digits = interval % 100;
+
+	// numbers ending with 11, 12 and 13 don't follow the standard pattern
+	if (last2digits < 4 || last2digits > 20)
 	{
-		// otherwise, check normally for 1st,2nd,3rd insertions
-		switch (interval % 10)
+		switch (last2digits % 10)
 		{
 			case 1: return sprintf(_("%dst"), interval);
 			case 2: return sprintf(_("%dnd"), interval);
 			case 3: return sprintf(_("%drd"), interval);
-			default: return sprintf(_("%dth"), interval);
 		}
 	}
-	else { return sprintf(_("%dth"), interval); }
 
-	return "";
+	return sprintf(_("%dth"), interval);
 }
 
+ERASEABLE
 string count_fill(float interval, string zeroth, string first, string second, string third, string multi)
 {
 	// This function is designed primarily for the English language, it's impossible
@@ -103,20 +102,21 @@ string count_fill(float interval, string zeroth, string first, string second, st
 
 	switch (floor(interval))
 	{
-		case 0: return sprintf(zeroth, interval);
+		case 0: return sprintf(CTX(zeroth), interval);
 		case 1:
 		{
 			if (interval == 1)  // EXACTLY value of 1
-				return sprintf(first, interval);
-			else return sprintf(multi, interval);
+				return sprintf(CTX(first), interval);
+			else return sprintf(CTX(multi), interval);
 		}
-		case 2: return sprintf(second, interval);
-		case 3: return sprintf(third, interval);
-		default: return sprintf(multi, interval);
+		case 2: return sprintf(CTX(second), interval);
+		case 3: return sprintf(CTX(third), interval);
+		default: return sprintf(CTX(multi), interval);
 	}
 	return "";
 }
 
+ERASEABLE
 string process_time(float outputtype, float seconds)
 {
 	float tmp_hours = 0, tmp_minutes = 0, tmp_seconds = 0;
@@ -164,42 +164,37 @@ string process_time(float outputtype, float seconds)
 
 			if (tmp_minutes)
 			{
-				output = sprintf(
-					"%s%s",
+				output = strcat(
 					count_minutes(tmp_minutes),
-					((output != "") ? sprintf(", %s", output) : ""));
+					((output != "") ? strcat(", ", output) : ""));
 			}
 
 			if (tmp_hours)
 			{
-				output = sprintf(
-					"%s%s",
+				output = strcat(
 					count_hours(tmp_hours),
-					((output != "") ? sprintf(", %s", output) : ""));
+					((output != "") ? strcat(", ", output) : ""));
 			}
 
 			if (tmp_days)
 			{
-				output = sprintf(
-					"%s%s",
+				output = strcat(
 					count_days(tmp_days),
-					((output != "") ? sprintf(", %s", output) : ""));
+					((output != "") ? strcat(", ", output) : ""));
 			}
 
 			if (tmp_weeks)
 			{
-				output = sprintf(
-					"%s%s",
+				output = strcat(
 					count_weeks(tmp_weeks),
-					((output != "") ? sprintf(", %s", output) : ""));
+					((output != "") ? strcat(", ", output) : ""));
 			}
 
 			if (tmp_years)
 			{
-				output = sprintf(
-					"%s%s",
+				output = strcat(
 					count_years(tmp_years),
-					((output != "") ? sprintf(", %s", output) : ""));
+					((output != "") ? strcat(", ", output) : ""));
 			}
 
 			return output;
@@ -215,9 +210,8 @@ string process_time(float outputtype, float seconds)
 			if (tmp_days)
 			{
 				output = sprintf(
-					"%s%s",
 					count_days(tmp_days),
-					((output != "") ? sprintf(", %s", output) : ""));
+					((output != "") ? strcat(", ", output) : ""));
 			}
 
 			return output;
@@ -225,4 +219,3 @@ string process_time(float outputtype, float seconds)
 	}
 	return "";
 }
-#endif

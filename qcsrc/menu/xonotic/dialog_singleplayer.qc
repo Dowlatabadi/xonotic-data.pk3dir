@@ -1,26 +1,16 @@
-#ifndef DIALOG_SINGLEPLAYER_H
-#define DIALOG_SINGLEPLAYER_H
-#include "dialog.qc"
-CLASS(XonoticSingleplayerDialog, XonoticDialog)
-	METHOD(XonoticSingleplayerDialog, fill, void(entity));
-	ATTRIB(XonoticSingleplayerDialog, title, string, _("Singleplayer"))
-	ATTRIB(XonoticSingleplayerDialog, tooltip, string, _("Play the singleplayer campaign or instant action matches against bots"))
-	ATTRIB(XonoticSingleplayerDialog, color, vector, SKINCOLOR_DIALOG_SINGLEPLAYER)
-	ATTRIB(XonoticSingleplayerDialog, intendedWidth, float, 0.80)
-	ATTRIB(XonoticSingleplayerDialog, rows, float, 24)
-	ATTRIB(XonoticSingleplayerDialog, columns, float, 5)
-	ATTRIB(XonoticSingleplayerDialog, campaignBox, entity, NULL)
-ENDCLASS(XonoticSingleplayerDialog)
-#endif
+#include "dialog_singleplayer.qh"
 
-#ifdef IMPLEMENTATION
+#include <common/gamemodes/_mod.qh>
+#include "bigbutton.qh"
+#include "radiobutton.qh"
+#include "textlabel.qh"
+#include "campaign.qh"
 
 void InstantAction_LoadMap(entity btn, entity dummy)
 {
 	float pmin = 2, pmax = 16, pstep = 1;
 
 	cvar_set("timelimit_override", "10");
-	cvar_set("g_lms_lives_override", "9");
 
 	if(random() < 0.4) // 40% are DM
 	{
@@ -138,11 +128,10 @@ void XonoticSingleplayerDialog_fill(entity me)
 	me.gotoRC(me, me.rows - 2, 0);
 		me.TD(me, 1, 2, e = makeXonoticTextLabel(0.5, _("Campaign Difficulty:")));
 		me.TD(me, 1, 1, e = makeXonoticRadioButton(1, "g_campaign_skill", "-2", ZCTX(_("CSKL^Easy"))));
-		me.TD(me, 1, 1, e = makeXonoticRadioButton(1, "g_campaign_skill", "-1", ZCTX(_("CSKL^Medium"))));
-		me.TD(me, 1, 1, e = makeXonoticRadioButton(1, "g_campaign_skill", "0", ZCTX(_("CSKL^Hard"))));
+		me.TD(me, 1, 1, e = makeXonoticRadioButton(1, "g_campaign_skill", "0", ZCTX(_("CSKL^Medium"))));
+		me.TD(me, 1, 1, e = makeXonoticRadioButton(1, "g_campaign_skill", "2", ZCTX(_("CSKL^Hard"))));
 		me.TR(me);
 		me.TD(me, 1, me.columns, e = makeXonoticButton(_("Start Singleplayer!"), '0 0 0'));
 			e.onClick = CampaignList_LoadMap;
 			e.onClickEntity = me.campaignBox;
 }
-#endif

@@ -1,7 +1,10 @@
-#ifndef BITS_H
-#define BITS_H
+#pragma once
+
 #include "log.qh"
 
+/// Only ever assign into the first 24 bits in QC (so max is BIT(23)).
+/// QC converts the float to int, performs the bit operation, then converts it back.
+/// Assigning to the highest bits means some of the low ones might get lost due to float precision.
 #define BIT(n) (1 << (n))
 #define BITS(n) (BIT(n) - 1)
 #ifndef BRANCHLESS_BITSET
@@ -10,6 +13,7 @@
 	#define BITSET(var, mask, flag) ((var) ^ (-(flag) ^ (var)) & (mask))
 #endif
 
+ERASEABLE
 int lowestbit(int f)
 {
 	f &= ~(f << 1);
@@ -20,6 +24,7 @@ int lowestbit(int f)
 	return f;
 }
 
+ERASEABLE
 int randombit(int bits)
 {
 	if (!(bits & (bits - 1)))  // this ONLY holds for powers of two!
@@ -42,6 +47,7 @@ int randombit(int bits)
 	return b;
 }
 
+ERASEABLE
 int randombits(int bits, int k, bool error_return)
 {
 	int r = 0;
@@ -56,6 +62,7 @@ int randombits(int bits, int k, bool error_return)
 	return r;
 }
 
+/*
 void randombit_test(int bits, int iter)
 {
 	while (iter > 0)
@@ -64,6 +71,7 @@ void randombit_test(int bits, int iter)
 		--iter;
 	}
 }
+*/
 
 enum {
 	OP_SET,
@@ -73,6 +81,7 @@ enum {
 	OP_MINUS
 };
 
+ERASEABLE
 bool GiveBit(entity e, .int fld, int bit, int op, int val)
 {
 	int v0 = (e.(fld) & bit);
@@ -97,6 +106,7 @@ bool GiveBit(entity e, .int fld, int bit, int op, int val)
 	return v0 != v1;
 }
 
+ERASEABLE
 bool GiveValue(entity e, .int fld, int op, int val)
 {
 	int v0 = e.(fld);
@@ -121,5 +131,3 @@ bool GiveValue(entity e, .int fld, int op, int val)
 	int v1 = e.(fld);
 	return v0 != v1;
 }
-
-#endif

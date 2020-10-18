@@ -1,24 +1,8 @@
-#ifndef SLIDER_RESOLUTION_H
-#define SLIDER_RESOLUTION_H
-#include "textslider.qc"
-CLASS(XonoticResolutionSlider, XonoticTextSlider)
-	METHOD(XonoticResolutionSlider, configureXonoticResolutionSlider, void(entity));
-	METHOD(XonoticResolutionSlider, loadResolutions, void(entity, float));
-	METHOD(XonoticResolutionSlider, addResolution, void(entity, float, float, float));
-	METHOD(XonoticResolutionSlider, loadCvars, void(entity));
-	METHOD(XonoticResolutionSlider, saveCvars, void(entity));
-	METHOD(XonoticResolutionSlider, draw, void(entity));
-	ATTRIB(XonoticResolutionSlider, vid_fullscreen, float, -1)
-	ATTRIB(XonoticResolutionSlider, maxAllowedWidth, float, 0)
-	ATTRIB(XonoticResolutionSlider, maxAllowedHeight, float, 0)
-ENDCLASS(XonoticResolutionSlider)
-entity makeXonoticResolutionSlider();
-float updateConwidths(float width, float height, float pixelheight);
-#endif
-
-#ifdef IMPLEMENTATION
+#include "slider_resolution.qh"
 
 /* private static */ float XonoticResolutionSlider_DataHasChanged;
+/* attrib */ float vid_conwidth;
+/* attrib */ float vid_conheight;
 
 // Updates cvars (to be called by menu.qc at startup or on detected res change)
 float updateConwidths(float width, float height, float pixelheight)
@@ -36,6 +20,20 @@ float updateConwidths(float width, float height, float pixelheight)
 	cvar_set("_menu_vid_height", ftos(height));
 	cvar_set("_menu_vid_pixelheight", ftos(pixelheight));
 	cvar_set("_menu_vid_desktopfullscreen", cvar_string("vid_desktopfullscreen"));
+
+	// engine is handling conwidth calculations!
+	if((cvar_type("vid_conwidthauto") & CVAR_TYPEFLAG_ENGINE) && cvar("vid_conwidthauto"))
+	{
+		if(vid_conwidth != cvar("vid_conwidth") || vid_conheight != cvar("vid_conheight"))
+		{
+			// Please reload resolutions list and such stuff.
+			XonoticResolutionSlider_DataHasChanged = true;
+			vid_conwidth = cvar("vid_conwidth");
+			vid_conheight = cvar("vid_conheight");
+			return 1;
+		}
+		return 0; // No recalculation
+	}
 
 	r_x = width;
 	r_y = height;
@@ -57,8 +55,8 @@ float updateConwidths(float width, float height, float pixelheight)
 
 	minfactor = min(1, 640 / c.x);            // can be > 1 only if c_x is <640
 	maxfactor = max(1, r.x / c.x, r.y / c.y); // can be < 1 only if r_x < c_x and r_y < c_y
-	LOG_TRACE("min factor: ", ftos(minfactor), "\n");
-	LOG_TRACE("max factor: ", ftos(maxfactor), "\n");
+	LOG_TRACE("min factor: ", ftos(minfactor));
+	LOG_TRACE("max factor: ", ftos(maxfactor));
 
 	if(sz < 0)
 		f = 1 - (maxfactor - 1) * sz;
@@ -121,10 +119,10 @@ void XonoticResolutionSlider_addResolution(entity me, float w, float h, float pi
 				bestdenom = denom;
 			}
 		}
-		me.insertValue(me, i, strzone(sprintf(_("%dx%d (%d:%d)"), w, h, bestnum, bestdenom)), strzone(strcat(ftos(w), " ", ftos(h), " ", ftos(pixelheight))));
+		me.insertValue(me, i, strzone(sprintf("%dx%d (%d:%d)", w, h, bestnum, bestdenom)), strzone(strcat(ftos(w), " ", ftos(h), " ", ftos(pixelheight))));
 	}
 	else
-		me.insertValue(me, i, strzone(sprintf(_("%dx%d"), w, h)), strzone(strcat(ftos(w), " ", ftos(h), " ", ftos(pixelheight))));
+		me.insertValue(me, i, strzone(sprintf("%dx%d", w, h)), strzone(strcat(ftos(w), " ", ftos(h), " ", ftos(pixelheight))));
 }
 float autocvar_menu_vid_allowdualscreenresolution;
 void XonoticResolutionSlider_configureXonoticResolutionSlider(entity me)
@@ -167,7 +165,7 @@ void XonoticResolutionSlider_loadResolutions(entity me, float fullscreen)
 		r = getresolution(-1);
 		if(r.x != 0 || r.y != 0)
 			me.addResolution(me, r.x, r.y, r.z);
-		LOG_TRACE("Added system resolutions.\n");
+		LOG_TRACE("Added system resolutions.");
 	}
 
 	if(me.nValues == 0)
@@ -202,9 +200,9 @@ void XonoticResolutionSlider_loadResolutions(entity me, float fullscreen)
 		me.addResolution(me, 1280, 960, 1); // pc res
 		me.addResolution(me, 1280, 1024, 1); // pc res
 		me.addResolution(me, 1920, 1080, 1); // 1080p
-		LOG_TRACE("Added default resolutions.\n");
+		LOG_TRACE("Added default resolutions.");
 	}
-	LOG_TRACE("Total number of resolutions detected: ", ftos(me.nValues), "\n");
+	LOG_TRACE("Total number of resolutions detected: ", ftos(me.nValues));
 
 	me.vid_fullscreen = fullscreen;
 
@@ -243,4 +241,3 @@ void XonoticResolutionSlider_draw(entity me)
 	}
 	SUPER(XonoticResolutionSlider).draw(me);
 }
-#endif

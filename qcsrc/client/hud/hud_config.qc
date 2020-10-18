@@ -1,15 +1,17 @@
 #include "hud_config.qh"
 
-#include "hud.qh"
+#include <client/autocvars.qh>
+#include <client/draw.qh>
+#include <client/hud/hud.qh>
+#include <client/hud/panel/scoreboard.qh>
+#include <client/view.qh>
 
-#define HUD_Write(s) fputs(fh, s)
-#define HUD_Write_Cvar(cvar) HUD_Write(strcat("seta ", cvar, " \"", cvar_string(cvar), "\"\n"))
-#define HUD_Write_PanelCvar(cvar_suf) HUD_Write_Cvar(strcat("hud_panel_", panel.panel_name, cvar_suf))
 // Save the config
 void HUD_Panel_ExportCfg(string cfgname)
 {
 	float fh;
 	string filename = strcat("hud_", autocvar_hud_skin, "_", cfgname, ".cfg");
+	string str = "";
 	fh = fopen(filename, FILE_WRITE);
 	if(fh >= 0)
 	{
@@ -39,6 +41,7 @@ void HUD_Panel_ExportCfg(string cfgname)
 		HUD_Write_Cvar("hud_progressbar_health_color");
 		HUD_Write_Cvar("hud_progressbar_armor_color");
 		HUD_Write_Cvar("hud_progressbar_fuel_color");
+		HUD_Write_Cvar("hud_progressbar_oxygen_color");
 		HUD_Write_Cvar("hud_progressbar_nexball_color");
 		HUD_Write_Cvar("hud_progressbar_speed_color");
 		HUD_Write_Cvar("hud_progressbar_acceleration_color");
@@ -56,11 +59,10 @@ void HUD_Panel_ExportCfg(string cfgname)
 		HUD_Write("\n");
 
 		// common cvars for all panels
-		for (int i = 0; i < hud_panels_COUNT; ++i)
+		for (int i = 0; i < REGISTRY_COUNT(hud_panels); ++i)
 		{
-			panel = hud_panels_from(i);
+			panel = REGISTRY_GET(hud_panels, i);
 
-			HUD_Write_PanelCvar("");
 			HUD_Write_PanelCvar("_pos");
 			HUD_Write_PanelCvar("_size");
 			HUD_Write_PanelCvar("_bg");
@@ -69,163 +71,27 @@ void HUD_Panel_ExportCfg(string cfgname)
 			HUD_Write_PanelCvar("_bg_alpha");
 			HUD_Write_PanelCvar("_bg_border");
 			HUD_Write_PanelCvar("_bg_padding");
-			switch(panel) {
-				case HUD_PANEL_WEAPONS:
-					HUD_Write_PanelCvar("_accuracy");
-					HUD_Write_PanelCvar("_label");
-					HUD_Write_PanelCvar("_label_scale");
-					HUD_Write_PanelCvar("_complainbubble");
-					HUD_Write_PanelCvar("_complainbubble_padding");
-					HUD_Write_PanelCvar("_complainbubble_time");
-					HUD_Write_PanelCvar("_complainbubble_fadetime");
-					HUD_Write_PanelCvar("_complainbubble_color_outofammo");
-					HUD_Write_PanelCvar("_complainbubble_color_donthave");
-					HUD_Write_PanelCvar("_complainbubble_color_unavailable");
-					HUD_Write_PanelCvar("_ammo");
-					HUD_Write_PanelCvar("_ammo_color");
-					HUD_Write_PanelCvar("_ammo_alpha");
-					HUD_Write_PanelCvar("_aspect");
-					HUD_Write_PanelCvar("_timeout");
-					HUD_Write_PanelCvar("_timeout_effect");
-					HUD_Write_PanelCvar("_timeout_fadebgmin");
-					HUD_Write_PanelCvar("_timeout_fadefgmin");
-					HUD_Write_PanelCvar("_timeout_speed_in");
-					HUD_Write_PanelCvar("_timeout_speed_out");
-					HUD_Write_PanelCvar("_onlyowned");
-					HUD_Write_PanelCvar("_noncurrent_alpha");
-					HUD_Write_PanelCvar("_noncurrent_scale");
-					break;
-				case HUD_PANEL_AMMO:
-					HUD_Write_PanelCvar("_onlycurrent");
-					HUD_Write_PanelCvar("_noncurrent_alpha");
-					HUD_Write_PanelCvar("_noncurrent_scale");
-					HUD_Write_PanelCvar("_iconalign");
-					HUD_Write_PanelCvar("_progressbar");
-					HUD_Write_PanelCvar("_progressbar_name");
-					HUD_Write_PanelCvar("_progressbar_xoffset");
-					HUD_Write_PanelCvar("_text");
-					break;
-				case HUD_PANEL_POWERUPS:
-					HUD_Write_PanelCvar("_iconalign");
-					HUD_Write_PanelCvar("_baralign");
-					HUD_Write_PanelCvar("_progressbar");
-					HUD_Write_PanelCvar("_text");
-					break;
-				case HUD_PANEL_HEALTHARMOR:
-					HUD_Write_PanelCvar("_flip");
-					HUD_Write_PanelCvar("_iconalign");
-					HUD_Write_PanelCvar("_baralign");
-					HUD_Write_PanelCvar("_progressbar");
-					HUD_Write_PanelCvar("_progressbar_health");
-					HUD_Write_PanelCvar("_progressbar_armor");
-					HUD_Write_PanelCvar("_progressbar_gfx");
-					HUD_Write_PanelCvar("_progressbar_gfx_smooth");
-					HUD_Write_PanelCvar("_text");
-					break;
-				case HUD_PANEL_NOTIFY:
-					HUD_Write_PanelCvar("_flip");
-					HUD_Write_PanelCvar("_fontsize");
-					HUD_Write_PanelCvar("_time");
-					HUD_Write_PanelCvar("_fadetime");
-					HUD_Write_PanelCvar("_icon_aspect");
-					break;
-				case HUD_PANEL_TIMER:
-					break;
-				case HUD_PANEL_RADAR:
-					HUD_Write_PanelCvar("_foreground_alpha");
-					HUD_Write_PanelCvar("_rotation");
-					HUD_Write_PanelCvar("_zoommode");
-					HUD_Write_PanelCvar("_scale");
-					HUD_Write_PanelCvar("_maximized_scale");
-					HUD_Write_PanelCvar("_maximized_size");
-					HUD_Write_PanelCvar("_maximized_rotation");
-					HUD_Write_PanelCvar("_maximized_zoommode");
-					break;
-				case HUD_PANEL_SCORE:
-					HUD_Write_PanelCvar("_rankings");
-					break;
-				case HUD_PANEL_VOTE:
-					HUD_Write_PanelCvar("_alreadyvoted_alpha");
-					break;
-				case HUD_PANEL_MODICONS:
-					HUD_Write_PanelCvar("_ca_layout");
-					HUD_Write_PanelCvar("_dom_layout");
-					HUD_Write_PanelCvar("_freezetag_layout");
-					break;
-				case HUD_PANEL_PRESSEDKEYS:
-					HUD_Write_PanelCvar("_aspect");
-					HUD_Write_PanelCvar("_attack");
-					break;
-				case HUD_PANEL_ENGINEINFO:
-					HUD_Write_PanelCvar("_framecounter_time");
-					HUD_Write_PanelCvar("_framecounter_decimals");
-					break;
-				case HUD_PANEL_INFOMESSAGES:
-					HUD_Write_PanelCvar("_flip");
-					break;
-				case HUD_PANEL_PHYSICS:
-					HUD_Write_PanelCvar("_speed_unit_show");
-					HUD_Write_PanelCvar("_speed_max");
-					HUD_Write_PanelCvar("_speed_vertical");
-					HUD_Write_PanelCvar("_topspeed");
-					HUD_Write_PanelCvar("_topspeed_time");
-					HUD_Write_PanelCvar("_acceleration_max");
-					HUD_Write_PanelCvar("_acceleration_vertical");
-					HUD_Write_PanelCvar("_flip");
-					HUD_Write_PanelCvar("_baralign");
-					HUD_Write_PanelCvar("_progressbar");
-					HUD_Write_PanelCvar("_acceleration_progressbar_mode");
-					HUD_Write_PanelCvar("_acceleration_progressbar_scale");
-					HUD_Write_PanelCvar("_acceleration_progressbar_nonlinear");
-					HUD_Write_PanelCvar("_text");
-					HUD_Write_PanelCvar("_text_scale");
-					break;
-				case HUD_PANEL_CENTERPRINT:
-					HUD_Write_PanelCvar("_align");
-					HUD_Write_PanelCvar("_flip");
-					HUD_Write_PanelCvar("_fontscale");
-					HUD_Write_PanelCvar("_time");
-					HUD_Write_PanelCvar("_fade_in");
-					HUD_Write_PanelCvar("_fade_out");
-					HUD_Write_PanelCvar("_fade_subsequent");
-					HUD_Write_PanelCvar("_fade_subsequent_passone");
-					HUD_Write_PanelCvar("_fade_subsequent_passone_minalpha");
-					HUD_Write_PanelCvar("_fade_subsequent_passtwo");
-					HUD_Write_PanelCvar("_fade_subsequent_passtwo_minalpha");
-					HUD_Write_PanelCvar("_fade_subsequent_minfontsize");
-					HUD_Write_PanelCvar("_fade_minfontsize");
-					break;
-				case HUD_PANEL_ITEMSTIME:
-					HUD_Write_PanelCvar("_iconalign");
-					HUD_Write_PanelCvar("_progressbar");
-					HUD_Write_PanelCvar("_progressbar_name");
-					HUD_Write_PanelCvar("_progressbar_reduced");
-					HUD_Write_PanelCvar("_text");
-					HUD_Write_PanelCvar("_ratio");
-					HUD_Write_PanelCvar("_dynamicsize");
-					break;
-				case HUD_PANEL_QUICKMENU:
-					HUD_Write_PanelCvar("_align");
-					break;
-			}
+			panel.panel_export(fh);
 			HUD_Write("\n");
 		}
+
 		HUD_Write("menu_sync\n"); // force the menu to reread the cvars, so that the dialogs are updated
 
-		LOG_INFOF(_("^2Successfully exported to %s! (Note: It's saved in data/data/)\n"), filename);
+		LOG_INFOF(_("^2Successfully exported to %s! (Note: It's saved in data/data/)"), filename);
 		fclose(fh);
 	}
 	else
-		LOG_INFOF(_("^1Couldn't write to %s\n"), filename);
+		LOG_INFOF(_("^1Couldn't write to %s"), filename);
 }
 
 void HUD_Configure_Exit_Force()
 {
-	if (menu_enabled)
+	if (hud_configure_menu_open)
 	{
-		menu_enabled = 0;
+		hud_configure_menu_open = 0;
 		localcmd("togglemenu\n");
 	}
+	cursor_type = CURSOR_NORMAL;
 	cvar_set("_hud_configure", "0");
 }
 
@@ -235,8 +101,8 @@ vector HUD_Panel_CheckMove(vector myPos, vector mySize)
 	vector myCenter, targCenter;
 	vector myTarget = myPos;
 	int i;
-	for (i = 0; i < hud_panels_COUNT; ++i) {
-		panel = hud_panels_from(i);
+	for (i = 0; i < REGISTRY_COUNT(hud_panels); ++i) {
+		panel = REGISTRY_GET(hud_panels, i);
 		if(!(panel.panel_configflags & PANEL_CONFIG_MAIN)) continue;
 		if(panel == highlightedPanel) continue;
 		HUD_Panel_UpdatePosSize();
@@ -332,8 +198,8 @@ vector HUD_Panel_CheckResize(vector mySize, vector resizeorigin) {
 	vector dist;
 	float ratio = mySize.x/mySize.y;
 	int i;
-	for (i = 0; i < hud_panels_COUNT; ++i) {
-		panel = hud_panels_from(i);
+	for (i = 0; i < REGISTRY_COUNT(hud_panels); ++i) {
+		panel = REGISTRY_GET(hud_panels, i);
 		if(!(panel.panel_configflags & PANEL_CONFIG_MAIN)) continue;
 		if(panel == highlightedPanel) continue;
 		HUD_Panel_UpdatePosSize();
@@ -633,17 +499,14 @@ void HUD_Panel_Arrow_Action(float nPrimary)
 	}
 }
 
-void HUD_Panel_EnableMenu();
-entity tab_panels[hud_panels_MAX];
+entity tab_panels[REGISTRY_MAX(hud_panels)];
 entity tab_panel;
 vector tab_panel_pos;
 float tab_backward;
-void HUD_Panel_FirstInDrawQ(float id);
 void reset_tab_panels()
 {
-	int i;
-	for(i = 0; i < hud_panels_COUNT; ++i)
-		tab_panels[i] = world;
+	for (int i = 0; i < REGISTRY_COUNT(hud_panels); ++i)
+		tab_panels[i] = NULL;
 }
 float HUD_Panel_InputEvent(float bInputType, float nPrimary, float nSecondary)
 {
@@ -672,10 +535,8 @@ float HUD_Panel_InputEvent(float bInputType, float nPrimary, float nSecondary)
 	}
 
 	// allow console bind to work
-	string con_keys;
-	float keys;
-	con_keys = findkeysforcommand("toggleconsole", 0);
-	keys = tokenize(con_keys); // findkeysforcommand returns data for this
+	string con_keys = findkeysforcommand("toggleconsole", 0);
+	int keys = tokenize(con_keys); // findkeysforcommand returns data for this
 
 	bool hit_con_bind = false;
 	int i;
@@ -707,7 +568,7 @@ float HUD_Panel_InputEvent(float bInputType, float nPrimary, float nSecondary)
 				highlightedAction = 0;
 				HUD_Panel_FirstInDrawQ(highlightedPanel.panel_id);
 			}
-			tab_panel = world;
+			tab_panel = NULL;
 			reset_tab_panels();
 		}
 	}
@@ -730,15 +591,15 @@ float HUD_Panel_InputEvent(float bInputType, float nPrimary, float nSecondary)
 	{
 		if (bInputType == 1)
 			return true;
-		menu_enabled = 1;
+		hud_configure_menu_open = 1;
 		localcmd("menu_showhudexit\n");
 	}
 	else if(nPrimary == K_BACKSPACE && hudShiftState & S_CTRL)
 	{
 		if (bInputType == 1)
 			return true;
-		if (!menu_enabled)
-			cvar_set("_hud_configure", "0");
+		if (!hud_configure_menu_open)
+			HUD_Configure_Exit_Force();
 	}
 	else if(nPrimary == K_TAB && hudShiftState & S_CTRL) // switch panel
 	{
@@ -775,17 +636,17 @@ float HUD_Panel_InputEvent(float bInputType, float nPrimary, float nSecondary)
 		vector candidate_pos = '0 0 0';
 		const float LEVELS_NUM = 4;
 		float level_height = vid_conheight / LEVELS_NUM;
-:find_tab_panel
+LABEL(find_tab_panel)
 		level = floor(tab_panel_pos.y / level_height) * level_height; //starting level
 		candidate_pos.x = (!tab_backward) ? vid_conwidth : 0;
 		start_posX = tab_panel_pos.x;
-		tab_panel = world;
+		tab_panel = NULL;
 		k=0;
 		while(++k)
 		{
-			for(i = 0; i < hud_panels_COUNT; ++i)
+			for(i = 0; i < REGISTRY_COUNT(hud_panels); ++i)
 			{
-				panel = hud_panels_from(i);
+				panel = REGISTRY_GET(hud_panels, i);
 				if(!(panel.panel_configflags & PANEL_CONFIG_MAIN))
 					continue;
 				if (panel == tab_panels[i] || panel == starting_panel)
@@ -806,11 +667,11 @@ float HUD_Panel_InputEvent(float bInputType, float nPrimary, float nSecondary)
 				reset_tab_panels();
 				if (!old_tab_panel)
 				{
-					tab_panel = world;
+					tab_panel = NULL;
 					return true;
 				}
 				starting_panel = old_tab_panel;
-				old_tab_panel = world;
+				old_tab_panel = NULL;
 				goto find_tab_panel; //u must find tab_panel!
 			}
 			if (!tab_backward)
@@ -835,7 +696,10 @@ float HUD_Panel_InputEvent(float bInputType, float nPrimary, float nSecondary)
 			return true;
 
 		if (highlightedPanel)
-			cvar_set(strcat("hud_panel_", highlightedPanel.panel_name), ftos(!cvar(strcat("hud_panel_", highlightedPanel.panel_name))));
+		{
+			if(panel.panel_configflags & PANEL_CONFIG_CANBEOFF)
+				cvar_set(strcat("hud_panel_", highlightedPanel.panel_name), ftos(!cvar(strcat("hud_panel_", highlightedPanel.panel_name))));
+		}
 		else
 			cvar_set(strcat("hud_dock"), (autocvar_hud_dock == "") ? "dock" : "");
 	}
@@ -891,7 +755,7 @@ float HUD_Panel_InputEvent(float bInputType, float nPrimary, float nSecondary)
 			cvar_set(strcat("hud_panel_", highlightedPanel_backup.panel_name, "_pos"), s);
 			s = strcat(ftos(panel_size_backup.x/vid_conwidth), " ", ftos(panel_size_backup.y/vid_conheight));
 			cvar_set(strcat("hud_panel_", highlightedPanel_backup.panel_name, "_size"), s);
-			highlightedPanel_backup = world;
+			highlightedPanel_backup = NULL;
 		}
 	}
 	else if(nPrimary == 's' && hudShiftState & S_CTRL) // save config
@@ -926,15 +790,15 @@ float HUD_Panel_InputEvent(float bInputType, float nPrimary, float nSecondary)
 	return true;
 }
 
-float HUD_Panel_Check_Mouse_Pos(float allow_move)
+int HUD_Panel_Check_Mouse_Pos(bool allow_move)
 {
 	int i, j = 0;
-	while(j < hud_panels_COUNT)
+	while(j < REGISTRY_COUNT(hud_panels))
 	{
 		i = panel_order[j];
 		j += 1;
 
-		panel = hud_panels_from(i);
+		panel = REGISTRY_GET(hud_panels, i);
 		if(!(panel.panel_configflags & PANEL_CONFIG_MAIN)) continue;
 		HUD_Panel_UpdatePosSize();
 
@@ -943,30 +807,30 @@ float HUD_Panel_Check_Mouse_Pos(float allow_move)
 		// move
 		if(allow_move && mousepos.x > panel_pos.x && mousepos.y > panel_pos.y && mousepos.x < panel_pos.x + panel_size.x && mousepos.y < panel_pos.y + panel_size.y)
 		{
-			return 1;
+			return CURSOR_MOVE;
 		}
 		// resize from topleft border
 		else if(mousepos.x >= panel_pos.x - border && mousepos.y >= panel_pos.y - border && mousepos.x <= panel_pos.x + 0.5 * panel_size.x && mousepos.y <= panel_pos.y + 0.5 * panel_size.y)
 		{
-			return 2;
+			return CURSOR_RESIZE;
 		}
 		// resize from topright border
 		else if(mousepos.x >= panel_pos.x + 0.5 * panel_size.x && mousepos.y >= panel_pos.y - border && mousepos.x <= panel_pos.x + panel_size.x + border && mousepos.y <= panel_pos.y + 0.5 * panel_size.y)
 		{
-			return 3;
+			return CURSOR_RESIZE2;
 		}
 		// resize from bottomleft border
 		else if(mousepos.x >= panel_pos.x - border && mousepos.y >= panel_pos.y + 0.5 * panel_size.y && mousepos.x <= panel_pos.x + 0.5 * panel_size.x && mousepos.y <= panel_pos.y + panel_size.y + border)
 		{
-			return 3;
+			return CURSOR_RESIZE2;
 		}
 		// resize from bottomright border
 		else if(mousepos.x >= panel_pos.x + 0.5 * panel_size.x && mousepos.y >= panel_pos.y + 0.5 * panel_size.y && mousepos.x <= panel_pos.x + panel_size.x + border && mousepos.y <= panel_pos.y + panel_size.y + border)
 		{
-			return 2;
+			return CURSOR_RESIZE;
 		}
 	}
-	return 0;
+	return CURSOR_NORMAL;
 }
 
 // move a panel to the beginning of the panel order array (which means it gets drawn last, on top of everything else)
@@ -975,7 +839,7 @@ void HUD_Panel_FirstInDrawQ(float id)
 	int i;
 	int place = -1;
 	// find out where in the array our current id is, save into place
-	for(i = 0; i < hud_panels_COUNT; ++i)
+	for(i = 0; i < REGISTRY_COUNT(hud_panels); ++i)
 	{
 		if(panel_order[i] == id)
 		{
@@ -985,7 +849,7 @@ void HUD_Panel_FirstInDrawQ(float id)
 	}
 	// place last if we didn't find a place for it yet (probably new panel, or screwed up cvar)
 	if(place == -1)
-		place = hud_panels_COUNT - 1;
+		place = REGISTRY_COUNT(hud_panels) - 1;
 
 	// move all ids up by one step in the array until "place"
 	for(i = place; i > 0; --i)
@@ -997,26 +861,24 @@ void HUD_Panel_FirstInDrawQ(float id)
 
 	// let's save them into the cvar by some strcat trickery
 	string s = "";
-	for(i = 0; i < hud_panels_COUNT; ++i)
+	for(i = 0; i < REGISTRY_COUNT(hud_panels); ++i)
 	{
 		s = strcat(s, ftos(panel_order[i]), " ");
 	}
 	cvar_set("_hud_panelorder", s);
-	if(hud_panelorder_prev)
-		strunzone(hud_panelorder_prev);
-	hud_panelorder_prev = strzone(autocvar__hud_panelorder); // prevent HUD_Main from doing useless update, we already updated here
+	strcpy(hud_panelorder_prev, autocvar__hud_panelorder); // prevent HUD_Main from doing useless update, we already updated here
 }
 
 void HUD_Panel_Highlight(float allow_move)
 {
 	int i, j = 0;
 
-	while(j < hud_panels_COUNT)
+	while(j < REGISTRY_COUNT(hud_panels))
 	{
 		i = panel_order[j];
 		j += 1;
 
-		panel = hud_panels_from(i);
+		panel = REGISTRY_GET(hud_panels, i);
 		if(!(panel.panel_configflags & PANEL_CONFIG_MAIN))
 			continue;
 		HUD_Panel_UpdatePosSize();
@@ -1026,7 +888,7 @@ void HUD_Panel_Highlight(float allow_move)
 		// move
 		if(allow_move && mousepos.x > panel_pos.x && mousepos.y > panel_pos.y && mousepos.x < panel_pos.x + panel_size.x && mousepos.y < panel_pos.y + panel_size.y)
 		{
-			highlightedPanel = hud_panels_from(i);
+			highlightedPanel = REGISTRY_GET(hud_panels, i);
 			HUD_Panel_FirstInDrawQ(i);
 			highlightedAction = 1;
 			panel_click_distance = mousepos - panel_pos;
@@ -1035,7 +897,7 @@ void HUD_Panel_Highlight(float allow_move)
 		// resize from topleft border
 		else if(mousepos.x >= panel_pos.x - border && mousepos.y >= panel_pos.y - border && mousepos.x <= panel_pos.x + 0.5 * panel_size.x && mousepos.y <= panel_pos.y + 0.5 * panel_size.y)
 		{
-			highlightedPanel = hud_panels_from(i);
+			highlightedPanel = REGISTRY_GET(hud_panels, i);
 			HUD_Panel_FirstInDrawQ(i);
 			highlightedAction = 2;
 			resizeCorner = 1;
@@ -1046,7 +908,7 @@ void HUD_Panel_Highlight(float allow_move)
 		// resize from topright border
 		else if(mousepos.x >= panel_pos.x + 0.5 * panel_size.x && mousepos.y >= panel_pos.y - border && mousepos.x <= panel_pos.x + panel_size.x + border && mousepos.y <= panel_pos.y + 0.5 * panel_size.y)
 		{
-			highlightedPanel = hud_panels_from(i);
+			highlightedPanel = REGISTRY_GET(hud_panels, i);
 			HUD_Panel_FirstInDrawQ(i);
 			highlightedAction = 2;
 			resizeCorner = 2;
@@ -1058,7 +920,7 @@ void HUD_Panel_Highlight(float allow_move)
 		// resize from bottomleft border
 		else if(mousepos.x >= panel_pos.x - border && mousepos.y >= panel_pos.y + 0.5 * panel_size.y && mousepos.x <= panel_pos.x + 0.5 * panel_size.x && mousepos.y <= panel_pos.y + panel_size.y + border)
 		{
-			highlightedPanel = hud_panels_from(i);
+			highlightedPanel = REGISTRY_GET(hud_panels, i);
 			HUD_Panel_FirstInDrawQ(i);
 			highlightedAction = 2;
 			resizeCorner = 3;
@@ -1070,7 +932,7 @@ void HUD_Panel_Highlight(float allow_move)
 		// resize from bottomright border
 		else if(mousepos.x >= panel_pos.x + 0.5 * panel_size.x && mousepos.y >= panel_pos.y + 0.5 * panel_size.y && mousepos.x <= panel_pos.x + panel_size.x + border && mousepos.y <= panel_pos.y + panel_size.y + border)
 		{
-			highlightedPanel = hud_panels_from(i);
+			highlightedPanel = REGISTRY_GET(hud_panels, i);
 			HUD_Panel_FirstInDrawQ(i);
 			highlightedAction = 2;
 			resizeCorner = 4;
@@ -1079,28 +941,19 @@ void HUD_Panel_Highlight(float allow_move)
 			return;
 		}
 	}
-	highlightedPanel = world;
+	highlightedPanel = NULL;
 	highlightedAction = 0;
 }
 
 void HUD_Panel_EnableMenu()
 {
-	menu_enabled = 2;
+	hud_configure_menu_open = 2;
 	localcmd("menu_showhudoptions ", highlightedPanel.panel_name, "\n");
 }
-float mouse_over_panel;
 void HUD_Panel_Mouse()
 {
 	if(autocvar__menu_alpha == 1)
 		return;
-
-	if (!autocvar_hud_cursormode)
-	{
-		mousepos = mousepos + getmousepos() * autocvar_menu_mouse_speed;
-
-		mousepos.x = bound(0, mousepos.x, vid_conwidth);
-		mousepos.y = bound(0, mousepos.y, vid_conheight);
-	}
 
 	if(mouseClicked)
 	{
@@ -1109,7 +962,7 @@ void HUD_Panel_Mouse()
 			if (tab_panel)
 			{
 				//stop ctrl-tab selection
-				tab_panel = world;
+				tab_panel = NULL;
 				reset_tab_panels();
 			}
 			HUD_Panel_Highlight(mouseClicked & S_MOUSE1); // sets highlightedPanel, highlightedAction, panel_click_distance, panel_click_resizeorigin
@@ -1132,7 +985,7 @@ void HUD_Panel_Mouse()
 					prevMouseClickedTime = time;
 					prevMouseClickedPos = mousepos;
 				}
-				mouse_over_panel = HUD_Panel_Check_Mouse_Pos(mouseClicked & S_MOUSE1);
+				cursor_type = HUD_Panel_Check_Mouse_Pos(mouseClicked & S_MOUSE1);
 			}
 		}
 		else
@@ -1184,27 +1037,13 @@ void HUD_Panel_Mouse()
 	{
 		if(prevMouseClicked)
 			highlightedAction = 0;
-		if(menu_enabled == 2)
-			mouse_over_panel = 0;
+		if(hud_configure_menu_open == 2)
+			cursor_type = CURSOR_NORMAL;
 		else
-			mouse_over_panel = HUD_Panel_Check_Mouse_Pos(true);
-		if (mouse_over_panel && !tab_panel)
+			cursor_type = HUD_Panel_Check_Mouse_Pos(true);
+		if (cursor_type != CURSOR_NORMAL && !tab_panel) // mouse over a panel?
 			drawfill(panel_pos - '1 1 0' * panel_bg_border, panel_size + '2 2 0' * panel_bg_border, '1 1 1', .1, DRAWFLAG_NORMAL);
 	}
-	// draw cursor after performing move/resize to have the panel pos/size updated before mouse_over_panel
-	const vector cursorsize = '32 32 0';
-	float cursor_alpha = 1 - autocvar__menu_alpha;
-
-	if(!mouse_over_panel)
-		drawpic(mousepos, strcat("gfx/menu/", autocvar_menu_skin, "/cursor.tga"), cursorsize, '1 1 1', cursor_alpha, DRAWFLAG_NORMAL);
-	else if(mouse_over_panel == 1)
-		drawpic(mousepos - cursorsize * 0.5, strcat("gfx/menu/", autocvar_menu_skin, "/cursor_move.tga"), cursorsize, '1 1 1', cursor_alpha, DRAWFLAG_NORMAL);
-	else if(mouse_over_panel == 2)
-		drawpic(mousepos - cursorsize * 0.5, strcat("gfx/menu/", autocvar_menu_skin, "/cursor_resize.tga"), cursorsize, '1 1 1', cursor_alpha, DRAWFLAG_NORMAL);
-	else
-		drawpic(mousepos - cursorsize * 0.5, strcat("gfx/menu/", autocvar_menu_skin, "/cursor_resize2.tga"), cursorsize, '1 1 1', cursor_alpha, DRAWFLAG_NORMAL);
-
-	prevMouseClicked = mouseClicked;
 }
 void HUD_Configure_DrawGrid()
 {
@@ -1217,11 +1056,11 @@ void HUD_Configure_DrawGrid()
 		hud_configure_realGridSize.y = hud_configure_gridSize.y * vid_conheight;
 		vector s;
 		// x-axis
-		s = eX + eY * vid_conheight;
+		s = vec2(1, vid_conheight);
 		for(i = 1; i < 1/hud_configure_gridSize.x; ++i)
 			drawfill(eX * i * hud_configure_realGridSize.x, s, '0.5 0.5 0.5', autocvar_hud_configure_grid_alpha, DRAWFLAG_NORMAL);
 		// y-axis
-		s = eY + eX * vid_conwidth;
+		s = vec2(vid_conwidth, 1);
 		for(i = 1; i < 1/hud_configure_gridSize.y; ++i)
 			drawfill(eY * i * hud_configure_realGridSize.y, s, '0.5 0.5 0.5', autocvar_hud_configure_grid_alpha, DRAWFLAG_NORMAL);
 	}
@@ -1233,7 +1072,7 @@ void HUD_Configure_Frame()
 	int i;
 	if(autocvar__hud_configure)
 	{
-		if(isdemo() || intermission == 2)
+		if(isdemo() || intermission == 2 || scoreboard_active)
 		{
 			HUD_Configure_Exit_Force();
 			return;
@@ -1241,18 +1080,16 @@ void HUD_Configure_Frame()
 
 		if(!hud_configure_prev)
 		{
-			if(autocvar_hud_cursormode)
-				setcursormode(1);
 			hudShiftState = 0;
-			for(i = hud_panels_COUNT - 1; i >= 0; --i)
-				hud_panels_from(panel_order[i]).update_time = time;
+			for(i = REGISTRY_COUNT(hud_panels) - 1; i >= 0; --i)
+				REGISTRY_GET(hud_panels, panel_order[i]).update_time = time;
 		}
 
 		// NOTE this check is necessary because _menu_alpha isn't updated the frame the menu gets enabled
 		if(autocvar__menu_alpha != _menu_alpha_prev)
 		{
 			if(autocvar__menu_alpha == 0)
-				menu_enabled = 0;
+				hud_configure_menu_open = 0;
 			_menu_alpha_prev = autocvar__menu_alpha;
 		}
 
@@ -1260,10 +1097,9 @@ void HUD_Configure_Frame()
 	}
 	else if(hud_configure_prev)
 	{
-		if(menu_enabled)
-			menu_enabled = 0;
-		if(autocvar_hud_cursormode)
-			setcursormode(0);
+		if(hud_configure_menu_open)
+			hud_configure_menu_open = 0;
+		hud_dynamic_shake_factor = -1;
 	}
 }
 
@@ -1272,11 +1108,13 @@ const string hlBorder = "gfx/hud/default/border_highlighted";
 const string hlBorder2 = "gfx/hud/default/border_highlighted2";
 void HUD_Panel_HlBorder(float myBorder, vector color, float theAlpha)
 {
-	drawfill(panel_pos - '1 1 0' * myBorder, panel_size + '2 2 0' * myBorder, '0 0.5 1', .5 * theAlpha, DRAWFLAG_NORMAL);
-	drawpic_tiled(panel_pos - '1 1 0' * myBorder, hlBorder, '8 1 0' * hlBorderSize, eX * (panel_size.x + 2 * myBorder) + eY * hlBorderSize, color, theAlpha, DRAWFLAG_NORMAL);
-	drawpic_tiled(panel_pos - '1 1 0' * myBorder + eY * (panel_size.y + 2 * myBorder - hlBorderSize), hlBorder, '8 1 0' * hlBorderSize, eX * (panel_size.x + 2 * myBorder) + eY * hlBorderSize, color, theAlpha, DRAWFLAG_NORMAL);
-	drawpic_tiled(panel_pos - '1 1 0' * myBorder + eY * hlBorderSize, hlBorder2, '1 8 0' * hlBorderSize, eY * (panel_size.y + 2 * myBorder - 2 * hlBorderSize) + eX * hlBorderSize, color, theAlpha, DRAWFLAG_NORMAL);
-	drawpic_tiled(panel_pos - '1 1 0' * myBorder + eY * hlBorderSize + eX * (panel_size.x + 2 * myBorder - hlBorderSize), hlBorder2, '1 8 0' * hlBorderSize, eY * (panel_size.y + 2 * myBorder - 2 * hlBorderSize) + eX * hlBorderSize, color, theAlpha, DRAWFLAG_NORMAL);
+	vector pos = panel_pos - vec2(myBorder, myBorder);
+	drawfill(pos, panel_size + '2 2 0' * myBorder, '0 0.5 1', .5 * theAlpha, DRAWFLAG_NORMAL);
+	drawpic_tiled(pos, hlBorder, '8 1 0' * hlBorderSize, vec2(panel_size.x + 2 * myBorder, hlBorderSize), color, theAlpha, DRAWFLAG_NORMAL);
+	drawpic_tiled(pos + eY * (panel_size.y + 2 * myBorder - hlBorderSize), hlBorder, '8 1 0' * hlBorderSize, vec2(panel_size.x + 2 * myBorder, hlBorderSize), color, theAlpha, DRAWFLAG_NORMAL);
+	pos.y += hlBorderSize;
+	drawpic_tiled(pos, hlBorder2, '1 8 0' * hlBorderSize, vec2(hlBorderSize, panel_size.y + 2 * myBorder - 2 * hlBorderSize), color, theAlpha, DRAWFLAG_NORMAL);
+	drawpic_tiled(pos + eX * (panel_size.x + 2 * myBorder - hlBorderSize), hlBorder2, '1 8 0' * hlBorderSize, vec2(hlBorderSize, panel_size.y + 2 * myBorder - 2 * hlBorderSize), color, theAlpha, DRAWFLAG_NORMAL);
 }
 
 void HUD_Configure_PostDraw()

@@ -1,18 +1,11 @@
-#ifndef DIALOG_HUDPANEL_ITEMSTIME_H
-#define DIALOG_HUDPANEL_ITEMSTIME_H
-#include "rootdialog.qc"
-CLASS(XonoticHUDItemsTimeDialog, XonoticRootDialog)
-	METHOD(XonoticHUDItemsTimeDialog, fill, void(entity));
-	ATTRIB(XonoticHUDItemsTimeDialog, title, string, _("Items Time Panel"))
-	ATTRIB(XonoticHUDItemsTimeDialog, color, vector, SKINCOLOR_DIALOG_TEAMSELECT)
-	ATTRIB(XonoticHUDItemsTimeDialog, intendedWidth, float, 0.4)
-	ATTRIB(XonoticHUDItemsTimeDialog, rows, float, 15)
-	ATTRIB(XonoticHUDItemsTimeDialog, columns, float, 4)
-	ATTRIB(XonoticHUDItemsTimeDialog, name, string, "HUDitemstime")
-ENDCLASS(XonoticHUDItemsTimeDialog)
-#endif
+#include "dialog_hudpanel_itemstime.qh"
 
-#ifdef IMPLEMENTATION
+#include "textlabel.qh"
+#include "textslider.qh"
+#include "radiobutton.qh"
+#include "checkbox.qh"
+#include "slider.qh"
+
 void XonoticHUDItemsTimeDialog_fill(entity me)
 {
 	entity e;
@@ -20,12 +13,12 @@ void XonoticHUDItemsTimeDialog_fill(entity me)
 
 	me.TR(me);
 		me.TD(me, 1, 4, e = makeXonoticTextSlider("hud_panel_itemstime"));
-			e.addValue(e, ZCTX(_("PNL^Disabled")), "0");
-			e.addValue(e, ZCTX(_("PNL^Enabled spectating")), "1");
-			e.addValue(e, ZCTX(_("PNL^Enabled even playing in warmup")), "2");
+			e.addValue(e, _("Disable"), "0");
+			e.addValue(e, _("Enable spectating"), "1");
+			e.addValue(e, _("Enable even playing in warmup"), "2");
 			e.configureXonoticTextSliderValues(e);
 
-	DIALOG_HUDPANEL_COMMON_NOTOGGLE();
+	dialog_hudpanel_main_settings(me, panelname);
 
 	me.TR(me);
 		me.TD(me, 1, 1.4, e = makeXonoticTextLabel(0, _("Align icon:")));
@@ -41,8 +34,7 @@ void XonoticHUDItemsTimeDialog_fill(entity me)
 	me.TR(me);
 		me.TD(me, 1, 4, e = makeXonoticCheckBox(0, "hud_panel_itemstime_hidespawned", _("Hide spawned items")));
 	me.TR(me);
-		me.TD(me, 1, 4, e = makeXonoticCheckBox(0, "hud_panel_itemstime_hidelarge", _("Hide large armor and health")));
+		me.TD(me, 1, 4, e = makeXonoticCheckBox(0, "hud_panel_itemstime_hidebig", _("Hide big armor and health")));
 	me.TR(me);
 		me.TD(me, 1, 4, e = makeXonoticCheckBox(0, "hud_panel_itemstime_dynamicsize", _("Dynamic size")));
 }
-#endif

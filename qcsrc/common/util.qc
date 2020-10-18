@@ -1,21 +1,163 @@
 #include "util.qh"
 
 #if defined(CSQC)
-    #include "../client/defs.qh"
-    #include "constants.qh"
-	#include "../client/mutators/events.qh"
-    #include "mapinfo.qh"
-    #include "notifications.qh"
-    #include "deathtypes/all.qh"
+	#include <client/mutators/_mod.qh>
+	#include <common/constants.qh>
+	#include <common/deathtypes/all.qh>
+	#include <common/gamemodes/_mod.qh>
+	#include <common/mapinfo.qh>
+	#include <common/notifications/all.qh>
+	#include <common/scores.qh>
 #elif defined(MENUQC)
 #elif defined(SVQC)
-    #include "constants.qh"
-    #include "../server/autocvars.qh"
-    #include "../server/defs.qh"
-	#include "../server/mutators/events.qh"
-    #include "notifications.qh"
-    #include "deathtypes/all.qh"
-    #include "mapinfo.qh"
+	#include <common/constants.qh>
+	#include <common/deathtypes/all.qh>
+	#include <common/gamemodes/_mod.qh>
+	#include <common/mapinfo.qh>
+	#include <common/notifications/all.qh>
+	#include <common/scores.qh>
+	#include <server/mutators/_mod.qh>
+#endif
+
+#ifdef SVQC
+float tracebox_inverted (vector v1, vector mi, vector ma, vector v2, float nomonsters, entity forent, float stopatentity, entity ignorestopatentity) // returns the number of traces done, for benchmarking
+{
+	vector pos, dir, t;
+	float nudge;
+	entity stopentity;
+
+	//nudge = 2 * cvar("collision_impactnudge"); // why not?
+	nudge = 0.5;
+
+	dir = normalize(v2 - v1);
+
+	pos = v1 + dir * nudge;
+
+	float c;
+	c = 0;
+
+	for (;;)
+	{
+		if(pos * dir >= v2 * dir)
+		{
+			// went too far
+			trace_fraction = 1;
+			trace_endpos = v2;
+			return c;
+		}
+
+		tracebox(pos, mi, ma, v2, nomonsters, forent);
+		++c;
+
+		if(c == 50)
+		{
+			LOG_TRACE("When tracing from ", vtos(v1), " to ", vtos(v2));
+			LOG_TRACE("  Nudging gets us nowhere at ", vtos(pos));
+			LOG_TRACE("  trace_endpos is ", vtos(trace_endpos));
+			LOG_TRACE("  trace distance is ", ftos(vlen(pos - trace_endpos)));
+		}
+
+		stopentity = trace_ent;
+
+		if(trace_startsolid)
+		{
+			// we started inside solid.
+			// then trace from endpos to pos
+			t = trace_endpos;
+			tracebox(t, mi, ma, pos, nomonsters, forent);
+			++c;
+			if(trace_startsolid)
+			{
+				// t is still inside solid? bad
+				// force advance, then, and retry
+				pos = t + dir * nudge;
+
+				// but if we hit an entity, stop RIGHT before it
+				if(stopatentity && stopentity && stopentity != ignorestopatentity)
+				{
+					trace_ent = stopentity;
+					trace_endpos = t;
+					trace_fraction = ((trace_endpos - v1) * dir) / ((v2 - v1) * dir);
+					return c;
+				}
+			}
+			else
+			{
+				// we actually LEFT solid!
+				trace_fraction = ((trace_endpos - v1) * dir) / ((v2 - v1) * dir);
+				return c;
+			}
+		}
+		else
+		{
+			// pos is outside solid?!? but why?!? never mind, just return it.
+			trace_endpos = pos;
+			trace_fraction = ((trace_endpos - v1) * dir) / ((v2 - v1) * dir);
+			return c;
+		}
+	}
+}
+
+void traceline_inverted (vector v1, vector v2, float nomonsters, entity forent, float stopatentity, entity ignorestopatentity)
+{
+	tracebox_inverted(v1, '0 0 0', '0 0 0', v2, nomonsters, forent, stopatentity, ignorestopatentity);
+}
+#endif
+
+#ifdef GAMEQC
+/*
+==================
+findbetterlocation
+
+Returns a point at least 12 units away from walls
+(useful for explosion animations, although the blast is performed where it really happened)
+Ripped from DPMod
+==================
+*/
+vector findbetterlocation (vector org, float mindist)
+{
+	vector vec = mindist * '1 0 0';
+	int c = 0;
+	while (c < 6)
+	{
+		traceline (org, org + vec, true, NULL);
+		vec = vec * -1;
+		if (trace_fraction < 1)
+		{
+			vector loc = trace_endpos;
+			traceline (loc, loc + vec, true, NULL);
+			if (trace_fraction >= 1)
+				org = loc + vec;
+		}
+		if (c & 1)
+		{
+			float h = vec.y;
+			vec.y = vec.x;
+			vec.x = vec.z;
+			vec.z = h;
+		}
+		c = c + 1;
+	}
+
+	return org;
+}
+
+/*
+* Get "real" origin, in worldspace, even if ent is attached to something else.
+*/
+vector real_origin(entity ent)
+{
+	vector v = ((ent.absmin + ent.absmax) * 0.5);
+	entity e = ent.tag_entity;
+
+	while(e)
+	{
+		v = v + ((e.absmin + e.absmax) * 0.5);
+		e = e.tag_entity;
+	}
+
+	return v;
+}
 #endif
 
 string wordwrap_buffer;
@@ -35,28 +177,29 @@ string wordwrap(string s, float l)
 	return r;
 }
 
-#ifndef MENUQC
-#ifndef CSQC
+#ifdef SVQC
+entity _wordwrap_buffer_sprint_ent;
 void wordwrap_buffer_sprint(string s)
-{SELFPARAM();
+{
 	wordwrap_buffer = strcat(wordwrap_buffer, s);
 	if(s == "\n")
 	{
-		sprint(self, wordwrap_buffer);
+		sprint(_wordwrap_buffer_sprint_ent, wordwrap_buffer);
 		wordwrap_buffer = "";
 	}
 }
 
-void wordwrap_sprint(string s, float l)
-{SELFPARAM();
+void wordwrap_sprint(entity to, string s, float l)
+{
 	wordwrap_buffer = "";
+	_wordwrap_buffer_sprint_ent = to;
 	wordwrap_cb(s, l, wordwrap_buffer_sprint);
+	_wordwrap_buffer_sprint_ent = NULL;
 	if(wordwrap_buffer != "")
-		sprint(self, strcat(wordwrap_buffer, "\n"));
+		sprint(to, strcat(wordwrap_buffer, "\n"));
 	wordwrap_buffer = "";
 	return;
 }
-#endif
 #endif
 
 #ifndef SVQC
@@ -76,7 +219,8 @@ void wordwrap_cb(string s, float l, void(string) callback)
 
 	s = strzone(s);
 	lleft = l;
-	for (i = 0;i < strlen(s);++i)
+	int len = strlen(s);
+	for (i = 0; i < len; ++i)
 	{
 		if (substring(s, i, 2) == "\\n")
 		{
@@ -94,12 +238,12 @@ void wordwrap_cb(string s, float l, void(string) callback)
 			if (lleft > 0)
 			{
 				callback(" ");
-				lleft = lleft - 1;
+				--lleft;
 			}
 		}
 		else
 		{
-			for (j = i+1;j < strlen(s);++j)
+			for (j = i+1; j < len; ++j)
 				//    ^^ this skips over the first character of a word, which
 				//       is ALWAYS part of the word
 				//       this is safe since if i+1 == strlen(s), i will become
@@ -127,7 +271,7 @@ void wordwrap_cb(string s, float l, void(string) callback)
 				lleft = l;
 			}
 			callback(substring(s, i, wlen));
-			lleft = lleft - wlen;
+			lleft -= wlen;
 			i = j - 1;
 		}
 	}
@@ -163,6 +307,7 @@ void depthfirst(entity start, .entity up, .entity downleft, .entity right, void(
 	}
 }
 
+#ifdef GAMEQC
 string ScoreString(int pFlags, float pValue)
 {
 	string valstr;
@@ -173,20 +318,7 @@ string ScoreString(int pFlags, float pValue)
 	if((pValue == 0) && (pFlags & (SFL_HIDE_ZERO | SFL_RANK | SFL_TIME)))
 		valstr = "";
 	else if(pFlags & SFL_RANK)
-	{
-		valstr = ftos(pValue);
-		l = strlen(valstr);
-		if((l >= 2) && (substring(valstr, l - 2, 1) == "1"))
-			valstr = strcat(valstr, "th");
-		else if(substring(valstr, l - 1, 1) == "1")
-			valstr = strcat(valstr, "st");
-		else if(substring(valstr, l - 1, 1) == "2")
-			valstr = strcat(valstr, "nd");
-		else if(substring(valstr, l - 1, 1) == "3")
-			valstr = strcat(valstr, "rd");
-		else
-			valstr = strcat(valstr, "th");
-	}
+		valstr = count_ordinal(pValue);
 	else if(pFlags & SFL_TIME)
 		valstr = TIME_ENCODED_TOSTRING(pValue);
 	else
@@ -194,6 +326,7 @@ string ScoreString(int pFlags, float pValue)
 
 	return valstr;
 }
+#endif
 
 // compressed vector format:
 // like MD3, just even shorter
@@ -207,13 +340,13 @@ string ScoreString(int pFlags, float pValue)
 
 float lengthLogTable[128];
 
-float invertLengthLog(float x)
+float invertLengthLog(float dist)
 {
 	int l, r, m;
 
-	if(x >= lengthLogTable[127])
+	if(dist >= lengthLogTable[127])
 		return 127;
-	if(x <= lengthLogTable[0])
+	if(dist <= lengthLogTable[0])
 		return 0;
 
 	l = 0;
@@ -222,15 +355,15 @@ float invertLengthLog(float x)
 	while(r - l > 1)
 	{
 		m = floor((l + r) / 2);
-		if(lengthLogTable[m] < x)
+		if(lengthLogTable[m] < dist)
 			l = m;
 		else
 			r = m;
 	}
 
 	// now: r is >=, l is <
-	float lerr = (x - lengthLogTable[l]);
-	float rerr = (lengthLogTable[r] - x);
+	float lerr = (dist - lengthLogTable[l]);
+	float rerr = (lengthLogTable[r] - dist);
 	if(lerr < rerr)
 		return l;
 	return r;
@@ -242,26 +375,26 @@ vector decompressShortVector(int data)
 	if(data == 0)
 		return '0 0 0';
 	float p	= (data & 0xF000) / 0x1000;
-	float y	= (data & 0x0F80) / 0x80;
+	float q	= (data & 0x0F80) / 0x80;
 	int len = (data & 0x007F);
 
-	//print("\ndecompress: p ", ftos(p)); print("y ", ftos(y)); print("len ", ftos(len), "\n");
+	//print("\ndecompress: p ", ftos(p)); print("q ", ftos(q)); print("len ", ftos(len), "\n");
 
 	if(p == 0)
 	{
 		out.x = 0;
 		out.y = 0;
-		if(y == 31)
+		if(q == 31)
 			out.z = -1;
 		else
 			out.z = +1;
 	}
 	else
 	{
-		y   = .19634954084936207740 * y;
+		q   = .19634954084936207740 * q;
 		p = .19634954084936207740 * p - 1.57079632679489661922;
-		out.x = cos(y) *  cos(p);
-		out.y = sin(y) *  cos(p);
+		out.x = cos(q) *  cos(p);
+		out.y = sin(q) *  cos(p);
 		out.z =          -sin(p);
 	}
 
@@ -274,7 +407,7 @@ float compressShortVector(vector vec)
 {
 	vector ang;
 	float p, y, len;
-	if(vlen(vec) == 0)
+	if(vec == '0 0 0')
 		return 0;
 	//print("compress: ", vtos(vec), "\n");
 	ang = vectoangles(vec);
@@ -302,10 +435,10 @@ float compressShortVector(vector vec)
 	return (p * 0x1000) + (y * 0x80) + len;
 }
 
-void compressShortVector_init()
+STATIC_INIT(compressShortVector)
 {
 	float l = 1;
-	float f = pow(2, 1/8);
+	float f = (2 ** (1/8));
 	int i;
 	for(i = 0; i < 128; ++i)
 	{
@@ -313,23 +446,24 @@ void compressShortVector_init()
 		l *= f;
 	}
 
-	if(cvar("developer"))
+	if(cvar("developer") > 0)
 	{
-		LOG_INFO("Verifying vector compression table...\n");
+		LOG_TRACE("Verifying vector compression table...");
 		for(i = 0x0F00; i < 0xFFFF; ++i)
 			if(i != compressShortVector(decompressShortVector(i)))
 			{
-				LOG_INFO("BROKEN vector compression: ", ftos(i));
-				LOG_INFO(" -> ", vtos(decompressShortVector(i)));
-				LOG_INFO(" -> ", ftos(compressShortVector(decompressShortVector(i))));
-				LOG_INFO("\n");
-				error("b0rk");
+				LOG_FATALF(
+				    "BROKEN vector compression: %s -> %s -> %s",
+				    ftos(i),
+				    vtos(decompressShortVector(i)),
+				    ftos(compressShortVector(decompressShortVector(i)))
+                );
 			}
-		LOG_INFO("Done.\n");
+		LOG_TRACE("Done.");
 	}
 }
 
-#ifndef MENUQC
+#ifdef GAMEQC
 float CheckWireframeBox(entity forent, vector v0, vector dvx, vector dvy, vector dvz)
 {
 	traceline(v0, v0 + dvx, true, forent); if(trace_fraction < 1) return 0;
@@ -376,6 +510,9 @@ string fixPriorityList(string order, float from, float to, float subtract, float
 		n = tokenize_console(neworder);
 		for(w = to; w >= from; --w)
 		{
+			int wflags = REGISTRY_GET(Weapons, w).spawnflags;
+			if(wflags & WEP_FLAG_SPECIALATTACK)
+				continue;
 			for(i = 0; i < n; ++i)
 				if(stof(argv(i)) == w)
 					break;
@@ -390,11 +527,11 @@ string fixPriorityList(string order, float from, float to, float subtract, float
 string mapPriorityList(string order, string(string) mapfunc)
 {
 	string neworder;
-	float i, n;
+	float n;
 
 	n = tokenize_console(order);
 	neworder = "";
-	for(i = 0; i < n; ++i)
+	for(float i = 0; i < n; ++i)
 		neworder = strcat(neworder, mapfunc(argv(i)), " ");
 
 	return substring(neworder, 0, strlen(neworder) - 1);
@@ -402,15 +539,12 @@ string mapPriorityList(string order, string(string) mapfunc)
 
 string swapInPriorityList(string order, float i, float j)
 {
-	string s;
-	float w, n;
-
-	n = tokenize_console(order);
+	float n = tokenize_console(order);
 
 	if(i >= 0 && i < n && j >= 0 && j < n && i != j)
 	{
-		s = "";
-		for(w = 0; w < n; ++w)
+		string s = "";
+		for(float w = 0; w < n; ++w)
 		{
 			if(w == i)
 				s = strcat(s, argv(j), " ");
@@ -425,19 +559,17 @@ string swapInPriorityList(string order, float i, float j)
 	return order;
 }
 
-#ifndef MENUQC
+#ifdef GAMEQC
 void get_mi_min_max(float mode)
 {
 	vector mi, ma;
 
-	if(mi_shortname)
-		strunzone(mi_shortname);
-	mi_shortname = mapname;
-	if(!strcasecmp(substring(mi_shortname, 0, 5), "maps/"))
-		mi_shortname = substring(mi_shortname, 5, strlen(mi_shortname) - 5);
-	if(!strcasecmp(substring(mi_shortname, strlen(mi_shortname) - 4, 4), ".bsp"))
-		mi_shortname = substring(mi_shortname, 0, strlen(mi_shortname) - 4);
-	mi_shortname = strzone(mi_shortname);
+	string s = mapname;
+	if(!strcasecmp(substring(s, 0, 5), "maps/"))
+		s = substring(s, 5, strlen(s) - 5);
+	if(!strcasecmp(substring(s, strlen(s) - 4, 4), ".bsp"))
+		s = substring(s, 0, strlen(s) - 4);
+	strcpy(mi_shortname, s);
 
 #ifdef CSQC
 	mi = world.mins;
@@ -449,7 +581,7 @@ void get_mi_min_max(float mode)
 
 	mi_min = mi;
 	mi_max = ma;
-	MapInfo_Get_ByName(mi_shortname, 0, 0);
+	MapInfo_Get_ByName(mi_shortname, 0, NULL);
 	if(MapInfo_Map_mins.x < MapInfo_Map_maxs.x)
 	{
 		mi_min = MapInfo_Map_mins;
@@ -466,7 +598,7 @@ void get_mi_min_max(float mode)
 					 '0 1 0' * ma.y + '0 0 1' * ma.z,
 					 '1 0 0' * ma.x,
 					 MOVE_WORLDONLY,
-					 world);
+					 NULL);
 			if(!trace_startsolid)
 				mi_min.x = trace_endpos.x;
 
@@ -475,7 +607,7 @@ void get_mi_min_max(float mode)
 					 '1 0 0' * ma.x + '0 0 1' * ma.z,
 					 '0 1 0' * ma.y,
 					 MOVE_WORLDONLY,
-					 world);
+					 NULL);
 			if(!trace_startsolid)
 				mi_min.y = trace_endpos.y;
 
@@ -484,7 +616,7 @@ void get_mi_min_max(float mode)
 					 '1 0 0' * ma.x + '0 1 0' * ma.y,
 					 '0 0 1' * ma.z,
 					 MOVE_WORLDONLY,
-					 world);
+					 NULL);
 			if(!trace_startsolid)
 				mi_min.z = trace_endpos.z;
 
@@ -493,7 +625,7 @@ void get_mi_min_max(float mode)
 					 '0 1 0' * ma.y + '0 0 1' * ma.z,
 					 '1 0 0' * mi.x,
 					 MOVE_WORLDONLY,
-					 world);
+					 NULL);
 			if(!trace_startsolid)
 				mi_max.x = trace_endpos.x;
 
@@ -502,7 +634,7 @@ void get_mi_min_max(float mode)
 					 '1 0 0' * ma.x + '0 0 1' * ma.z,
 					 '0 1 0' * mi.y,
 					 MOVE_WORLDONLY,
-					 world);
+					 NULL);
 			if(!trace_startsolid)
 				mi_max.y = trace_endpos.y;
 
@@ -511,7 +643,7 @@ void get_mi_min_max(float mode)
 					 '1 0 0' * ma.x + '0 1 0' * ma.y,
 					 '0 0 1' * mi.z,
 					 MOVE_WORLDONLY,
-					 world);
+					 NULL);
 			if(!trace_startsolid)
 				mi_max.z = trace_endpos.z;
 		}
@@ -564,31 +696,32 @@ void get_mi_min_max_texcoords(float mode)
 float cvar_settemp(string tmp_cvar, string tmp_value)
 {
 	float created_saved_value;
-	entity e;
 
 	created_saved_value = 0;
 
 	if (!(tmp_cvar || tmp_value))
 	{
-		LOG_TRACE("Error: Invalid usage of cvar_settemp(string, string); !\n");
+		LOG_TRACE("Error: Invalid usage of cvar_settemp(string, string); !");
 		return 0;
 	}
 
 	if(!cvar_type(tmp_cvar))
 	{
-		LOG_INFOF("Error: cvar %s doesn't exist!\n", tmp_cvar);
+		LOG_INFOF("Error: cvar %s doesn't exist!", tmp_cvar);
 		return 0;
 	}
 
-	for(e = world; (e = find(e, classname, "saved_cvar_value")); )
-		if(e.netname == tmp_cvar)
-			created_saved_value = -1; // skip creation
+	IL_EACH(g_saved_cvars, it.netname == tmp_cvar,
+	{
+		created_saved_value = -1; // skip creation
+		break; // no need to continue
+	});
 
 	if(created_saved_value != -1)
 	{
 		// creating a new entity to keep track of this cvar
-		e = new(saved_cvar_value);
-		make_pure(e);
+		entity e = new_pure(saved_cvar_value);
+		IL_PUSH(g_saved_cvars, e);
 		e.netname = strzone(tmp_cvar);
 		e.message = strzone(cvar_string(tmp_cvar));
 		created_saved_value = 1;
@@ -600,25 +733,92 @@ float cvar_settemp(string tmp_cvar, string tmp_value)
 	return created_saved_value;
 }
 
-float cvar_settemp_restore()
+int cvar_settemp_restore()
 {
-	float i = 0;
-	entity e = world;
+	int j = 0;
+	// FIXME this new-style loop fails!
+#if 0
+	FOREACH_ENTITY_CLASS("saved_cvar_value", true,
+	{
+		if(cvar_type(it.netname))
+		{
+			cvar_set(it.netname, it.message);
+			strunzone(it.netname);
+			strunzone(it.message);
+			delete(it);
+			++j;
+		}
+		else
+			LOG_INFOF("Error: cvar %s doesn't exist anymore! It can still be restored once it's manually recreated.", it.netname);
+	});
+
+#else
+	entity e = NULL;
 	while((e = find(e, classname, "saved_cvar_value")))
 	{
 		if(cvar_type(e.netname))
 		{
 			cvar_set(e.netname, e.message);
-			strunzone(e.netname);
-			strunzone(e.message);
-			remove(e);
-			++i;
+			delete(e);
+			++j;
 		}
 		else
-			LOG_INFOF("Error: cvar %s doesn't exist anymore! It can still be restored once it's manually recreated.\n", e.netname);
+			print(sprintf("Error: cvar %s doesn't exist anymore! It can still be restored once it's manually recreated.", e.netname));
+	}
+#endif
+
+	return j;
+}
+
+bool isCaretEscaped(string theText, float pos)
+{
+	int i = 0;
+	while(pos - i >= 1 && substring(theText, pos - i - 1, 1) == "^")
+		++i;
+	return (i & 1);
+}
+
+int skipIncompleteTag(string theText, float pos, int len)
+{
+	int tag_start = -1;
+
+	if(substring(theText, pos - 1, 1) == "^")
+	{
+		if(isCaretEscaped(theText, pos - 1) || pos >= len)
+			return 0;
+
+		int ch = str2chr(theText, pos);
+		if(ch >= '0' && ch <= '9')
+			return 1; // ^[0-9] color code found
+		else if (ch == 'x')
+			tag_start = pos - 1; // ^x tag found
+		else
+			return 0;
+	}
+	else
+	{
+		for(int i = 2; pos - i >= 0 && i <= 4; ++i)
+		{
+			if(substring(theText, pos - i, 2) == "^x")
+			{
+				tag_start = pos - i; // ^x tag found
+				break;
+			}
+		}
 	}
 
-	return i;
+	if(tag_start >= 0)
+	{
+		if(tag_start + 5 < len)
+		if(IS_HEXDIGIT(substring(theText, tag_start + 2, 1)))
+		if(IS_HEXDIGIT(substring(theText, tag_start + 3, 1)))
+		if(IS_HEXDIGIT(substring(theText, tag_start + 4, 1)))
+		{
+			if(!isCaretEscaped(theText, tag_start))
+				return 5 - (pos - tag_start); // ^xRGB color code found
+		}
+	}
+	return 0;
 }
 
 float textLengthUpToWidth(string theText, float maxWidth, vector theSize, textLengthUpToWidth_widthFunction_t w)
@@ -631,56 +831,24 @@ float textLengthUpToWidth(string theText, float maxWidth, vector theSize, textLe
 	if(w(theText, theSize) <= maxWidth)
 		return strlen(theText); // yeah!
 
+	bool colors = (w("^7", theSize) == 0);
+
 	// binary search for right place to cut string
-	float ch;
-	float left, right, middle; // this always works
+	int len, left, right, middle;
 	left = 0;
-	right = strlen(theText); // this always fails
+	right = len = strlen(theText);
+	int ofs = 0;
 	do
 	{
 		middle = floor((left + right) / 2);
-		if(w(substring(theText, 0, middle), theSize) <= maxWidth)
-			left = middle;
+		if(colors)
+			ofs = skipIncompleteTag(theText, middle, len);
+		if(w(substring(theText, 0, middle + ofs), theSize) <= maxWidth)
+			left = middle + ofs;
 		else
 			right = middle;
 	}
 	while(left < right - 1);
-
-	if(w("^7", theSize) == 0) // detect color codes support in the width function
-	{
-		// NOTE: when color codes are involved, this binary search is,
-		// mathematically, BROKEN. However, it is obviously guaranteed to
-		// terminate, as the range still halves each time - but nevertheless, it is
-		// guaranteed that it finds ONE valid cutoff place (where "left" is in
-		// range, and "right" is outside).
-
-		// terencehill: the following code detects truncated ^xrgb tags (e.g. ^x or ^x4)
-		// and decrease left on the basis of the chars detected of the truncated tag
-		// Even if the ^xrgb tag is not complete/correct, left is decreased
-		// (sometimes too much but with a correct result)
-		// it fixes also ^[0-9]
-		while(left >= 1 && substring(theText, left-1, 1) == "^")
-			left-=1;
-
-		if (left >= 2 && substring(theText, left-2, 2) == "^x") // ^x/
-			left-=2;
-		else if (left >= 3 && substring(theText, left-3, 2) == "^x")
-			{
-				ch = str2chr(theText, left-1);
-				if( (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F') ) // ^xr/
-					left-=3;
-			}
-		else if (left >= 4 && substring(theText, left-4, 2) == "^x")
-			{
-				ch = str2chr(theText, left-2);
-				if ( (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F') )
-				{
-					ch = str2chr(theText, left-1);
-					if ( (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F') ) // ^xrg/
-						left-=4;
-				}
-			}
-	}
 
 	return left;
 }
@@ -695,56 +863,24 @@ float textLengthUpToLength(string theText, float maxWidth, textLengthUpToLength_
 	if(w(theText) <= maxWidth)
 		return strlen(theText); // yeah!
 
+	bool colors = (w("^7") == 0);
+
 	// binary search for right place to cut string
-	float ch;
-	float left, right, middle; // this always works
+	int len, left, right, middle;
 	left = 0;
-	right = strlen(theText); // this always fails
+	right = len = strlen(theText);
+	int ofs = 0;
 	do
 	{
 		middle = floor((left + right) / 2);
-		if(w(substring(theText, 0, middle)) <= maxWidth)
-			left = middle;
+		if(colors)
+			ofs = skipIncompleteTag(theText, middle, len);
+		if(w(substring(theText, 0, middle + ofs)) <= maxWidth)
+			left = middle + ofs;
 		else
 			right = middle;
 	}
 	while(left < right - 1);
-
-	if(w("^7") == 0) // detect color codes support in the width function
-	{
-		// NOTE: when color codes are involved, this binary search is,
-		// mathematically, BROKEN. However, it is obviously guaranteed to
-		// terminate, as the range still halves each time - but nevertheless, it is
-		// guaranteed that it finds ONE valid cutoff place (where "left" is in
-		// range, and "right" is outside).
-
-		// terencehill: the following code detects truncated ^xrgb tags (e.g. ^x or ^x4)
-		// and decrease left on the basis of the chars detected of the truncated tag
-		// Even if the ^xrgb tag is not complete/correct, left is decreased
-		// (sometimes too much but with a correct result)
-		// it fixes also ^[0-9]
-		while(left >= 1 && substring(theText, left-1, 1) == "^")
-			left-=1;
-
-		if (left >= 2 && substring(theText, left-2, 2) == "^x") // ^x/
-			left-=2;
-		else if (left >= 3 && substring(theText, left-3, 2) == "^x")
-			{
-				ch = str2chr(theText, left-1);
-				if( (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F') ) // ^xr/
-					left-=3;
-			}
-		else if (left >= 4 && substring(theText, left-4, 2) == "^x")
-			{
-				ch = str2chr(theText, left-2);
-				if ( (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F') )
-				{
-					ch = str2chr(theText, left-1);
-					if ( (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F') ) // ^xrg/
-						left-=4;
-				}
-			}
-	}
 
 	return left;
 }
@@ -755,8 +891,7 @@ string find_last_color_code(string s)
 	if (start == -1) // no caret found
 		return "";
 	int len = strlen(s)-1;
-	int i;
-	for(i = len; i >= start; --i)
+	for(int i = len; i >= start; --i)
 	{
 		if(substring(s, i, 1) != "^")
 			continue;
@@ -769,14 +904,14 @@ string find_last_color_code(string s)
 		if (carets & 1)
 		{
 			if(i+1 <= len)
-			if(strstrofs("0123456789", substring(s, i+1, 1), 0) >= 0)
+			if(IS_DIGIT(substring(s, i+1, 1)))
 				return substring(s, i, 2);
 
 			if(i+4 <= len)
 			if(substring(s, i+1, 1) == "x")
-			if(strstrofs("0123456789abcdefABCDEF", substring(s, i+2, 1), 0) >= 0)
-			if(strstrofs("0123456789abcdefABCDEF", substring(s, i+3, 1), 0) >= 0)
-			if(strstrofs("0123456789abcdefABCDEF", substring(s, i+4, 1), 0) >= 0)
+			if(IS_HEXDIGIT(substring(s, i + 2, 1)))
+			if(IS_HEXDIGIT(substring(s, i + 3, 1)))
+			if(IS_HEXDIGIT(substring(s, i + 4, 1)))
 				return substring(s, i, 5);
 		}
 		i -= carets; // this also skips one char before the carets
@@ -893,7 +1028,7 @@ string textShortenToLength(string theText, float maxWidth, textLengthUpToLength_
 		return strcat(substring(theText, 0, textLengthUpToLength(theText, maxWidth - tw("..."), tw)), "...");
 }
 
-float isGametypeInFilter(float gt, float tp, float ts, string pattern)
+float isGametypeInFilter(Gametype gt, float tp, float ts, string pattern)
 {
 	string subpattern, subpattern2, subpattern3, subpattern4;
 	subpattern = strcat(",", MapInfo_Type_ToString(gt), ",");
@@ -1044,26 +1179,25 @@ vector get_shotvelocity(vector myvel, vector mydir, float spd, float newton_styl
 
 float compressShotOrigin(vector v)
 {
-	float x, y, z;
-	x = rint(v.x * 2);
-	y = rint(v.y * 4) + 128;
-	z = rint(v.z * 4) + 128;
-	if(x > 255 || x < 0)
+	float rx = rint(v.x * 2);
+	float ry = rint(v.y * 4) + 128;
+	float rz = rint(v.z * 4) + 128;
+	if(rx > 255 || rx < 0)
 	{
-		LOG_INFO("shot origin ", vtos(v), " x out of bounds\n");
-		x = bound(0, x, 255);
+		LOG_DEBUG("shot origin ", vtos(v), " x out of bounds\n");
+		rx = bound(0, rx, 255);
 	}
-	if(y > 255 || y < 0)
+	if(ry > 255 || ry < 0)
 	{
-		LOG_INFO("shot origin ", vtos(v), " y out of bounds\n");
-		y = bound(0, y, 255);
+		LOG_DEBUG("shot origin ", vtos(v), " y out of bounds\n");
+		ry = bound(0, ry, 255);
 	}
-	if(z > 255 || z < 0)
+	if(rz > 255 || rz < 0)
 	{
-		LOG_INFO("shot origin ", vtos(v), " z out of bounds\n");
-		z = bound(0, z, 255);
+		LOG_DEBUG("shot origin ", vtos(v), " z out of bounds\n");
+		rz = bound(0, rz, 255);
 	}
-	return x * 0x10000 + y * 0x100 + z;
+	return rx * 0x10000 + ry * 0x100 + rz;
 }
 vector decompressShotOrigin(int f)
 {
@@ -1074,7 +1208,7 @@ vector decompressShotOrigin(int f)
 	return v;
 }
 
-#ifndef MENUQC
+#ifdef GAMEQC
 vector healtharmor_maxdamage(float h, float a, float armorblock, int deathtype)
 {
 	// NOTE: we'll always choose the SMALLER value...
@@ -1103,6 +1237,8 @@ vector healtharmor_applydamage(float a, float armorblock, int deathtype, float d
 {
 	vector v;
 	if (DEATH_IS(deathtype, DEATH_DROWN))  // Why should armor help here...
+		armorblock = 0;
+	if (deathtype & HITTYPE_ARMORPIERCE)
 		armorblock = 0;
 	v.y = bound(0, damage * armorblock, a); // save
 	v.x = bound(0, damage - v.y, damage); // take
@@ -1152,9 +1288,17 @@ float matchacl(string acl, string str)
 		if(s == t)
 		{
 			r = d;
+			break; // if we found a killing case, apply it! other settings may be allowed in the future, but this one is caught
 		}
 	}
 	return r;
+}
+
+ERASEABLE
+void write_String_To_File(int fh, string str, bool alsoprint)
+{
+	fputs(fh, str);
+	if (alsoprint) LOG_INFO(str);
 }
 
 string get_model_datafilename(string m, float sk, string fil)
@@ -1188,8 +1332,9 @@ float get_model_parameters(string m, float sk)
 		get_model_parameters_bone_aimweight[i] = 0;
 	}
 	get_model_parameters_fixbone = 0;
+	get_model_parameters_hidden = false;
 
-#ifndef MENUQC
+#ifdef GAMEQC
 	MUTATOR_CALLHOOK(ClearModelParams);
 #endif
 
@@ -1243,7 +1388,12 @@ float get_model_parameters(string m, float sk)
 				case "reserved":    get_model_parameters_species = SPECIES_RESERVED;    break;
 			}
 		if(c == "sex")
+		{
+			if (s == "Male")				s = _("Male");
+			else if (s == "Female")			s = _("Female");
+			else if (s == "Undisclosed")	s = _("Undisclosed");
 			get_model_parameters_sex = s;
+		}
 		if(c == "weight")
 			get_model_parameters_weight = stof(s);
 		if(c == "age")
@@ -1254,7 +1404,7 @@ float get_model_parameters(string m, float sk)
 			get_model_parameters_bone_upperbody = s;
 		if(c == "bone_weapon")
 			get_model_parameters_bone_weapon = s;
-	#ifndef MENUQC
+	#ifdef GAMEQC
 		MUTATOR_CALLHOOK(GetModelParams, c, s);
 	#endif
 		for(int i = 0; i < MAX_AIM_BONES; ++i)
@@ -1265,6 +1415,8 @@ float get_model_parameters(string m, float sk)
 			}
 		if(c == "fixbone")
 			get_model_parameters_fixbone = stof(s);
+		if(c == "hidden")
+			get_model_parameters_hidden = stob(s);
 	}
 
 	while((s = fgets(fh)))
@@ -1278,6 +1430,158 @@ float get_model_parameters(string m, float sk)
 	fclose(fh);
 
 	return 1;
+}
+
+string translate_key(string key)
+{
+	if (prvm_language == "en") return key;
+
+	if (substring(key, 0, 1) == "<")
+	{
+		if (key == "<KEY NOT FOUND>") return _("<KEY NOT FOUND>");
+		if (key == "<UNKNOWN KEYNUM>") return _("<UNKNOWN KEYNUM>");
+	}
+
+	switch(key)
+	{
+		case "TAB":				return _("TAB");
+		case "ENTER":			return _("ENTER");
+		case "ESCAPE":			return _("ESCAPE");
+		case "SPACE":			return _("SPACE");
+
+		case "BACKSPACE":		return _("BACKSPACE");
+		case "UPARROW":			return _("UPARROW");
+		case "DOWNARROW":		return _("DOWNARROW");
+		case "LEFTARROW":		return _("LEFTARROW");
+		case "RIGHTARROW":		return _("RIGHTARROW");
+
+		case "ALT":				return _("ALT");
+		case "CTRL":			return _("CTRL");
+		case "SHIFT":			return _("SHIFT");
+
+		case "INS":				return _("INS");
+		case "DEL":				return _("DEL");
+		case "PGDN":			return _("PGDN");
+		case "PGUP":			return _("PGUP");
+		case "HOME":			return _("HOME");
+		case "END":				return _("END");
+
+		case "PAUSE":			return _("PAUSE");
+
+		case "NUMLOCK":			return _("NUMLOCK");
+		case "CAPSLOCK":		return _("CAPSLOCK");
+		case "SCROLLOCK":		return _("SCROLLOCK");
+
+		case "SEMICOLON":		return _("SEMICOLON");
+		case "TILDE":			return _("TILDE");
+		case "BACKQUOTE":		return _("BACKQUOTE");
+		case "QUOTE":			return _("QUOTE");
+		case "APOSTROPHE":		return _("APOSTROPHE");
+		case "BACKSLASH":		return _("BACKSLASH");
+	}
+
+	if (substring(key, 0, 1) == "F")
+	{
+		string subkey = substring(key, 1, -1);
+		if (IS_DIGIT(substring(key, 3, 1))) // check only first digit
+		{
+			return sprintf(_("F%d"), stof(subkey));
+		}
+		// continue in case there is another key name starting with F
+	}
+
+	if (substring(key, 0, 3) == "KP_")
+	{
+		string subkey = substring(key, 3, -1);
+		if (IS_DIGIT(substring(key, 3, 1))) // check only first digit
+		{
+			return sprintf(_("KP_%d"), stof(subkey));
+		}
+
+		switch(subkey)
+		{
+			case "INS":				return sprintf(_("KP_%s"), _("INS"));
+			case "END":				return sprintf(_("KP_%s"), _("END"));
+			case "DOWNARROW":		return sprintf(_("KP_%s"), _("DOWNARROW"));
+			case "PGDN":			return sprintf(_("KP_%s"), _("PGDN"));
+			case "LEFTARROW":		return sprintf(_("KP_%s"), _("LEFTARROW"));
+			case "RIGHTARROW":		return sprintf(_("KP_%s"), _("RIGHTARROW"));
+			case "HOME":			return sprintf(_("KP_%s"), _("HOME"));
+			case "UPARROW":			return sprintf(_("KP_%s"), _("UPARROW"));
+			case "PGUP":			return sprintf(_("KP_%s"), _("PGUP"));
+			case "PERIOD":			return sprintf(_("KP_%s"), _("PERIOD"));
+			case "DEL":				return sprintf(_("KP_%s"), _("DEL"));
+			case "DIVIDE":			return sprintf(_("KP_%s"), _("DIVIDE"));
+			case "SLASH":			return sprintf(_("KP_%s"), _("SLASH"));
+			case "MULTIPLY":		return sprintf(_("KP_%s"), _("MULTIPLY"));
+			case "MINUS":			return sprintf(_("KP_%s"), _("MINUS"));
+			case "PLUS":			return sprintf(_("KP_%s"), _("PLUS"));
+			case "ENTER":			return sprintf(_("KP_%s"), _("ENTER"));
+			case "EQUALS":			return sprintf(_("KP_%s"), _("EQUALS"));
+			default:				return key;
+		}
+	}
+
+	if (key == "PRINTSCREEN") return _("PRINTSCREEN");
+
+	if (substring(key, 0, 5) == "MOUSE")
+		return sprintf(_("MOUSE%d"), stof(substring(key, 5, -1)));
+
+	if (key == "MWHEELUP") return _("MWHEELUP");
+	if (key == "MWHEELDOWN") return _("MWHEELDOWN");
+
+	if (substring(key, 0,3) == "JOY")
+		return sprintf(_("JOY%d"), stof(substring(key, 3, -1)));
+
+	if (substring(key, 0,3) == "AUX")
+		return sprintf(_("AUX%d"), stof(substring(key, 3, -1)));
+
+	if (substring(key, 0, 4) == "X360_")
+	{
+		string subkey = substring(key, 4, -1);
+		switch(subkey)
+		{
+			case "DPAD_UP":					return sprintf(_("X360_%s"), _("DPAD_UP"));
+			case "DPAD_DOWN":				return sprintf(_("X360_%s"), _("DPAD_DOWN"));
+			case "DPAD_LEFT":				return sprintf(_("X360_%s"), _("DPAD_LEFT"));
+			case "DPAD_RIGHT":				return sprintf(_("X360_%s"), _("DPAD_RIGHT"));
+			case "START":					return sprintf(_("X360_%s"), _("START"));
+			case "BACK":					return sprintf(_("X360_%s"), _("BACK"));
+			case "LEFT_THUMB":				return sprintf(_("X360_%s"), _("LEFT_THUMB"));
+			case "RIGHT_THUMB":				return sprintf(_("X360_%s"), _("RIGHT_THUMB"));
+			case "LEFT_SHOULDER":			return sprintf(_("X360_%s"), _("LEFT_SHOULDER"));
+			case "RIGHT_SHOULDER":			return sprintf(_("X360_%s"), _("RIGHT_SHOULDER"));
+			case "LEFT_TRIGGER":			return sprintf(_("X360_%s"), _("LEFT_TRIGGER"));
+			case "RIGHT_TRIGGER":			return sprintf(_("X360_%s"), _("RIGHT_TRIGGER"));
+			case "LEFT_THUMB_UP":			return sprintf(_("X360_%s"), _("LEFT_THUMB_UP"));
+			case "LEFT_THUMB_DOWN":			return sprintf(_("X360_%s"), _("LEFT_THUMB_DOWN"));
+			case "LEFT_THUMB_LEFT":			return sprintf(_("X360_%s"), _("LEFT_THUMB_LEFT"));
+			case "LEFT_THUMB_RIGHT":		return sprintf(_("X360_%s"), _("LEFT_THUMB_RIGHT"));
+			case "RIGHT_THUMB_UP":			return sprintf(_("X360_%s"), _("RIGHT_THUMB_UP"));
+			case "RIGHT_THUMB_DOWN":		return sprintf(_("X360_%s"), _("RIGHT_THUMB_DOWN"));
+			case "RIGHT_THUMB_LEFT":		return sprintf(_("X360_%s"), _("RIGHT_THUMB_LEFT"));
+			case "RIGHT_THUMB_RIGHT":		return sprintf(_("X360_%s"), _("RIGHT_THUMB_RIGHT"));
+			default:						return key;
+		}
+	}
+
+	if (substring(key, 0, 4) == "JOY_")
+	{
+		string subkey = substring(key, 4, -1);
+		switch(subkey)
+		{
+			case "UP":			return sprintf(_("JOY_%s"), _("UP"));
+			case "DOWN":		return sprintf(_("JOY_%s"), _("DOWN"));
+			case "LEFT":		return sprintf(_("JOY_%s"), _("LEFT"));
+			case "RIGHT":		return sprintf(_("JOY_%s"), _("RIGHT"));
+			default:			return key;
+		}
+	}
+
+	if (substring(key, 0, 8) == "MIDINOTE")
+		return sprintf(_("MIDINOTE%d"), stof(substring(key, 8, -1)));
+
+	return key;
 }
 
 // x-encoding (encoding as zero length invisible string)
@@ -1336,7 +1640,7 @@ void m_shutdown()
 {
 	if(shutdown_running)
 	{
-		LOG_INFO("Recursive shutdown detected! Only restoring cvars...\n");
+		LOG_INFO("Recursive shutdown detected! Only restoring cvars...");
 	}
 	else
 	{
@@ -1347,7 +1651,7 @@ void m_shutdown()
 	cvar_settemp_restore(); // this must be done LAST, but in any case
 }
 
-#ifndef MENUQC
+#ifdef GAMEQC
 .float skeleton_bones_index;
 void Skeleton_SetBones(entity e)
 {
@@ -1369,8 +1673,7 @@ void execute_next_frame()
 	if(to_execute_next_frame)
 	{
 		localcmd("\n", to_execute_next_frame, "\n");
-		strunzone(to_execute_next_frame);
-		to_execute_next_frame = string_null;
+		strfree(to_execute_next_frame);
 	}
 }
 void queue_to_execute_next_frame(string s)
@@ -1378,9 +1681,8 @@ void queue_to_execute_next_frame(string s)
 	if(to_execute_next_frame)
 	{
 		s = strcat(s, "\n", to_execute_next_frame);
-		strunzone(to_execute_next_frame);
 	}
-	to_execute_next_frame = strzone(s);
+	strcpy(to_execute_next_frame, s);
 }
 
 .float FindConnectedComponent_processing;
@@ -1397,7 +1699,7 @@ void FindConnectedComponent(entity e, .entity fld, findNextEntityNearFunction_t 
 
 	// start with a 1-element queue
 	queue_start = queue_end = e;
-	queue_end.(fld) = world;
+	queue_end.(fld) = NULL;
 	queue_end.FindConnectedComponent_processing = 1;
 
 	// for each queued item:
@@ -1405,7 +1707,7 @@ void FindConnectedComponent(entity e, .entity fld, findNextEntityNearFunction_t 
 	{
 		// find all neighbors of queue_start
 		entity t;
-		for(t = world; (t = nxt(t, queue_start, pass)); )
+		for(t = NULL; (t = nxt(t, queue_start, pass)); )
 		{
 			if(t.FindConnectedComponent_processing)
 				continue;
@@ -1414,7 +1716,7 @@ void FindConnectedComponent(entity e, .entity fld, findNextEntityNearFunction_t 
 				// it is connected? ADD IT. It will look for neighbors soon too.
 				queue_end.(fld) = t;
 				queue_end = t;
-				queue_end.(fld) = world;
+				queue_end.(fld) = NULL;
 				queue_end.FindConnectedComponent_processing = 1;
 			}
 		}
@@ -1425,7 +1727,7 @@ void FindConnectedComponent(entity e, .entity fld, findNextEntityNearFunction_t 
 		queue_start.FindConnectedComponent_processing = 0;
 }
 
-#ifndef MENUQC
+#ifdef GAMEQC
 vector animfixfps(entity e, vector a, vector b)
 {
 	// multi-frame anim: keep as-is
@@ -1444,17 +1746,11 @@ vector animfixfps(entity e, vector a, vector b)
 }
 #endif
 
-#ifdef SVQC
-void dedicated_print(string input) // print(), but only print if the server is not local
+#ifdef GAMEQC
+Notification Announcer_PickNumber(int type, int num)
 {
-	if(server_is_dedicated) { LOG_INFO(input); }
-}
-#endif
-
-#ifndef MENUQC
-float Announcer_PickNumber(float type, float num)
-{
-	switch(type)
+    return = NULL;
+	switch (type)
 	{
 		case CNT_GAMESTART:
 		{
@@ -1559,11 +1855,10 @@ float Announcer_PickNumber(float type, float num)
 			break;
 		}
 	}
-	return NOTIF_ABORT; // abort sending if none of these numbers were right
 }
 #endif
 
-#ifndef MENUQC
+#ifdef GAMEQC
 int Mod_Q1BSP_SuperContentsFromNativeContents(int nativecontents)
 {
 	switch(nativecontents)
@@ -1599,3 +1894,216 @@ int Mod_Q1BSP_NativeContentsFromSuperContents(int supercontents)
 	return CONTENT_EMPTY;
 }
 #endif
+
+#ifdef SVQC
+void attach_sameorigin(entity e, entity to, string tag)
+{
+    vector org, t_forward, t_left, t_up, e_forward, e_up;
+    float tagscale;
+
+    org = e.origin - gettaginfo(to, gettagindex(to, tag));
+    tagscale = (vlen(v_forward) ** -2); // undo a scale on the tag
+    t_forward = v_forward * tagscale;
+    t_left = v_right * -tagscale;
+    t_up = v_up * tagscale;
+
+    e.origin_x = org * t_forward;
+    e.origin_y = org * t_left;
+    e.origin_z = org * t_up;
+
+    // current forward and up directions
+    if (substring(e.model, 0, 1) == "*") // bmodels have their own rules
+		e.angles = AnglesTransform_FromVAngles(e.angles);
+	else
+		e.angles = AnglesTransform_FromAngles(e.angles);
+    fixedmakevectors(e.angles);
+
+    // untransform forward, up!
+    e_forward.x = v_forward * t_forward;
+    e_forward.y = v_forward * t_left;
+    e_forward.z = v_forward * t_up;
+    e_up.x = v_up * t_forward;
+    e_up.y = v_up * t_left;
+    e_up.z = v_up * t_up;
+
+    e.angles = fixedvectoangles2(e_forward, e_up);
+    if (substring(e.model, 0, 1) == "*") // bmodels have their own rules
+		e.angles = AnglesTransform_ToVAngles(e.angles);
+	else
+		e.angles = AnglesTransform_ToAngles(e.angles);
+
+    setattachment(e, to, tag);
+    setorigin(e, e.origin);
+}
+
+void detach_sameorigin(entity e)
+{
+    vector org;
+    org = gettaginfo(e, 0);
+    e.angles = fixedvectoangles2(v_forward, v_up);
+    if (substring(e.model, 0, 1) == "*") // bmodels have their own rules
+		e.angles = AnglesTransform_ToVAngles(e.angles);
+	else
+		e.angles = AnglesTransform_ToAngles(e.angles);
+    setorigin(e, org);
+    setattachment(e, NULL, "");
+    setorigin(e, e.origin);
+}
+
+void follow_sameorigin(entity e, entity to)
+{
+    set_movetype(e, MOVETYPE_FOLLOW); // make the hole follow
+    e.aiment = to; // make the hole follow bmodel
+    e.punchangle = to.angles; // the original angles of bmodel
+    e.view_ofs = e.origin - to.origin; // relative origin
+    e.v_angle = e.angles - to.angles; // relative angles
+}
+
+#if 0
+// TODO: unused, likely for a reason, possibly needs extensions (allow setting the new movetype as a parameter?)
+void unfollow_sameorigin(entity e)
+{
+    set_movetype(e, MOVETYPE_NONE);
+}
+#endif
+
+.string aiment_classname;
+.float aiment_deadflag;
+void SetMovetypeFollow(entity ent, entity e)
+{
+	// FIXME this may not be warpzone aware
+	set_movetype(ent, MOVETYPE_FOLLOW); // make the hole follow
+	ent.solid = SOLID_NOT; // MOVETYPE_FOLLOW is always non-solid - this means this cannot be teleported by warpzones any more! Instead, we must notice when our owner gets teleported.
+	ent.aiment = e; // make the hole follow bmodel
+	ent.punchangle = e.angles; // the original angles of bmodel
+	ent.view_ofs = ent.origin - e.origin; // relative origin
+	ent.v_angle = ent.angles - e.angles; // relative angles
+	ent.aiment_classname = strzone(e.classname);
+	ent.aiment_deadflag = e.deadflag;
+}
+void UnsetMovetypeFollow(entity ent)
+{
+	set_movetype(ent, MOVETYPE_FLY);
+	PROJECTILE_MAKETRIGGER(ent);
+	ent.aiment = NULL;
+}
+float LostMovetypeFollow(entity ent)
+{
+/*
+	if(ent.move_movetype != MOVETYPE_FOLLOW)
+		if(ent.aiment)
+			error("???");
+*/
+	if(ent.aiment)
+	{
+		if(ent.aiment.classname != ent.aiment_classname)
+			return 1;
+		if(ent.aiment.deadflag != ent.aiment_deadflag)
+			return 1;
+	}
+	return 0;
+}
+#endif
+
+#ifdef GAMEQC
+// decolorizes and team colors the player name when needed
+string playername(string thename, int teamid, bool team_colorize)
+{
+	TC(int, teamid);
+	bool do_colorize = (teamplay && team_colorize);
+#ifdef SVQC
+	if(do_colorize && !intermission_running)
+#else
+	if(do_colorize)
+#endif
+    {
+        string t = Team_ColorCode(teamid);
+        return strcat(t, strdecolorize(thename));
+    }
+    else
+        return thename;
+}
+
+float trace_hits_box_a0, trace_hits_box_a1;
+
+float trace_hits_box_1d(float end, float thmi, float thma)
+{
+    if (end == 0)
+    {
+        // just check if x is in range
+        if (0 < thmi)
+            return false;
+        if (0 > thma)
+            return false;
+    }
+    else
+    {
+        // do the trace with respect to x
+        // 0 -> end has to stay in thmi -> thma
+        trace_hits_box_a0 = max(trace_hits_box_a0, min(thmi / end, thma / end));
+        trace_hits_box_a1 = min(trace_hits_box_a1, max(thmi / end, thma / end));
+        if (trace_hits_box_a0 > trace_hits_box_a1)
+            return false;
+    }
+    return true;
+}
+
+float trace_hits_box(vector start, vector end, vector thmi, vector thma)
+{
+    end -= start;
+    thmi -= start;
+    thma -= start;
+    // now it is a trace from 0 to end
+
+    trace_hits_box_a0 = 0;
+    trace_hits_box_a1 = 1;
+
+    if (!trace_hits_box_1d(end.x, thmi.x, thma.x))
+        return false;
+    if (!trace_hits_box_1d(end.y, thmi.y, thma.y))
+        return false;
+    if (!trace_hits_box_1d(end.z, thmi.z, thma.z))
+        return false;
+
+    return true;
+}
+
+float tracebox_hits_box(vector start, vector mi, vector ma, vector end, vector thmi, vector thma)
+{
+    return trace_hits_box(start, end, thmi - ma, thma - mi);
+}
+#endif
+
+ERASEABLE
+float cvar_or(string cv, float v)
+{
+	string s = cvar_string(cv);
+	if(s == "")
+		return v;
+	else
+		return stof(s);
+}
+
+// NOTE base is the central value
+// freq: circle frequency, = 2*pi*frequency in hertz
+// start_pos:
+//  -1 start from the lower value
+//   0 start from the base value
+//   1 start from the higher value
+ERASEABLE
+float blink_synced(float base, float range, float freq, float start_time, int start_pos)
+{
+	// note:
+	//   RMS = sqrt(base^2 + 0.5 * range^2)
+	// thus
+	//   base = sqrt(RMS^2 - 0.5 * range^2)
+	// ensure RMS == 1
+
+	return base + range * sin((time - start_time - (M_PI / 2) * start_pos) * freq);
+}
+
+ERASEABLE
+float blink(float base, float range, float freq)
+{
+	return blink_synced(base, range, freq, 0, 0);
+}

@@ -1,80 +1,199 @@
 #include "ent_cs.qh"
 
-// #define PROP(public, fld, sv, cl)
-#define ENTCS_NETPROPS(PROP) \
-	PROP(true, sv_entnum, \
-	{ WriteByte(chan, etof(player) - 1); }, \
-	{ this.sv_entnum = ReadByte(); }) \
-    \
-	PROP(false, origin, \
-	{ WriteShort(chan, this.origin.x);  WriteShort(chan, this.origin.y); \
-	  WriteShort(chan, this.origin.z); }, \
-	{ this.has_sv_origin = true; vector v; v.x = ReadShort(); v.y = ReadShort(); v.z = ReadShort(); setorigin(this, v); }) \
-    \
-	PROP(false, angles_y, \
-	{ WriteByte(chan, this.angles.y / 360 * 256); }, \
-	{ vector v = '0 0 0'; v.y = ReadByte() / 256 * 360; this.angles = v; }) \
-    \
-	PROP(false, health, \
-	{ WriteByte(chan, this.health / 10);  /* FIXME: use a better scale? */ }, \
-	{ this.healthvalue = ReadByte() * 10; }) \
-    \
-	PROP(false, armorvalue, \
-	{ WriteByte(chan, this.armorvalue / 10);  /* FIXME: use a better scale? */ }, \
-	{ this.armorvalue = ReadByte() * 10; }) \
-    \
-	PROP(true, netname, \
-	{ WriteString(chan, this.netname); }, \
-	{ if (this.netname) strunzone(this.netname); this.netname = strzone(ReadString()); }) \
-    \
-	PROP(true, model, \
-	{ WriteString(chan, this.model); }, \
-	{ if (this.model) strunzone(this.model); this.model = strzone(ReadString()); }) \
-    \
-	PROP(true, skin, \
-	{ WriteByte(chan, this.skin); }, \
-	{ this.skin = ReadByte(); }) \
-    \
-	/**/
+#if defined(CSQC)
+	#include <common/gamemodes/_mod.qh>
+	#include <common/resources.qh>
+#elif defined(MENUQC)
+#elif defined(SVQC)
+	#include <common/gamemodes/_mod.qh>
+	#include <common/resources.qh>
+	#include <server/resources.qh>
+#endif
+
+REGISTRY(EntCSProps, BITS(16) - 1)
+REGISTER_REGISTRY(EntCSProps)
+REGISTRY_SORT(EntCSProps)
+REGISTRY_CHECK(EntCSProps)
+
+REGISTRY_DEFINE_GET(EntCSProps, NULL)
+STATIC_INIT(EntCSProps_renumber) { FOREACH(EntCSProps, true, it.m_id = i); }
+
+// these entcs_props ids need to be referenced directly
+int ENTCS_PROP_ENTNUM_id = 0;
+int ENTCS_PROP_ORIGIN_id = 0;
+STATIC_INIT(EntCSProps_setglobalids)
+{
+	FOREACH(EntCSProps, true, {
+		if (it.registered_id == "ENTCS_PROP_ENTNUM")
+			ENTCS_PROP_ENTNUM_id = it.m_id;
+		if (it.registered_id == "ENTCS_PROP_ORIGIN")
+			ENTCS_PROP_ORIGIN_id = it.m_id;
+	});
+}
+
+#ifdef SVQC
+// Force an origin update, for player sounds
+void entcs_force_origin(entity player)
+{
+	CS(player).entcs.m_forceupdate = BIT(ENTCS_PROP_ORIGIN_id);
+}
+#endif
+
+.bool m_public;
+.bool(entity ent, entity player) m_check;
+.void(entity ent, entity player) m_set;
+.void(int chan, entity ent) m_send;
+.void(entity ent) m_receive;
+
+#ifdef SVQC
+#define _ENTCS_PROP(id, ispublic, checkprop, checkprop_pl, setprop, svsend, clreceive) \
+	void id##_set(entity ent, entity player) { setprop(ent.(checkprop), player.(checkprop_pl)); } \
+	void id##_send(int chan, entity ent) { LAMBDA(svsend); } \
+	REGISTER(EntCSProps, ENTCS_PROP, id, m_id, new_pure(entcs_prop)) { \
+		this.m_public = ispublic; \
+		this.m_check = id##_check; \
+		this.m_set = id##_set; \
+		this.m_send = id##_send; \
+	}
+
+#define ENTCS_PROP(id, ispublic, checkprop, checkprop_pl, setprop, svsend, clreceive) \
+	bool id##_check(entity ent, entity player) { return (ent.(checkprop) != player.(checkprop_pl)); } \
+	_ENTCS_PROP(id, ispublic, checkprop, checkprop_pl, setprop, svsend, clreceive)
+
+#define ENTCS_PROP_CODED(id, ispublic, checkprop, checkprop_pl, setprop, decfactor, svsend, clreceive) \
+	bool id##_check(entity ent, entity player) { \
+		return (floor(ent.(checkprop)) / decfactor != floor(player.(checkprop_pl)) / decfactor); \
+	} \
+	_ENTCS_PROP(id, ispublic, checkprop, checkprop_pl, setprop, svsend, clreceive)
+
+#elif defined(CSQC)
+#define ENTCS_PROP(id, ispublic, checkprop, checkprop_pl, setprop, svsend, clreceive) \
+	void id##_receive(entity ent) { LAMBDA(clreceive); } \
+	REGISTER(EntCSProps, ENTCS_PROP, id, m_id, new_pure(entcs_prop)) { \
+		this.m_public = ispublic; \
+		this.m_receive = id##_receive; \
+	}
+
+#define ENTCS_PROP_CODED(id, ispublic, checkprop, checkprop_pl, setprop, decfactor, svsend, clreceive) \
+	ENTCS_PROP(id, ispublic, checkprop, checkprop_pl, setprop, svsend, clreceive)
+#endif
+
+#ifdef SVQC
+#define ENTCS_PROP_RESOURCE(id, ispublic, checkprop, setprop, decfactor, svsend, clreceive) \
+	bool id##_check(entity ent, entity player) { \
+		return (floor(GetResource(ent, checkprop) / decfactor) != floor(GetResource(player, checkprop) / decfactor)); \
+	} \
+	void id##_set(entity ent, entity player) { SetResourceExplicit(ent, checkprop, GetResource(player, checkprop)); } \
+	void id##_send(int chan, entity ent) { LAMBDA(svsend); } \
+	REGISTER(EntCSProps, ENTCS_PROP, id, m_id, new_pure(entcs_prop)) { \
+		this.m_public = ispublic; \
+		this.m_check = id##_check; \
+		this.m_set = id##_set; \
+		this.m_send = id##_send; \
+	}
+#elif defined(CSQC)
+#define ENTCS_PROP_RESOURCE(id, ispublic, checkprop, setprop, decfactor, svsend, clreceive) \
+	void id##_receive(entity ent) { LAMBDA(clreceive); } \
+	REGISTER(EntCSProps, ENTCS_PROP, id, m_id, new_pure(entcs_prop)) { \
+		this.m_public = ispublic; \
+		this.m_receive = id##_receive; \
+	}
+#endif
+
+#define ENTCS_SET_NORMAL(var, x) MACRO_BEGIN \
+	var = x; \
+MACRO_END
+
+/** the engine player name strings are mutable! */
+#define ENTCS_SET_MUTABLE_STRING(var, x) MACRO_BEGIN \
+	strcpy(var, x); \
+MACRO_END
+
+ENTCS_PROP(ENTNUM, false, sv_entnum, sv_entnum, ENTCS_SET_NORMAL, {}, {}) /* sentinel */
+
+ENTCS_PROP(ORIGIN, false, origin, origin, ENTCS_SET_NORMAL,
+	{ WriteVector(chan, ent.origin); },
+	{ ent.has_sv_origin = true; vector v = ReadVector(); setorigin(ent, v); })
+
+#define DEC_FACTOR (360 / 32)
+ENTCS_PROP_CODED(ANGLES, false, angles_y, angles_y, ENTCS_SET_NORMAL, DEC_FACTOR,
+	{ WriteByte(chan, ent.angles.y / DEC_FACTOR); },
+	{ vector v = '0 0 0'; v.y = ReadByte() * DEC_FACTOR; ent.angles = v; })
+#undef DEC_FACTOR
+
+// FIXME: use a better scale?
+#define DEC_FACTOR 10
+ENTCS_PROP_RESOURCE(HEALTH, false, RES_HEALTH, ENTCS_SET_NORMAL, DEC_FACTOR,
+	{ WriteByte(chan, bound(0, GetResource(ent, RES_HEALTH) / DEC_FACTOR, 255)); },
+	{ ent.healthvalue = ReadByte() * DEC_FACTOR; })
+
+ENTCS_PROP_RESOURCE(ARMOR, false, RES_ARMOR, ENTCS_SET_NORMAL, DEC_FACTOR,
+	{ WriteByte(chan, bound(0, GetResource(ent, RES_ARMOR) / DEC_FACTOR, 255)); },
+	{ SetResourceExplicit(ent, RES_ARMOR, ReadByte() * DEC_FACTOR); })
+#undef DEC_FACTOR
+
+ENTCS_PROP(NAME, true, netname, netname, ENTCS_SET_MUTABLE_STRING,
+	{ WriteString(chan, ent.netname); },
+	{ strcpy(ent.netname, ReadString()); })
+
+ENTCS_PROP(MODEL, true, model, model, ENTCS_SET_NORMAL,
+	{ WriteString(chan, ent.model); },
+	{ strcpy(ent.model, ReadString()); })
+
+ENTCS_PROP(SKIN, true, skin, skin, ENTCS_SET_NORMAL,
+	{ WriteByte(chan, ent.skin); },
+	{ ent.skin = ReadByte(); })
+
+ENTCS_PROP(CLIENTCOLORS, true, clientcolors, clientcolors, ENTCS_SET_NORMAL,
+	{ WriteByte(chan, ent.clientcolors); },
+	{ ent.colormap = ReadByte(); })
+
+ENTCS_PROP(FRAGS, true, frags, frags, ENTCS_SET_NORMAL,
+	{ WriteShort(chan, ent.frags); },
+	{ ent.frags = ReadShort(); })
+
+// use sv_solid to avoid changing solidity state of entcs entities
+ENTCS_PROP(SOLID, true, sv_solid, solid, ENTCS_SET_NORMAL,
+	{ WriteByte(chan, ent.sv_solid); },
+	{ ent.sv_solid = ReadByte(); })
 
 #ifdef SVQC
 
 	int ENTCS_PUBLICMASK = 0;
 	STATIC_INIT(ENTCS_PUBLICMASK)
 	{
-		int i = 1;
-		#define X(public, fld, sv, cl) { if (public) ENTCS_PUBLICMASK |= BIT(i); } i += 1;
-		ENTCS_NETPROPS(X);
-	#undef X
-		if (i >= BITS(16 - 1)) LOG_FATAL("Exceeded ENTCS_NETPROPS limit");
+		FOREACH(EntCSProps, it.m_public,
+		{
+			ENTCS_PUBLICMASK |= BIT(it.m_id);
+		});
 	}
 
 	bool _entcs_send(entity this, entity to, int sf, int chan)
 	{
 		entity player = this.owner;
-		sf |= BIT(0) | BIT(1);
-		if (IS_PLAYER(to) || to.caplayer)                                  // unless spectating,
-		{
-			bool same_team = (to == player) || (teamplay && player.team == to.team);
-			if (!same_team && !radar_showennemies) sf &= ENTCS_PUBLICMASK; // no private updates
-		}
+		sf |= BIT(ENTCS_PROP_ENTNUM_id); // assume private
+		do {
+			if (IS_PLAYER(player))
+			{
+				if (radar_showenemies) break;
+				if (SAME_TEAM(to, player)) break;
+				if (!(IS_PLAYER(to) || to.caplayer) && time > game_starttime) break;
+			}
+			sf &= ENTCS_PUBLICMASK; // no private updates
+		} while (0);
+
 		sf |= this.m_forceupdate;
 		this.m_forceupdate = 0;
-		bool valid =
-		    IS_PLAYER(player)             // player must be active
-		    || player == to               // player is self
-		;
-		if (!valid) sf = 0;
 		if (chan == MSG_ENTITY)
 			WriteHeader(chan, ENT_CLIENT_ENTCS);
 		else
 			WriteHeader(chan, CLIENT_ENTCS);
 		WriteByte(chan, etof(player) - 1);
 		WriteShort(chan, sf);
-		int i = 1;
-		#define X(public, fld, sv, cl) { if (sf & BIT(i)) sv; } i += 1;
-		ENTCS_NETPROPS(X);
-	#undef X
+		FOREACH(EntCSProps, sf & BIT(it.m_id),
+		{
+			it.m_send(chan, this);
+		});
 		return true;
 	}
 
@@ -83,62 +202,55 @@
 		return _entcs_send(this, to, sf, MSG_ENTITY);
 	}
 
-	void entcs_think()
+	void entcs_think(entity this)
 	{
-		SELFPARAM();
 		this.nextthink = time + 0.033333333333;  // TODO: increase this to like 0.15 once the client can do smoothing
-		entity o = this.owner;
-		int i = 1;
-		#define X(public, fld, sv, cl) \
-			if (o.fld != this.fld) \
-			{ \
-				this.fld = o.fld; \
-				this.SendFlags |= BIT(i); \
-			} \
-			i += 1;
-		ENTCS_NETPROPS(X);
-	#undef X
+		entity player = this.owner;
+		FOREACH(EntCSProps, it.m_check(this, player),
+		{
+			it.m_set(this, player);
+			this.SendFlags |= BIT(it.m_id);
+		});
+		setorigin(this, this.origin); // relink
 	}
 
 	void entcs_attach(entity player)
 	{
-		entity e = player.entcs = new(entcs_sender);
-		make_pure(e);
+		entity e = CS(player).entcs = new(entcs_sender);
 		e.owner = player;
-		e.think = entcs_think;
+		setthink(e, entcs_think);
 		e.nextthink = time;
 		Net_LinkEntity(e, false, 0, entcs_send);
 		if (!IS_REAL_CLIENT(player)) return;
-		FOR_EACH_CLIENT(e)
-		{
-			assert(e.entcs);
-			_entcs_send(e.entcs, msg_entity = player, BITS(23), MSG_ONE);
-		}
+		FOREACH_CLIENT(true, {
+			assert(CS(it).entcs);
+			_entcs_send(CS(it).entcs, msg_entity = player, BITS(23), MSG_ONE);
+		});
 	}
 
 	void entcs_detach(entity player)
 	{
-		if (!player.entcs) return;
-		remove(player.entcs);
-		player.entcs = NULL;
+		if (!CS(player).entcs) return;
+		delete(CS(player).entcs);
+		CS(player).entcs = NULL;
 	}
 
 #endif
 
 #ifdef CSQC
 
-	void Ent_RemoveEntCS()
+	void Ent_RemoveEntCS(entity this)
 	{
-		SELFPARAM();
 		int n = this.sv_entnum;
 		entity e = entcs_receiver(n);
 		entcs_receiver(n, NULL);
-		if (e != this) remove(e);
+		strfree(e.netname);
+		strfree(e.model);
+		if (e != this) delete(e);
 	}
 
-	void entcs_think()
+	void entcs_think(entity this)
 	{
-		SELFPARAM();
 		entity e = CSQCModel_server2csqc(this.sv_entnum);
 		if (e == NULL)
 		{
@@ -150,8 +262,7 @@
 		// `cl_forceplayermodels 1` sounds will be wrong until the player has been in the PVS, but so be it
 		if (this.model != e.model)
 		{
-			if (this.model) strunzone(this.model);
-			this.model = strzone(e.model);
+			strcpy(this.model, e.model);
 		}
 	}
 
@@ -161,37 +272,36 @@
 		entity e = entcs_receiver(n);
 		if (e == NULL)
 		{
-			if (this)
-			{
-				e = this;
-			}
+			if (!this)
+				// initial = temp
+				e = new_pure(ENT_CLIENT_ENTCS);
 			else
-			{
-				e = new(entcs_receiver);
-				make_pure(e);
-			}
-			e.sv_entnum = n;
-			e.think = entcs_think;
+				// initial = linked
+				e = this;
+			setthink(e, entcs_think);
 			entcs_receiver(n, e);
 		}
-		else if (this && e != this)
+		else if (e != this && this)
 		{
-			this.classname = "entcs_gc";
-			this.sv_entnum = n;
+			// upgrade to linked
+			delete(e);
+			e = this;
+			setthink(e, entcs_think);
+			entcs_receiver(n, e);
 		}
-		this = e;
-		InterpolateOrigin_Undo(this);
-		this.sv_entnum = n;
+
+		InterpolateOrigin_Undo(e);
+		e.sv_entnum = n;
 		int sf = ReadShort();
-		this.has_sv_origin = false;
-		this.m_entcs_private = boolean(sf & BIT(0));
-		int i = 1;
-		#define X(public, fld, sv, cl) { if (sf & BIT(i)) cl; } i += 1;
-		ENTCS_NETPROPS(X);
-	#undef X
-		this.iflags |= IFLAG_ORIGIN;
-		InterpolateOrigin_Note(this);
-		WITH(entity, self, this, this.think());
+		e.has_sv_origin = false;
+		e.m_entcs_private = boolean(sf & BIT(ENTCS_PROP_ENTNUM_id));
+		FOREACH(EntCSProps, sf & BIT(it.m_id),
+		{
+			it.m_receive(e);
+		});
+		e.iflags |= IFLAG_ORIGIN;
+		InterpolateOrigin_Note(e);
+		getthink(e)(e);
 		return true;
 	}
 
@@ -200,7 +310,6 @@
 		if (isnew)
 		{
 			make_pure(this);
-			this.classname = "entcs_receiver";
 			this.entremove = Ent_RemoveEntCS;
 		}
 		return ReadEntcs(this);

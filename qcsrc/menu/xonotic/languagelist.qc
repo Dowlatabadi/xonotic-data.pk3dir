@@ -1,40 +1,7 @@
-#ifndef LANGUAGELIST_H
-#define LANGUAGELIST_H
-#include "listbox.qc"
-CLASS(XonoticLanguageList, XonoticListBox)
-	METHOD(XonoticLanguageList, configureXonoticLanguageList, void(entity));
-	ATTRIB(XonoticLanguageList, rowsPerItem, float, 1)
-	METHOD(XonoticLanguageList, drawListBoxItem, void(entity, int, vector, bool, bool));
-	METHOD(XonoticLanguageList, resizeNotify, void(entity, vector, vector, vector, vector));
-	METHOD(XonoticLanguageList, setSelected, void(entity, float));
-	METHOD(XonoticLanguageList, loadCvars, void(entity));
-	METHOD(XonoticLanguageList, saveCvars, void(entity));
+#include "languagelist.qh"
 
-	ATTRIB(XonoticLanguageList, realFontSize, vector, '0 0 0')
-	ATTRIB(XonoticLanguageList, realUpperMargin, float, 0)
-	ATTRIB(XonoticLanguageList, columnNameOrigin, float, 0)
-	ATTRIB(XonoticLanguageList, columnNameSize, float, 0)
-	ATTRIB(XonoticLanguageList, columnPercentageOrigin, float, 0)
-	ATTRIB(XonoticLanguageList, columnPercentageSize, float, 0)
-
-	METHOD(XonoticLanguageList, doubleClickListBoxItem, void(entity, float, vector));
-	METHOD(XonoticLanguageList, keyDown, float(entity, float, float, float)); // enter handling
-
-	METHOD(XonoticLanguageList, destroy, void(entity));
-
-	ATTRIB(XonoticLanguageList, languagelist, float, -1)
-	METHOD(XonoticLanguageList, getLanguages, void(entity));
-	METHOD(XonoticLanguageList, setLanguage, void(entity));
-	METHOD(XonoticLanguageList, languageParameter, string(entity, float, float));
-
-	ATTRIB(XonoticLanguageList, name, string, "languageselector") // change this to make it noninteractive (for first run dialog)
-ENDCLASS(XonoticLanguageList)
-
-entity makeXonoticLanguageList();
-void SetLanguage_Click(entity btn, entity me);
-#endif
-
-#ifdef IMPLEMENTATION
+#include "../item/modalcontroller.qh"
+#include "mainwindow.qh"
 
 const float LANGPARM_ID = 0;
 const float LANGPARM_NAME = 1;
@@ -59,7 +26,6 @@ void XonoticLanguageList_configureXonoticLanguageList(entity me)
 
 void XonoticLanguageList_drawListBoxItem(entity me, int i, vector absSize, bool isSelected, bool isFocused)
 {
-	string s, p;
 	if(isSelected)
 		draw_Fill('0 0 0', '1 1 0', SKINCOLOR_LISTBOX_SELECTED, SKINALPHA_LISTBOX_SELECTED);
 	else if(isFocused)
@@ -68,17 +34,31 @@ void XonoticLanguageList_drawListBoxItem(entity me, int i, vector absSize, bool 
 		draw_Fill('0 0 0', '1 1 0', SKINCOLOR_LISTBOX_FOCUSED, me.focusedItemAlpha);
 	}
 
-	s = me.languageParameter(me, i, LANGPARM_NAME_LOCALIZED);
+	string p = me.languageParameter(me, i, LANGPARM_PERCENTAGE);
+	float alpha_factor = 1;
+	if (p != "")
+	{
+		float percent = stof(p);
+		if (percent >= 90)
+			alpha_factor = 1;
+		else if (percent >= 50)
+			alpha_factor = 0.65;
+		else
+			alpha_factor = 0.3;
+	}
+	else
+		p = "\xE2\x9C\x94"; // Unicode Character 'HEAVY CHECK MARK' (U+2714)
+
+	string s = me.languageParameter(me, i, LANGPARM_NAME_LOCALIZED);
 
 	vector save_fontscale = draw_fontscale;
 	float f = draw_CondensedFontFactor(s, false, me.realFontSize, 1);
 	draw_fontscale.x *= f;
 	vector fs = me.realFontSize;
 	fs.x *= f;
-	draw_Text(me.realUpperMargin * eY + me.columnNameOrigin * eX, s, fs, SKINCOLOR_TEXT, SKINALPHA_TEXT, 0);
+	draw_Text(me.realUpperMargin * eY + me.columnNameOrigin * eX, s, fs, SKINCOLOR_TEXT * alpha_factor, SKINALPHA_TEXT, 0);
 	draw_fontscale = save_fontscale;
 
-	p = me.languageParameter(me, i, LANGPARM_PERCENTAGE);
 	if(p != "")
 	{
 		vector save_fontscale = draw_fontscale;
@@ -86,7 +66,8 @@ void XonoticLanguageList_drawListBoxItem(entity me, int i, vector absSize, bool 
 		draw_fontscale.x *= f;
 		vector fs = me.realFontSize;
 		fs.x *= f;
-		draw_Text(me.realUpperMargin * eY + (me.columnPercentageOrigin + (me.columnPercentageSize - draw_TextWidth(p, 0, fs))) * eX, p, fs, SKINCOLOR_TEXT, SKINALPHA_TEXT, 0);
+		float x_ofs = me.columnPercentageOrigin + (me.columnPercentageSize - draw_TextWidth(p, 0, fs));
+		draw_Text(me.realUpperMargin * eY + x_ofs * eX, p, fs, SKINCOLOR_TEXT, SKINALPHA_TEXT * alpha_factor, 0);
 		draw_fontscale = save_fontscale;
 	}
 }
@@ -216,5 +197,3 @@ void SetLanguage_Click(entity btn, entity me)
 {
 	me.setLanguage(me);
 }
-
-#endif

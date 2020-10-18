@@ -1,5 +1,4 @@
-#ifndef GUIDE_PAGES_H
-#define GUIDE_PAGES_H
+#pragma once
 
 CLASS(GuidePage, Object);
     ATTRIB(GuidePage, m_id, int, 0);
@@ -25,5 +24,3 @@ REGISTER_REGISTRY(GuidePages)
 REGISTER_GUIDE_PAGE(0, _("Intro")) { this.m_description = _(
 "Welcome to xonotic"
 );}
-
-#endif

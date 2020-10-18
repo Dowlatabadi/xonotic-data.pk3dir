@@ -1,39 +1,4 @@
-#ifndef DIALOG_MEDIA_GUIDE_ENTRIES_H
-#define DIALOG_MEDIA_GUIDE_ENTRIES_H
-#include "../datasource.qc"
-#include "../listbox.qc"
-CLASS(XonoticEntryList, XonoticListBox)
-    ATTRIB(XonoticEntryList, alphaBG, float, 0)
-    ATTRIB(XonoticEntryList, itemAbsSize, vector, '0 0 0')
-    ATTRIB(XonoticEntryList, origin, vector, '0 0 0')
-    ATTRIB(XonoticEntryList, realFontSize, vector, '0 0 0')
-    ATTRIB(XonoticEntryList, realUpperMargin1, float, 0)
-    ATTRIB(XonoticEntryList, realUpperMargin2, float, 0)
-    ATTRIB(XonoticEntryList, rowsPerItem, float, 4)
-    ATTRIB(XonoticEntryList, stringFilterBox, entity, NULL)
-    ATTRIB(XonoticEntryList, stringFilter, string, string_null)
-    ATTRIB(XonoticEntryList, typeToSearchString, string, string_null)
-    ATTRIB(XonoticEntryList, typeToSearchTime, float, 0)
-
-    METHOD(XonoticEntryList, drawListBoxItem, void(entity, int, vector, bool, bool));
-    METHOD(XonoticEntryList, keyDown, float(entity, float, float, float));
-    METHOD(XonoticEntryList, refilter, void(entity));
-    METHOD(XonoticEntryList, resizeNotify, void(entity, vector, vector, vector, vector));
-    METHOD(XonoticEntryList, setSelected, void(entity, int));
-
-    ATTRIB(XonoticEntryList, source, DataSource, NULL)
-
-    CONSTRUCTOR(XonoticEntryList, DataSource _source) {
-        CONSTRUCT(XonoticEntryList);
-        this.source = _source;
-        this.configureXonoticListBox(this);
-        this.refilter(this);
-    }
-
-ENDCLASS(XonoticEntryList)
-#endif
-
-#ifdef IMPLEMENTATION
+#include "entries.qh"
 
 string XonoticEntryList_cb_name, XonoticEntryList_cb_icon;
 void XonoticEntryList_cb(string _name, string _icon) {
@@ -124,4 +89,3 @@ void XonoticEntryList_setSelected(entity this, int i)
     SUPER(XonoticEntryList).setSelected(this, i);
     this.onChange(this, this.onChangeEntity);
 }
-#endif

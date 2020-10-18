@@ -29,9 +29,41 @@ case "$1" in
 esac
 
 if [ x"$mode" = x"pot" ]; then
+	make QCC="../../../../gmqcc/gmqcc" clean
+	make QCC="../../../../gmqcc/gmqcc"
 	{
-		find qcsrc -type f -name \*.\* -not -name \*.po -not -name \*.txt
-	} | xgettext -LC -k_ -f- --from-code utf-8 -F -o common.pot >&2
+		grep -h '^\.' .tmp/*_includes.txt | cut -d ' ' -f 2 | sed -e 's,^,qcsrc/,' | while IFS= read -r name; do
+			while :; do
+				case "$name" in
+					*/./*)
+						name=${name%%/./*}/${name#*/./}
+						;;
+					./*)
+						name=${name#./}
+						;;
+					*/*/../*)
+						before=${name%%/../*}
+						before=${before%/*}
+						name=$before/${name#*/../}
+						;;
+					*/../*)
+						name=${name#*/../}
+						;;
+					*)
+						break
+						;;
+				esac
+			done
+			echo "$name"
+		done | sort -u
+	} | xgettext -LC -k_ -f- --from-code utf-8 -F -o common.pot.new >&2
+	if msgcmp -N --use-untranslated common.pot common.pot.new; then
+		echo "No contentful changes to common.pot - OK."
+		rm -f common.pot.new
+	else
+		echo "Updating common.pot. This probably should be committed."
+		mv -v common.pot.new common.pot
+	fi
 fi
 
 if [ x"$mode" = x"txt" ]; then
@@ -49,6 +81,7 @@ if [ x"$mode" = x"txt" ]; then
 					continue
 				fi
 			fi
+			# Note: we're only reporting EXISTING fuzzy matches in the Fuzzy count, thus -N.
 			po=`msgmerge -N "$X" common.pot`
 			ne=`printf "%s\n" "$po" | msgfmt -o /dev/null --check-format --check-header --use-fuzzy - 2>&1 | grep . | wc -l`
 			nu=`printf "%s\n" "$po" | msgattrib --untranslated - | grep -c ^#:`
@@ -68,11 +101,11 @@ if [ x"$mode" = x"txt" ]; then
 				if [ "$p" -lt 50 ]; then
 					continue
 				fi
-				item="$l $l \"$l\" 0%"
+				item="$l \"$l\" \"$l\" 0%"
 			fi
 			printf "%s\n" "$item" | sed -e "s/[0-9][0-9]*%/$p%/"
 		done
-	} | tr '"' '\t' | sort -k3 | tr '\t' '"'
+	} | LC_ALL=C sort -t '"' -k4,4
 fi
 
 if [ x"$mode" = x"po" ]; then
@@ -87,6 +120,7 @@ if [ x"$mode" = x"po" ]; then
 				continue
 			fi
 		fi
+		# Note: no -N here, this is the point where we allow fuzzy matching.
 		msgmerge -F -U "$X" common.pot >&2
 		msgfmt -o /dev/null --check-format --check-header --use-fuzzy "$X" 2>&1 \
 		                              | grep . > "$X".errors       || rm -f "$X".errors
@@ -238,6 +272,7 @@ EOF
 				continue
 			fi
 		fi
+		# Note: no -N here, this is the point where we allow fuzzy matching.
 		msgmerge -F -U "$X" common.pot >/dev/null 2>&1
 	done
 fi

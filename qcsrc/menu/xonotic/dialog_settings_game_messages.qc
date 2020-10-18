@@ -1,21 +1,9 @@
-#ifndef DIALOG_SETTINGS_GAME_MESSAGES_H
-#define DIALOG_SETTINGS_GAME_MESSAGES_H
-#include "tab.qc"
-CLASS(XonoticGameMessageSettingsTab, XonoticTab)
-	METHOD(XonoticGameMessageSettingsTab, fill, void(entity));
-	METHOD(XonoticGameMessageSettingsTab, showNotify, void(entity));
-	ATTRIB(XonoticGameMessageSettingsTab, title, string, _("Messages"))
-	ATTRIB(XonoticGameMessageSettingsTab, intendedWidth, float, 0.9)
-	ATTRIB(XonoticGameMessageSettingsTab, rows, float, 13)
-	ATTRIB(XonoticGameMessageSettingsTab, columns, float, 6)
-	ATTRIB(XonoticGameMessageSettingsTab, weaponsList, entity, NULL)
-ENDCLASS(XonoticGameMessageSettingsTab)
-entity makeXonoticGameMessageSettingsTab();
-#include "../gamesettings.qh"
-REGISTER_SETTINGS(Messages, makeXonoticGameMessageSettingsTab());
-#endif
+#include "dialog_settings_game_messages.qh"
 
-#ifdef IMPLEMENTATION
+#include "textlabel.qh"
+#include "checkbox.qh"
+#include "textslider.qh"
+
 void XonoticGameMessageSettingsTab_showNotify(entity me)
 {
 	loadAllCvars(me);
@@ -65,10 +53,10 @@ void XonoticGameMessageSettingsTab_fill(entity me)
 	me.TR(me);
 		me.TDempty(me, 0.4);
 		me.TD(me, 1, 2.6, e = makeXonoticCheckBox_T(0, "notification_show_sprees_info_newline", _("Print on a seperate line"), "-"));
-			setDependent(e, "notification_show_sprees", 1, 1);
+			setDependentAND(e, "notification_show_sprees", 1, 1, "notification_show_sprees_info", 1, 3);
 	me.TR(me);
 		me.TD(me, 1, 3, e = makeXonoticCheckBoxEx_T(2, 1, "notification_CHOICE_FRAG", _("Add extra frag information to centerprint when available"), "-"));
-			makeMulti(e, "notification_CHOICE_FRAGGED notification_CHOICE_TYPEFRAG notification_CHOICE_TYPEFRAGGED");
+			makeMulti(e, "notification_CHOICE_FRAGGED notification_CHOICE_TYPEFRAG notification_CHOICE_TYPEFRAGGED notification_CHOICE_FRAG_FIRE notification_CHOICE_FRAGGED_FIRE notification_CHOICE_FRAG_FREEZE notification_CHOICE_FRAGGED_FREEZE");
 			e.sendCvars = true;
 	me.TR(me);
 		me.TD(me, 1, 3, e = makeXonoticCheckBox_T(0, "notification_show_location", _("Add frag location to death messages when available"), "-"));
@@ -76,23 +64,23 @@ void XonoticGameMessageSettingsTab_fill(entity me)
 	me.gotoRC(me, 9, 0); me.setFirstColumn(me, me.currentColumn);
 		me.TD(me, 1, 3, e = makeXonoticHeaderLabel(_("Gamemode Settings")));
 	me.TR(me);
-		me.TD(me, 1, 3, e = makeXonoticCheckBoxEx_T(2, 1, "notification_CHOICE_CTF_CAPTURE_TIME_RED", _("Display capture times in Capture The Flag"), "-"));
-			makeMulti(e, "notification_CHOICE_CTF_CAPTURE_TIME_BLUE notification_CHOICE_CTF_CAPTURE_BROKEN_RED notification_CHOICE_CTF_CAPTURE_BROKEN_BLUE notification_CHOICE_CTF_CAPTURE_UNBROKEN_RED notification_CHOICE_CTF_CAPTURE_UNBROKEN_BLUE ");
+		me.TD(me, 1, 3, e = makeXonoticCheckBoxEx_T(2, 1, "notification_CHOICE_CTF_CAPTURE_TIME", _("Display capture times in Capture The Flag"), "-"));
+			makeMulti(e, "notification_CHOICE_CTF_CAPTURE_BROKEN notification_CHOICE_CTF_CAPTURE_UNBROKEN");
 			e.sendCvars = true;
 	me.TR(me);
 		me.TD(me, 1, 3, e = makeXonoticCheckBoxEx_T(2, 1, "notification_CHOICE_CTF_PICKUP_ENEMY", _("Display name of flag stealer in Capture The Flag"), "-"));
-			makeMulti(e, "notification_CHOICE_CTF_PICKUP_TEAM");
+			makeMulti(e, "notification_CHOICE_CTF_PICKUP_ENEMY_TEAM notification_CHOICE_CTF_PICKUP_ENEMY_NEUTRAL");
 			e.sendCvars = true;
 
 	me.gotoRC(me, 0, 3.2); me.setFirstColumn(me, me.currentColumn);
 		me.TD(me, 1, 3, e = makeXonoticHeaderLabel(_("Other")));
 	me.TR(me);
-		me.TD(me, 1, 3, e = makeXonoticCheckBoxEx_T(4, 1, "con_notify", _("Display console messages in the top left corner"), "-"));
+		me.TD(me, 1, 3, e = makeXonoticCheckBoxEx_T(4, 0, "con_notify", _("Display console messages in the top left corner"), "-"));
 	me.TR(me);
 		me.TD(me, 1, 3, e = makeXonoticCheckBoxEx_T(2, 1, "notification_allow_chatboxprint", _("Display all info messages in the chatbox"), "-"));
 	me.TR(me);
 		me.TD(me, 1, 3, e = makeXonoticCheckBoxEx_T(2, 1, "notification_INFO_QUIT_DISCONNECT", _("Display player statuses in the chatbox"), "-"));
-			makeMulti(e, "notification_INFO_QUIT_KICK_IDLING notification_INFO_JOIN_CONNECT_TEAM_BLUE notification_INFO_JOIN_CONNECT_TEAM_PINK notification_INFO_JOIN_CONNECT_TEAM_RED notification_INFO_JOIN_CONNECT_TEAM_YELLOW");
+			makeMulti(e, "notification_INFO_QUIT_KICK_IDLING notification_INFO_JOIN_CONNECT");
 	me.TR(me);
 	me.TR(me);
 		me.TD(me, 1, 3, e = makeXonoticCheckBox_T(0, "notification_CENTER_POWERUP_INVISIBILITY", _("Powerup notifications"), "-"));
@@ -106,12 +94,9 @@ void XonoticGameMessageSettingsTab_fill(entity me)
 
 	me.gotoRC(me, 9, 3.2); me.setFirstColumn(me, me.currentColumn);
 		me.TD(me, 1, 3, e = makeXonoticHeaderLabel(_("Announcers")));
-	#if 0
-	// there's just not enough room for this, and it's not important enough to justify...
 	me.TR(me);
 		me.TD(me, 1, 3, e = makeXonoticCheckBoxEx_T(2, 0, "notification_ANNCE_NUM_RESPAWN_1", _("Respawn countdown sounds"), "-"));
 			makeMulti(e, "notification_ANNCE_NUM_RESPAWN_2 notification_ANNCE_NUM_RESPAWN_3 notification_ANNCE_NUM_RESPAWN_4 notification_ANNCE_NUM_RESPAWN_5 notification_ANNCE_NUM_RESPAWN_6 notification_ANNCE_NUM_RESPAWN_7 notification_ANNCE_NUM_RESPAWN_8 notification_ANNCE_NUM_RESPAWN_9 notification_ANNCE_NUM_RESPAWN_10");
-	#endif
 	me.TR(me);
 		me.TD(me, 1, 3, e = makeXonoticCheckBoxEx_T(1, 0, "notification_ANNCE_KILLSTREAK_03", _("Killstreak sounds"), "-"));
 			makeMulti(e, "notification_ANNCE_KILLSTREAK_05 notification_ANNCE_KILLSTREAK_10 notification_ANNCE_KILLSTREAK_15 notification_ANNCE_KILLSTREAK_20 notification_ANNCE_KILLSTREAK_25 notification_ANNCE_KILLSTREAK_30");
@@ -119,4 +104,3 @@ void XonoticGameMessageSettingsTab_fill(entity me)
 		me.TD(me, 1, 3, e = makeXonoticCheckBoxEx_T(1, 0, "notification_ANNCE_ACHIEVEMENT_AIRSHOT", _("Achievement sounds"), "-"));
 			makeMulti(e, "notification_ANNCE_ACHIEVEMENT_AMAZING notification_ANNCE_ACHIEVEMENT_AWESOME notification_ANNCE_ACHIEVEMENT_BOTLIKE notification_ANNCE_ACHIEVEMENT_ELECTROBITCH notification_ANNCE_ACHIEVEMENT_IMPRESSIVE notification_ANNCE_ACHIEVEMENT_YODA");
 }
-#endif

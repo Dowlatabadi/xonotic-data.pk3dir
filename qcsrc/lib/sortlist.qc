@@ -1,9 +1,9 @@
 #include "sortlist.qh"
 
+ERASEABLE
 entity Sort_Spawn()
 {
-	entity sort = new(sortlist);
-	make_pure(sort);
+	entity sort = new_pure(sortlist);
 	sort.sort_next = NULL;
 	sort.chain = sort;
 	return sort;
@@ -14,7 +14,7 @@ entity Sort_New(float(entity,entity) cmp)
     entity sort;
     sort = spawn();
     sort.sort_cmp = cmp;
-    sort.sort_next = world;
+    sort.sort_next = NULL;
     sort.chain = sort;
     return sort;
 }
@@ -57,7 +57,7 @@ void Sort_Reset(entity sort)
 
 float Sort_HasNext(entity sort)
 {
-    return (sort.chain.sort_next != world);
+    return (sort.chain.sort_next != NULL);
 }
 
 entity Sort_Next(entity sort)
@@ -68,7 +68,7 @@ entity Sort_Next(entity sort)
         next = spawn();
         sort.chain.sort_next = next;
         next.sort_prev = sort.chain;
-        next.sort_next = world;
+        next.sort_next = NULL;
     }
     sort.chain = next;
     return next;

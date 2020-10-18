@@ -1,53 +1,8 @@
-#include "../../common/campaign_common.qh"
+#include "campaign.qh"
 
-#ifndef CAMPAIGN_H
-#define CAMPAIGN_H
-#include "listbox.qc"
-CLASS(XonoticCampaignList, XonoticListBox)
-	METHOD(XonoticCampaignList, configureXonoticCampaignList, void(entity));
-	ATTRIB(XonoticCampaignList, rowsPerItem, float, 10)
-	METHOD(XonoticCampaignList, draw, void(entity));
-	METHOD(XonoticCampaignList, drawListBoxItem, void(entity, int, vector, bool, bool));
-	METHOD(XonoticCampaignList, doubleClickListBoxItem, void(entity, float, vector));
-	METHOD(XonoticCampaignList, resizeNotify, void(entity, vector, vector, vector, vector));
-	METHOD(XonoticCampaignList, setSelected, void(entity, float));
-	METHOD(XonoticCampaignList, keyDown, float(entity, float, float, float));
-	METHOD(XonoticCampaignList, campaignGo, void(entity, float));
-	METHOD(XonoticCampaignList, destroy, void(entity));
+#include <common/campaign_common.qh>
+#include "inputbox.qh"
 
-	ATTRIB(XonoticCampaignList, campaignGlob, float, 0)
-	ATTRIB(XonoticCampaignList, realFontSize, vector, '0 0 0')
-	ATTRIB(XonoticCampaignList, columnPreviewOrigin, float, 0)
-	ATTRIB(XonoticCampaignList, columnPreviewSize, float, 0)
-	ATTRIB(XonoticCampaignList, columnNameOrigin, float, 0)
-	ATTRIB(XonoticCampaignList, columnNameSize, float, 0)
-	ATTRIB(XonoticCampaignList, columnCheckMarkOrigin, float, 0)
-	ATTRIB(XonoticCampaignList, columnCheckMarkSize, float, 0)
-	ATTRIB(XonoticCampaignList, checkMarkOrigin, vector, '0 0 0')
-	ATTRIB(XonoticCampaignList, checkMarkSize, vector, '0 0 0')
-	ATTRIB(XonoticCampaignList, realUpperMargin1, float, 0)
-	ATTRIB(XonoticCampaignList, realUpperMargin2, float, 0)
-
-	ATTRIB(XonoticCampaignList, origin, vector, '0 0 0')
-	ATTRIB(XonoticCampaignList, itemAbsSize, vector, '0 0 0')
-	ATTRIB(XonoticCampaignList, emptyLineHeight, float, 0.5)
-
-	ATTRIB(XonoticCampaignList, campaignIndex, float, 0)
-	ATTRIB(XonoticCampaignList, cvarName, string, string_null)
-	METHOD(XonoticCampaignList, loadCvars, void(entity));
-	METHOD(XonoticCampaignList, saveCvars, void(entity));
-
-	ATTRIB(XonoticCampaignList, buttonNext, entity, NULL)
-	ATTRIB(XonoticCampaignList, buttonPrev, entity, NULL)
-	ATTRIB(XonoticCampaignList, labelTitle, entity, NULL)
-ENDCLASS(XonoticCampaignList)
-entity makeXonoticCampaignList();
-void CampaignList_LoadMap(entity btn, entity me);
-void MultiCampaign_Next(entity btn, entity me);
-void MultiCampaign_Prev(entity btn, entity me);
-#endif
-
-#ifdef IMPLEMENTATION
 string campaign_longdesc_wrapped[CAMPAIGN_MAX_ENTRIES];
 
 void rewrapCampaign(float w, float l0, float emptyheight, vector theFontSize)
@@ -59,8 +14,7 @@ void rewrapCampaign(float w, float l0, float emptyheight, vector theFontSize)
 	for(i = 0; i < campaign_entries; ++i)
 	{
 		l = l0;
-		if(campaign_longdesc_wrapped[i])
-			strunzone(campaign_longdesc_wrapped[i]);
+		strfree(campaign_longdesc_wrapped[i]);
 		n = tokenizebyseparator(campaign_longdesc[i], "\n");
 		r = "";
 		for(j = 0; j < n; ++j)
@@ -82,11 +36,11 @@ void rewrapCampaign(float w, float l0, float emptyheight, vector theFontSize)
 			}
 		}
 		goto nottoolong;
-:toolong
+LABEL(toolong)
 		while(substring(r, strlen(r) - 1, 1) == "\n")
 			r = substring(r, 0, strlen(r) - 1);
 		r = strcat(r, "...\n");
-:nottoolong
+LABEL(nottoolong)
 		campaign_longdesc_wrapped[i] = strzone(substring(r, 0, strlen(r) - 1));
 	}
 }
@@ -103,7 +57,7 @@ void XonoticCampaignList_configureXonoticCampaignList(entity me)
 	me.configureXonoticListBox(me);
 	me.campaignGlob = search_begin("maps/campaign*.txt", true, true);
 	me.loadCvars(me);
-	me.campaignGo(me, 0); // takes care of enabling/disabling buttons too
+	me.campaignGo(me, 0); // it makes work buttons too
 }
 
 void XonoticCampaignList_destroy(entity me)
@@ -115,12 +69,8 @@ void XonoticCampaignList_destroy(entity me)
 void XonoticCampaignList_loadCvars(entity me)
 {
 	// read campaign cvars
-	if(campaign_name)
-		strunzone(campaign_name);
-	if(me.cvarName)
-		strunzone(me.cvarName);
-	campaign_name = strzone(cvar_string("g_campaign_name"));
-	me.cvarName = strzone(strcat("g_campaign", campaign_name, "_index"));
+	strcpy(campaign_name, cvar_string("g_campaign_name"));
+	strcpy(me.cvarName, strcat("g_campaign", campaign_name, "_index"));
 	registercvar(me.cvarName, "", 0); // saved by server QC anyway
 	CampaignFile_Unload();
 	CampaignFile_Load(0, CAMPAIGN_MAX_ENTRIES);
@@ -146,11 +96,8 @@ void XonoticCampaignList_saveCvars(entity me)
 
 void XonoticCampaignList_campaignGo(entity me, float step)
 {
-	float canNext, canPrev;
 	string s;
 	float i, j, n;
-
-	canNext = canPrev = 0;
 
 	if(me.campaignGlob >= 0)
 	{
@@ -186,15 +133,10 @@ void XonoticCampaignList_campaignGo(entity me, float step)
 			s = substring(s, 13, strlen(s) - 17);
 			cvar_set("g_campaign_name", s);
 			me.loadCvars(me);
-			canNext = (j != n - 1);
-			canPrev = (j != 0);
+			me.hasNextCampaign = (j != n - 1);
+			me.hasPrevCampaign = (j != 0);
 		}
 	}
-
-	if(me.buttonNext)
-		me.buttonNext.disabled = !canNext;
-	if(me.buttonPrev)
-		me.buttonPrev.disabled = !canPrev;
 }
 
 void MultiCampaign_Next(entity btn, entity me)
@@ -208,6 +150,11 @@ void MultiCampaign_Prev(entity btn, entity me)
 
 void XonoticCampaignList_draw(entity me)
 {
+	if(me.buttonNext)
+		me.buttonNext.disabled = !me.hasNextCampaign;
+	if(me.buttonPrev)
+		me.buttonPrev.disabled = !me.hasPrevCampaign;
+
 	if(cvar(me.cvarName) != me.campaignIndex || cvar_string("g_campaign_name") != campaign_name)
 		me.loadCvars(me);
 	SUPER(XonoticCampaignList).draw(me);
@@ -218,8 +165,10 @@ void XonoticCampaignList_resizeNotify(entity me, vector relOrigin, vector relSiz
 	me.itemAbsSize = '0 0 0';
 	SUPER(XonoticCampaignList).resizeNotify(me, relOrigin, relSize, absOrigin, absSize);
 
-	me.realFontSize_y = me.fontSize / (me.itemAbsSize_y = (absSize.y * me.itemHeight));
-	me.realFontSize_x = me.fontSize / (me.itemAbsSize_x = (absSize.x * (1 - me.controlWidth)));
+	me.itemAbsSize.y = absSize.y * me.itemHeight;
+	me.itemAbsSize.x = absSize.x * (1 - me.controlWidth);
+	me.realFontSize.y = me.fontSize / me.itemAbsSize.y;
+	me.realFontSize.x = me.fontSize / me.itemAbsSize.x;
 	me.realUpperMargin1 = 0.5 * me.realFontSize.y;
 	me.realUpperMargin2 = me.realUpperMargin1 + 2 * me.realFontSize.y;
 
@@ -233,6 +182,9 @@ void XonoticCampaignList_resizeNotify(entity me, vector relOrigin, vector relSiz
 	me.columnCheckMarkOrigin = me.columnNameOrigin + me.columnNameSize + me.realFontSize.x * 2;
 
 	me.checkMarkOrigin = eY + eX * (me.columnCheckMarkOrigin + me.columnCheckMarkSize) - me.checkMarkSize;
+
+	me.typeIconOrigin = vec3(me.columnPreviewSize - me.checkMarkSize.x, me.checkMarkOrigin.y, 0);
+	me.typeIconSize = me.checkMarkSize;
 
 	rewrapCampaign(me.columnNameSize, me.rowsPerItem - 3, me.emptyLineHeight, me.realFontSize);
 }
@@ -277,13 +229,19 @@ void XonoticCampaignList_drawListBoxItem(entity me, int i, vector absSize, bool 
 	else
 		draw_Picture(me.columnPreviewOrigin * eX, strcat("/maps/", campaign_mapname[i]), me.columnPreviewSize * eX + eY, '1 1 1', theAlpha);
 
+	s = strcat("/gfx/menu/", cvar_string("menu_skin"), "/gametype_", campaign_gametype[i]);
+	if(i <= me.campaignIndex && draw_PictureSize(s) != '0 0 0')
+		draw_Picture(me.typeIconOrigin, s, me.typeIconSize, '1 1 1', 1);
+
 	if(i < me.campaignIndex)
 		draw_Picture(me.checkMarkOrigin, "checkmark", me.checkMarkSize, '1 1 1', 1);
 	if(i <= me.campaignIndex)
 		s = campaign_shortdesc[i]; // fteqcc sucks
 	else
 		s = "???";
-	s = draw_TextShortenToWidth(sprintf(_("Level %d: %s"), i+1, s), me.columnNameSize, 0, me.realFontSize);
+	// NOTE the following string is equal to the one used in the campaign level notification
+	// (CAMPAIGN_MESSAGE) to avoid adding another duplicate string to translate
+	s = draw_TextShortenToWidth(strcat(sprintf(_("Level %s: "), itos(i+1)), s), me.columnNameSize, 0, me.realFontSize);
 	draw_Text(me.realUpperMargin1 * eY + (me.columnNameOrigin + 0.00 * (me.columnNameSize - draw_TextWidth(s, 0, me.realFontSize))) * eX, s, me.realFontSize, theColor, theAlpha, 0);
 
 	if(i <= me.campaignIndex)
@@ -322,4 +280,3 @@ float XonoticCampaignList_keyDown(entity me, float scan, float ascii, float shif
 		return SUPER(XonoticCampaignList).keyDown(me, scan, ascii, shift);
 	return 1;
 }
-#endif

@@ -1,62 +1,40 @@
-#ifndef TURRET_FUSIONREACTOR_H
-#define TURRET_FUSIONREACTOR_H
+#include "fusionreactor.qh"
 
-CLASS(FusionReactor, Turret)
-/* spawnflags */ ATTRIB(FusionReactor, spawnflags, int, TUR_FLAG_SUPPORT | TUR_FLAG_AMMOSOURCE);
-/* mins       */ ATTRIB(FusionReactor, mins, vector, '-34 -34 0');
-/* maxs       */ ATTRIB(FusionReactor, maxs, vector, '34 34 90');
-/* modelname  */ ATTRIB(FusionReactor, mdl, string, "base.md3");
-/* model      */ ATTRIB_STRZONE(FusionReactor, model, string, strcat("models/turrets/", this.mdl));
-/* head_model */ ATTRIB_STRZONE(FusionReactor, head_model, string, strcat("models/turrets/", "reactor.md3"));
-/* netname    */ ATTRIB(FusionReactor, netname, string, "fusionreactor");
-/* fullname   */ ATTRIB(FusionReactor, turret_name, string, _("Fusion Reactor"));
-ENDCLASS(FusionReactor)
-REGISTER_TURRET(FUSIONREACTOR, NEW(FusionReactor));
-
-#endif
-
-#ifdef IMPLEMENTATION
 #ifdef SVQC
-bool turret_fusionreactor_firecheck()
-{SELFPARAM();
-    if (self.attack_finished_single[0] > time)
-        return false;
+bool turret_fusionreactor_firecheck(entity this)
+{
+    entity targ = this.enemy;
 
-    if (self.enemy.deadflag != DEAD_NO)
-        return false;
+    switch(MUTATOR_CALLHOOK(FusionReactor_ValidTarget, this, targ))
+    {
+        case MUT_FUSREAC_TARG_VALID: { return true; }
+        case MUT_FUSREAC_TARG_INVALID: { return false; }
+    }
 
-    if (self.enemy == world)
-        return false;
-
-    if (self.ammo < self.shot_dmg)
-        return false;
-
-    if (self.enemy.ammo >= self.enemy.ammo_max)
-        return false;
-
-    if (vlen(self.enemy.origin - self.origin) > self.target_range)
-        return false;
-
-    if(self.team != self.enemy.team)
-        return false;
-
-    if(!(self.enemy.ammo_flags & TFL_AMMO_ENERGY))
-        return false;
+    if((this.attack_finished_single[0] > time)
+    || (!targ)
+    || (IS_DEAD(targ))
+    || (this.ammo < this.shot_dmg)
+    || (targ.ammo >= targ.ammo_max)
+    || (vdist(targ.origin - this.origin, >, this.target_range))
+    || (this.team != targ.team)
+    || (!(targ.ammo_flags & TFL_AMMO_ENERGY))
+    ) { return false; }
 
     return true;
 }
 
-spawnfunc(turret_fusionreactor) { if (!turret_initialize(TUR_FUSIONREACTOR)) remove(self); }
+spawnfunc(turret_fusionreactor) { if (!turret_initialize(this, TUR_FUSIONREACTOR)) delete(this); }
 
-METHOD(FusionReactor, tr_attack, void(FusionReactor this))
+METHOD(FusionReactor, tr_attack, void(FusionReactor this, entity it))
 {
-    self.enemy.ammo = min(self.enemy.ammo + self.shot_dmg,self.enemy.ammo_max);
-    vector fl_org = 0.5 * (self.enemy.absmin + self.enemy.absmax);
+    it.enemy.ammo = min(it.enemy.ammo + it.shot_dmg,it.enemy.ammo_max);
+    vector fl_org = 0.5 * (it.enemy.absmin + it.enemy.absmax);
     te_smallflash(fl_org);
 }
-METHOD(FusionReactor, tr_think, void(FusionReactor thistur))
+METHOD(FusionReactor, tr_think, void(FusionReactor thistur, entity it))
 {
-    self.tur_head.avelocity = '0 250 0' * (self.ammo / self.ammo_max);
+    it.tur_head.avelocity = '0 250 0' * (it.ammo / it.ammo_max);
 }
 METHOD(FusionReactor, tr_setup, void(FusionReactor this, entity it))
 {
@@ -73,5 +51,4 @@ METHOD(FusionReactor, tr_setup, void(FusionReactor this, entity it))
     it.turret_firecheckfunc = turret_fusionreactor_firecheck;
 }
 
-#endif
 #endif

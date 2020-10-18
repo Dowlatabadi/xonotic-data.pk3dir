@@ -1,20 +1,5 @@
-#ifndef WEAPONARENACHECKBOX_H
-#define WEAPONARENACHECKBOX_H
-#include "../item/checkbox.qc"
-CLASS(XonoticWeaponarenaCheckBox, CheckBox)
-	METHOD(XonoticWeaponarenaCheckBox, configureXonoticWeaponarenaCheckBox, void(entity, string, string));
-	METHOD(XonoticWeaponarenaCheckBox, setChecked, void(entity, float));
-	ATTRIB(XonoticWeaponarenaCheckBox, fontSize, float, SKINFONTSIZE_NORMAL)
-	ATTRIB(XonoticWeaponarenaCheckBox, image, string, SKINGFX_CHECKBOX)
-	ATTRIB(XonoticWeaponarenaCheckBox, netname, string, string_null)
+#include "weaponarenacheckbox.qh"
 
-	METHOD(XonoticWeaponarenaCheckBox, loadCvars, void(entity));
-	METHOD(XonoticWeaponarenaCheckBox, saveCvars, void(entity));
-ENDCLASS(XonoticWeaponarenaCheckBox)
-entity makeXonoticWeaponarenaCheckBox(string, string);
-#endif
-
-#ifdef IMPLEMENTATION
 entity makeXonoticWeaponarenaCheckBox(string theWeapon, string theText)
 {
 	entity me;
@@ -36,9 +21,8 @@ void XonoticWeaponarenaCheckBox_setChecked(entity me, float foo)
 }
 void XonoticWeaponarenaCheckBox_loadCvars(entity me)
 {
-	float n = tokenize_console(cvar_string("menu_weaponarena"));
-	float i;
-	for(i=0; i<n; ++i)
+	int n = tokenize_console(cvar_string("menu_weaponarena"));
+	for (int i = 0; i < n; i++)
 	{
 		if(argv(i) == me.netname)
 		{
@@ -56,4 +40,3 @@ void XonoticWeaponarenaCheckBox_saveCvars(entity me)
 		localcmd(strcat("\nmenu_cmd removefromlist menu_weaponarena ", me.netname, "\n"));
 	localcmd("\ng_weaponarena \"$menu_weaponarena\"\n");
 }
-#endif

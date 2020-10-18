@@ -1,5 +1,6 @@
-#include "command.qh"
 #include "markup.qh"
+
+#include <common/command/command.qh>
 
 // =========================================================
 //  Markup chat characters command code, reworked by Samual
@@ -53,7 +54,6 @@ void GenericCommand_markup_init()
 	markup_from[i] = "&.."; markup_to[i] = "\x9e"; ++i;
 	markup_from[i] = "&.)"; markup_to[i] = "\x9f"; ++i;
 	markup_from[i] = "&<|"; markup_to[i] = "\xff"; ++i;
-	unused_float = i;
 }
 
 string GenericCommand_markup(string s2)
@@ -67,7 +67,8 @@ string GenericCommand_markup(string s2)
 
 	red = 0;
 	ccase = 0;
-	for(i = 0; i < strlen(s2); ++i)
+	int len = strlen(s2);
+	for (i = 0; i < len; ++i)
 	{
 		for(j = 0; j < NUM_MARKUPS; ++j)
 		{

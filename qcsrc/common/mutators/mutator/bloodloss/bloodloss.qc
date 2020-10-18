@@ -1,45 +1,70 @@
-#ifdef IMPLEMENTATION
-REGISTER_MUTATOR(bloodloss, cvar("g_bloodloss"));
+#include "bloodloss.qh"
 
+#ifdef GAMEQC
+#ifdef SVQC
+REGISTER_MUTATOR(bloodloss, autocvar_g_bloodloss);
+#elif defined(CSQC)
+REGISTER_MUTATOR(bloodloss, true);
+#endif
+
+#ifdef SVQC
 .float bloodloss_timer;
 
 MUTATOR_HOOKFUNCTION(bloodloss, PlayerPreThink)
-{SELFPARAM();
-	if(IS_PLAYER(self))
-	if(self.health <= autocvar_g_bloodloss && self.deadflag == DEAD_NO)
+{
+	entity player = M_ARGV(0, entity);
+
+	if(game_stopped)
+		return; // during intermission, the player's health changes to strange values for the engine, let's not cause damage during this phase!
+
+	if(IS_PLAYER(player))
+	if(GetResource(player, RES_HEALTH) <= autocvar_g_bloodloss && !IS_DEAD(player) && time >= player.bloodloss_timer)
 	{
-		self.BUTTON_CROUCH = true;
-
-		if(time >= self.bloodloss_timer)
-		{
-			if(self.vehicle)
-				vehicles_exit(VHEF_RELEASE);
-			if(self.event_damage)
-				self.event_damage(self, self, 1, DEATH_ROT.m_id, self.origin, '0 0 0');
-			self.bloodloss_timer = time + 0.5 + random() * 0.5;
-		}
+		if(player.vehicle)
+			vehicles_exit(player.vehicle, VHEF_RELEASE); // TODO: boots player out of their vehicle each health rot tick!
+		if(player.event_damage)
+			player.event_damage(player, player, player, 1, DEATH_ROT.m_id, DMG_NOWEP, player.origin, '0 0 0');
+		player.bloodloss_timer = time + 0.5 + random() * 0.5;
 	}
+}
 
-	return false;
+MUTATOR_HOOKFUNCTION(bloodloss, PlayerCanCrouch)
+{
+	entity player = M_ARGV(0, entity);
+	if(GetResource(player, RES_HEALTH) <= autocvar_g_bloodloss)
+		M_ARGV(1, bool) = true; // do_crouch
 }
 
 MUTATOR_HOOKFUNCTION(bloodloss, PlayerJump)
-{SELFPARAM();
-	if(self.health <= autocvar_g_bloodloss)
-		return true;
+{
+	entity player = M_ARGV(0, entity);
 
-	return false;
+	if(GetResource(player, RES_HEALTH) <= autocvar_g_bloodloss)
+		return true;
 }
 
 MUTATOR_HOOKFUNCTION(bloodloss, BuildMutatorsString)
 {
-	ret_string = strcat(ret_string, ":bloodloss");
-	return false;
+	M_ARGV(0, string) = strcat(M_ARGV(0, string), ":bloodloss");
 }
 
 MUTATOR_HOOKFUNCTION(bloodloss, BuildMutatorsPrettyString)
 {
-	ret_string = strcat(ret_string, ", Blood loss");
-	return false;
+	M_ARGV(0, string) = strcat(M_ARGV(0, string), ", Blood loss");
 }
+#endif
+
+#ifdef CSQC
+MUTATOR_HOOKFUNCTION(bloodloss, PlayerCanCrouch)
+{
+	if(STAT(HEALTH) > 0 && STAT(HEALTH) <= STAT(BLOODLOSS))
+		M_ARGV(1, bool) = true; // do_crouch
+}
+MUTATOR_HOOKFUNCTION(bloodloss, PlayerJump)
+{
+	if(STAT(HEALTH) > 0 && STAT(HEALTH) <= STAT(BLOODLOSS))
+		return true;
+}
+#endif
+
 #endif

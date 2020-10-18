@@ -1,23 +1,30 @@
 #include "spawnpoints.qh"
 
-#include "mutators/all.qh"
-#include "g_world.qh"
-#include "race.qh"
-#include "../common/constants.qh"
-#include "../common/teams.qh"
-#include "../common/triggers/subs.qh"
-#include "../common/util.qh"
-#include "../lib/warpzone/common.qh"
-#include "../lib/warpzone/util_server.qh"
+#include <common/constants.qh>
+#include <common/gamemodes/_mod.qh>
+#include <common/mapobjects/subs.qh>
+#include <common/mapobjects/target/spawnpoint.qh>
+#include <common/mapobjects/triggers.qh>
+#include <common/net_linked.qh>
+#include <common/stats.qh>
+#include <common/teams.qh>
+#include <common/util.qh>
+#include <common/weapons/_all.qh>
+#include <lib/warpzone/common.qh>
+#include <lib/warpzone/util_server.qh>
+#include <server/command/vote.qh>
+#include <server/intermission.qh>
+#include <server/mutators/_mod.qh>
+#include <server/race.qh>
+#include <server/utils.qh>
+#include <server/world.qh>
 
 bool SpawnPoint_Send(entity this, entity to, int sf)
 {
 	WriteHeader(MSG_ENTITY, ENT_CLIENT_SPAWNPOINT);
 
-	WriteByte(MSG_ENTITY, self.team);
-	WriteShort(MSG_ENTITY, self.origin.x);
-	WriteShort(MSG_ENTITY, self.origin.y);
-	WriteShort(MSG_ENTITY, self.origin.z);
+	WriteByte(MSG_ENTITY, this.team);
+	WriteVector(MSG_ENTITY, this.origin);
 
 	return true;
 }
@@ -30,13 +37,11 @@ bool SpawnEvent_Send(entity this, entity to, int sf)
 
 	if(autocvar_g_spawn_alloweffects)
 	{
-		WriteByte(MSG_ENTITY, etof(self.owner));
-		WriteShort(MSG_ENTITY, self.owner.origin.x);
-		WriteShort(MSG_ENTITY, self.owner.origin.y);
-		WriteShort(MSG_ENTITY, self.owner.origin.z);
+		WriteByte(MSG_ENTITY, etof(this.owner));
+		WriteVector(MSG_ENTITY, this.owner.origin);
 		send = true;
 	}
-	else if((to == self.owner) || (IS_SPEC(to) && (to.enemy == self.owner)) )
+	else if((to == this.owner) || (IS_SPEC(to) && (to.enemy == this.owner)) )
 	{
 		WriteByte(MSG_ENTITY, 0);
 		send = true;
@@ -47,110 +52,105 @@ bool SpawnEvent_Send(entity this, entity to, int sf)
 }
 
 .vector spawnpoint_prevorigin;
-void spawnpoint_think()
+void spawnpoint_think(entity this)
 {
-	self.nextthink = time + 0.1;
-	if(self.origin != self.spawnpoint_prevorigin)
+	this.nextthink = time + 0.1;
+	if(this.origin != this.spawnpoint_prevorigin)
 	{
-		self.spawnpoint_prevorigin = self.origin;
-		self.SendFlags |= 1;
+		this.spawnpoint_prevorigin = this.origin;
+		this.SendFlags |= 1;
 	}
 }
 
-void spawnpoint_use()
-{SELFPARAM();
+void spawnpoint_use(entity this, entity actor, entity trigger)
+{
 	if(teamplay)
 	if(have_team_spawns > 0)
 	{
-		self.team = activator.team;
-		some_spawn_has_been_used = 1;
+		this.team = actor.team;
+		some_spawn_has_been_used = true;
+		this.SendFlags |= 1; // update team on the client side
 	}
 	//LOG_INFO("spawnpoint was used!\n");
 }
 
-void relocate_spawnpoint()
-{SELFPARAM();
-    // nudge off the floor
-    setorigin(self, self.origin + '0 0 1');
+void spawnpoint_reset(entity this)
+{
+	this.SendFlags |= 1; // update team since it was restored during reset
+}
 
-    tracebox(self.origin, PL_MIN_CONST, PL_MAX_CONST, self.origin, true, self);
-    if (trace_startsolid)
-    {
-        vector o;
-        o = self.origin;
-        self.mins = PL_MIN_CONST;
-        self.maxs = PL_MAX_CONST;
-        if (!move_out_of_solid(self))
-            objerror("could not get out of solid at all!");
-        LOG_INFO("^1NOTE: this map needs FIXING. Spawnpoint at ", vtos(o - '0 0 1'));
-        LOG_INFO(" needs to be moved out of solid, e.g. by '", ftos(self.origin.x - o.x));
-        LOG_INFO(" ", ftos(self.origin.y - o.y));
-        LOG_INFO(" ", ftos(self.origin.z - o.z), "'\n");
-        if (autocvar_g_spawnpoints_auto_move_out_of_solid)
-        {
-            if (!spawnpoint_nag)
-                LOG_INFO("\{1}^1NOTE: this map needs FIXING (it contains spawnpoints in solid, see server log)\n");
-            spawnpoint_nag = 1;
-        }
-        else
-        {
-            setorigin(self, o);
-            self.mins = self.maxs = '0 0 0';
-            objerror("player spawn point in solid, mapper sucks!\n");
-            return;
-        }
-    }
-
-    self.use = spawnpoint_use;
-    self.think = spawnpoint_think;
-    self.nextthink = time + 0.5 + random() * 2; // shouldn't need it for a little second
-    self.team_saved = self.team;
-    if (!self.cnt)
-        self.cnt = 1;
-
-    if (have_team_spawns != 0)
-        if (self.team)
-            have_team_spawns = 1;
-    have_team_spawns_forteam[self.team] = 1;
-
-    if (autocvar_r_showbboxes)
-    {
-        // show where spawnpoints point at too
-        makevectors(self.angles);
-        entity e = new(info_player_foo);
-        setorigin(e, self.origin + v_forward * 24);
-        setsize(e, '-8 -8 -8', '8 8 8');
-        e.solid = SOLID_TRIGGER;
-    }
+void link_spawnpoint(entity this)
+{
+	bool anypoint = (autocvar_g_spawn_useallspawns || (teamplay && have_team_spawns <= 0)); // TODO: check if available teams is equal to spawnpoints available
 
 	// Don't show team spawns in non-team matches,
 	// and don't show non-team spawns in team matches.
 	// (Unless useallspawns is activated)
-	if(
-		!(
-			( // if this passes, there is a DM spawn on a team match
-				teamplay
-				&& (self.team != NUM_TEAM_1)
-				&& (self.team != NUM_TEAM_2)
-				&& (self.team != NUM_TEAM_3)
-				&& (self.team != NUM_TEAM_4)
-			)
-			||
-			( // if this passes, there is a team spawn on a DM match
-				!teamplay
-				&&
-				(
-					(self.team == NUM_TEAM_1)
-					|| (self.team == NUM_TEAM_2)
-					|| (self.team == NUM_TEAM_3)
-					|| (self.team == NUM_TEAM_4)
-				)
-			)
-		)
-		||
-		autocvar_g_spawn_useallspawns
-	)
-	{ Net_LinkEntity(self, false, 0, SpawnPoint_Send); }
+	if(anypoint || !((teamplay && !Team_IsValidTeam(this.team)) || (!teamplay && Team_IsValidTeam(this.team))))
+		Net_LinkEntity(this, false, 0, SpawnPoint_Send);
+}
+
+void relocate_spawnpoint(entity this)
+{
+    // nudge off the floor
+    setorigin(this, this.origin + '0 0 1');
+
+    tracebox(this.origin, PL_MIN_CONST, PL_MAX_CONST, this.origin, true, this);
+    if (trace_startsolid)
+    {
+        vector o;
+        o = this.origin;
+        this.mins = PL_MIN_CONST;
+        this.maxs = PL_MAX_CONST;
+        if (!move_out_of_solid(this))
+            objerror(this, "could not get out of solid at all!");
+        LOG_INFOF(
+            "^1NOTE: this map needs FIXING. Spawnpoint at %s needs to be moved out of solid, e.g. by %s",
+            vtos(o - '0 0 1'),
+            vtos(this.origin - o)
+        );
+        if (autocvar_g_spawnpoints_auto_move_out_of_solid)
+        {
+            if (!spawnpoint_nag)
+                LOG_INFO("\{1}^1NOTE: this map needs FIXING (it contains spawnpoints in solid, see server log)");
+            spawnpoint_nag = 1;
+        }
+        else
+        {
+            setorigin(this, o);
+            this.mins = this.maxs = '0 0 0';
+            objerror(this, "player spawn point in solid, mapper sucks!\n");
+            return;
+        }
+    }
+
+    this.use = spawnpoint_use;
+    setthink(this, spawnpoint_think);
+    this.nextthink = time + 0.5 + random() * 2; // shouldn't need it for a little second
+    this.reset2 = spawnpoint_reset; // restores team, allows re-sending the spawnpoint
+    this.team_saved = this.team;
+    IL_PUSH(g_saved_team, this);
+    if (!this.cnt)
+        this.cnt = 1;
+
+    if (have_team_spawns != 0)
+        if (this.team)
+            have_team_spawns = 1;
+    have_team_spawns_forteams |= BIT(this.team);
+
+    if (autocvar_r_showbboxes)
+    {
+        // show where spawnpoints point at too
+        vector forward, right, up;
+        MAKE_VECTORS(this.angles, forward, right, up);
+        entity e = new(info_player_foo);
+        setorigin(e, this.origin + forward * 24);
+        setsize(e, '-8 -8 -8', '8 8 8');
+        e.solid = SOLID_TRIGGER;
+    }
+
+    // network it after all spawnpoints are setup, so that we can check if team spawnpoints are used
+	InitializeEntity(this, link_spawnpoint, INITPRIO_FINDTARGET);
 }
 
 spawnfunc(info_player_survivor)
@@ -165,8 +165,8 @@ spawnfunc(info_player_start)
 
 spawnfunc(info_player_deathmatch)
 {
-	self.classname = "info_player_deathmatch";
-	relocate_spawnpoint();
+	IL_PUSH(g_spawnpoints, this);
+	relocate_spawnpoint(this);
 }
 
 /*QUAKED spawnfunc_info_player_team1 (1 0 0) (-16 -16 -24) (16 16 24)
@@ -210,24 +210,18 @@ spawnfunc(info_player_team4)
 // Returns:
 //   _x: prio (-1 if unusable)
 //   _y: weight
-vector Spawn_Score(entity spot, float mindist, float teamcheck)
-{SELFPARAM();
-	float shortest, thisdist;
-	float prio;
-	entity player;
-
-	prio = 0;
-
+vector Spawn_Score(entity this, entity spot, float mindist, float teamcheck, bool targetcheck)
+{
 	// filter out spots for the wrong team
 	if(teamcheck >= 0)
 		if(spot.team != teamcheck)
 			return '-1 0 0';
 
 	if(race_spawns)
-		if(spot.target == "")
+		if(!spot.target || spot.target == "")
 			return '-1 0 0';
 
-	if(IS_REAL_CLIENT(self))
+	if(IS_REAL_CLIENT(this))
 	{
 		if(spot.restriction == 1)
 			return '-1 0 0';
@@ -238,64 +232,60 @@ vector Spawn_Score(entity spot, float mindist, float teamcheck)
 			return '-1 0 0';
 	}
 
-	shortest = vlen(world.maxs - world.mins);
-	FOR_EACH_PLAYER(player) if (player != self)
-	{
-		thisdist = vlen(player.origin - spot.origin);
+	float prio = 0;
+	float shortest = vlen(world.maxs - world.mins);
+	FOREACH_CLIENT(IS_PLAYER(it) && !IS_DEAD(it) && it != this, {
+		float thisdist = vlen(it.origin - spot.origin);
 		if (thisdist < shortest)
 			shortest = thisdist;
-	}
+	});
 	if(shortest > mindist)
 		prio += SPAWN_PRIO_GOOD_DISTANCE;
 
-	spawn_score = prio * '1 0 0' + shortest * '0 1 0';
-	spawn_spot = spot;
+	vector spawn_score = prio * '1 0 0' + shortest * '0 1 0';
 
 	// filter out spots for assault
-	if(spot.target != "") {
-		entity ent;
-		float found;
-
-		found = 0;
-		for(ent = world; (ent = find(ent, targetname, spot.target)); )
+	if(spot.target && spot.target != "" && targetcheck)
+	{
+		int found = 0;
+		for(entity targ = findchain(targetname, spot.target); targ; targ = targ.chain)
 		{
 			++found;
-			if(ent.spawn_evalfunc)
+			if(targ.spawn_evalfunc)
 			{
-				WITH(entity, self, ent, {
-					spawn_score = ent.spawn_evalfunc(this, spot, spawn_score);
-				});
+				spawn_score = targ.spawn_evalfunc(targ, this, spot, spawn_score);
 				if(spawn_score.x < 0)
 					return spawn_score;
 			}
 		}
 
-		if(!found)
+		if(!found && !g_cts)
 		{
-			LOG_TRACE("WARNING: spawnpoint at ", vtos(spot.origin), " could not find its target ", spot.target, "\n");
+			LOG_TRACE("WARNING: spawnpoint at ", vtos(spot.origin), " could not find its target ", spot.target);
 			return '-1 0 0';
 		}
 	}
 
-	MUTATOR_CALLHOOK(Spawn_Score, self, spawn_spot, spawn_score);
+	MUTATOR_CALLHOOK(Spawn_Score, this, spot, spawn_score);
+	spawn_score = M_ARGV(2, vector);
 	return spawn_score;
 }
 
-void Spawn_ScoreAll(entity firstspot, float mindist, float teamcheck)
+void Spawn_ScoreAll(entity this, entity firstspot, float mindist, float teamcheck, bool targetcheck)
 {
 	entity spot;
 	for(spot = firstspot; spot; spot = spot.chain)
-		spot.spawnpoint_score = Spawn_Score(spot, mindist, teamcheck);
+		spot.spawnpoint_score = Spawn_Score(this, spot, mindist, teamcheck, targetcheck);
 }
 
-entity Spawn_FilterOutBadSpots(entity firstspot, float mindist, float teamcheck)
+entity Spawn_FilterOutBadSpots(entity this, entity firstspot, float mindist, float teamcheck, bool targetcheck)
 {
 	entity spot, spotlist, spotlistend;
 
-	spotlist = world;
-	spotlistend = world;
+	spotlist = NULL;
+	spotlistend = NULL;
 
-	Spawn_ScoreAll(firstspot, mindist, teamcheck);
+	Spawn_ScoreAll(this, firstspot, mindist, teamcheck, targetcheck);
 
 	for(spot = firstspot; spot; spot = spot.chain)
 	{
@@ -309,7 +299,7 @@ entity Spawn_FilterOutBadSpots(entity firstspot, float mindist, float teamcheck)
 		}
 	}
 	if(spotlistend)
-		spotlistend.chain = world;
+		spotlistend.chain = NULL;
 
 	return spotlist;
 }
@@ -322,7 +312,7 @@ entity Spawn_WeightedPoint(entity firstspot, float lower, float upper, float exp
 
 	RandomSelection_Init();
 	for(spot = firstspot; spot; spot = spot.chain)
-		RandomSelection_Add(spot, 0, string_null, pow(bound(lower, spot.spawnpoint_score.y, upper), exponent) * spot.cnt, (spot.spawnpoint_score.y >= lower) * 0.5 + spot.spawnpoint_score.x);
+		RandomSelection_AddEnt(spot, (bound(lower, spot.spawnpoint_score.y, upper) ** exponent) * spot.cnt, (spot.spawnpoint_score.y >= lower) * 0.5 + spot.spawnpoint_score.x);
 
 	return RandomSelection_chosen_ent;
 }
@@ -334,24 +324,34 @@ SelectSpawnPoint
 Finds a point to respawn
 =============
 */
-entity SelectSpawnPoint (float anypoint)
-{SELFPARAM();
+bool testspawn_checked;
+entity testspawn_point;
+entity SelectSpawnPoint(entity this, bool anypoint)
+{
 	float teamcheck;
-	entity spot, firstspot;
+	entity spot = NULL;
 
-	spot = find (world, classname, "testplayerstart");
-	if (spot)
-		return spot;
+	if(!testspawn_checked)
+	{
+		testspawn_point = find(NULL, classname, "testplayerstart");
+		testspawn_checked = true;
+	}
+
+	if(testspawn_point)
+		return testspawn_point;
+
+	if(this.spawnpoint_targ)
+		return this.spawnpoint_targ;
 
 	if(anypoint || autocvar_g_spawn_useallspawns)
 		teamcheck = -1;
 	else if(have_team_spawns > 0)
 	{
-		if(have_team_spawns_forteam[self.team] == 0)
+		if(!(have_team_spawns_forteams & BIT(this.team)))
 		{
 			// we request a spawn for a team, and we have team
 			// spawns, but that team has no spawns?
-			if(have_team_spawns_forteam[0])
+			if(have_team_spawns_forteams & BIT(0))
 				// try noteam spawns
 				teamcheck = 0;
 			else
@@ -359,9 +359,9 @@ entity SelectSpawnPoint (float anypoint)
 				teamcheck = -1;
 		}
 		else
-			teamcheck = self.team; // MUST be team
+			teamcheck = this.team; // MUST be team
 	}
-	else if(have_team_spawns == 0 && have_team_spawns_forteam[0])
+	else if(have_team_spawns == 0 && (have_team_spawns_forteams & BIT(0)))
 		teamcheck = 0; // MUST be noteam
 	else
 		teamcheck = -1;
@@ -369,7 +369,16 @@ entity SelectSpawnPoint (float anypoint)
 
 
 	// get the entire list of spots
-	firstspot = findchain(classname, "info_player_deathmatch");
+	//entity firstspot = findchain(classname, "info_player_deathmatch");
+	entity firstspot = IL_FIRST(g_spawnpoints);
+	entity prev = NULL;
+	IL_EACH(g_spawnpoints, true,
+	{
+		if(prev)
+			prev.chain = it;
+		it.chain = NULL;
+		prev = it;
+	});
 	// filter out the bad ones
 	// (note this returns the original list if none survived)
 	if(anypoint)
@@ -378,7 +387,23 @@ entity SelectSpawnPoint (float anypoint)
 	}
 	else
 	{
-		firstspot = Spawn_FilterOutBadSpots(firstspot, 100, teamcheck);
+		firstspot = Spawn_FilterOutBadSpots(this, firstspot, 100, teamcheck, true);
+
+		// emergency fallback! double check without targets
+		// fixes some crashes with improperly repacked maps
+		if(!firstspot)
+		{
+			firstspot = IL_FIRST(g_spawnpoints);
+			prev = NULL;
+			IL_EACH(g_spawnpoints, true,
+			{
+				if(prev)
+					prev.chain = it;
+				it.chain = NULL;
+				prev = it;
+			});
+			firstspot = Spawn_FilterOutBadSpots(this, firstspot, 100, teamcheck, false);
+		}
 
 		// there is 50/50 chance of choosing a random spot or the furthest spot
 		// (this means that roughly every other spawn will be furthest, so you
@@ -396,7 +421,7 @@ entity SelectSpawnPoint (float anypoint)
 		else
 		{
 			if(some_spawn_has_been_used)
-				return world; // team can't spawn any more, because of actions of other team
+				return NULL; // team can't spawn any more, because of actions of other team
 			else
 				error("Cannot find a spawn point - please fix the map!");
 		}

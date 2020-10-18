@@ -1,34 +1,4 @@
-#ifndef DIALOG_MEDIA_GUIDE_TOPICS_H
-#define DIALOG_MEDIA_GUIDE_TOPICS_H
-#include "../datasource.qc"
-#include "../listbox.qc"
-CLASS(XonoticTopicList, XonoticListBox)
-    ATTRIB(XonoticTopicList, columnIconOrigin, float, 0)
-    ATTRIB(XonoticTopicList, columnIconSize, float, 0)
-    ATTRIB(XonoticTopicList, columnNameOrigin, float, 0)
-    ATTRIB(XonoticTopicList, columnNameSize, float, 0)
-    ATTRIB(XonoticTopicList, realFontSize, vector, '0 0 0')
-    ATTRIB(XonoticTopicList, realUpperMargin, float, 0)
-    ATTRIB(XonoticTopicList, rowsPerItem, float, 3)
-
-    METHOD(XonoticTopicList, clickListBoxItem, void(entity, float, vector));
-    METHOD(XonoticTopicList, drawListBoxItem, void(entity, int, vector, bool, bool));
-    METHOD(XonoticTopicList, keyDown, bool(entity, float, float, float));
-    METHOD(XonoticTopicList, resizeNotify, void(entity, vector, vector, vector, vector));
-    METHOD(XonoticTopicList, setSelected, void(entity, int));
-
-    ATTRIB(XonoticTopicList, source, DataSource, NULL)
-
-    CONSTRUCTOR(XonoticTopicList, DataSource _source) {
-    	CONSTRUCT(XonoticTopicList);
-    	this.source = _source;
-    	this.nItems = _source.reload(_source, "");
-    	this.configureXonoticListBox(this);
-    }
-ENDCLASS(XonoticTopicList)
-#endif
-
-#ifdef IMPLEMENTATION
+#include "topics.qh"
 
 void XonoticTopicList_clickListBoxItem(entity this, float i, vector where)
 {
@@ -91,4 +61,3 @@ void XonoticTopicList_setSelected(entity this, int i)
     SUPER(XonoticEntryList).setSelected(this, i);
     this.onChange(this, this.onChangeEntity);
 }
-#endif

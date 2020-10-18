@@ -1,10 +1,14 @@
+#include "all.qh"
+
 #ifdef SVQC
+#include <server/utils.qh>
 
 bool autocvar_bot_sound_monopoly;
 
 .entity realowner;
 bool sound_allowed(int to, entity e)
 {
+	if(!e) return true; // save on a few checks
 	for ( ; ; )
 	{
 		if (e.classname == "body") e = e.enemy;
@@ -30,8 +34,9 @@ const int SND_VOLUME = BIT(0);
 const int SND_ATTENUATION = BIT(1);
 const int SND_LARGEENTITY = BIT(3);
 const int SND_LARGESOUND = BIT(4);
+const int SND_SPEEDUSHORT4000 = BIT(5);
 
-void soundtoat(int to, entity e, vector o, int chan, string samp, float vol, float attenu)
+void soundtoat(int to, entity e, vector o, int chan, string samp, float vol, float attenu, float _pitch)
 {
 	if (!sound_allowed(to, e)) return;
 	int entno = etof(e);
@@ -39,14 +44,17 @@ void soundtoat(int to, entity e, vector o, int chan, string samp, float vol, flo
 	attenu = floor(attenu * 64);
 	vol = floor(vol * 255);
 	int sflags = 0;
+	int speed4000 = floor((_pitch * 0.01) * 4000 + 0.5);
 	if (vol != 255) sflags |= SND_VOLUME;
 	if (attenu != 64) sflags |= SND_ATTENUATION;
 	if (entno >= 8192 || chan < 0 || chan > 7) sflags |= SND_LARGEENTITY;
 	if (idx >= 256) sflags |= SND_LARGESOUND;
+	if (speed4000 && speed4000 != 4000) sflags |= SND_SPEEDUSHORT4000;
 	WriteByte(to, SVC_SOUND);
 	WriteByte(to, sflags);
 	if (sflags & SND_VOLUME) WriteByte(to, vol);
 	if (sflags & SND_ATTENUATION) WriteByte(to, attenu);
+	if (sflags & SND_SPEEDUSHORT4000) WriteShort(to, speed4000);
 	if (sflags & SND_LARGEENTITY)
 	{
 		WriteShort(to, entno);
@@ -63,15 +71,15 @@ void soundtoat(int to, entity e, vector o, int chan, string samp, float vol, flo
 	WriteCoord(to, o.z);
 }
 
-void soundto(int _dest, entity e, int chan, string samp, float vol, float _atten)
+void soundto(int _dest, entity e, int chan, string samp, float vol, float _atten, float _pitch)
 {
 	if (!sound_allowed(_dest, e)) return;
 	vector o = e.origin + 0.5 * (e.mins + e.maxs);
-	soundtoat(_dest, e, o, chan, samp, vol, _atten);
+	soundtoat(_dest, e, o, chan, samp, vol, _atten, _pitch);
 }
 void soundat(entity e, vector o, int chan, string samp, float vol, float _atten)
 {
-	soundtoat(((chan & 8) ? MSG_ALL : MSG_BROADCAST), e, o, chan, samp, vol, _atten);
+	soundtoat(((chan & 8) ? MSG_ALL : MSG_BROADCAST), e, o, chan, samp, vol, _atten, 0);
 }
 void stopsoundto(int _dest, entity e, int chan)
 {
@@ -108,18 +116,18 @@ void stopsound(entity e, int chan)
 void play2(entity e, string filename)
 {
 	msg_entity = e;
-	soundtoat(MSG_ONE, world, '0 0 0', CH_INFO, filename, VOL_BASE, ATTEN_NONE);
+	soundtoat(MSG_ONE, NULL, '0 0 0', CH_INFO, filename, VOL_BASE, ATTEN_NONE, 0);
 }
 
 .float spamtime;
 /** use this one if you might be causing spam (e.g. from touch functions that might get called more than once per frame) */
-float spamsound(entity e, int chan, string samp, float vol, float _atten)
+float spamsound(entity e, int chan, Sound samp, float vol, float _atten)
 {
 	if (!sound_allowed(MSG_BROADCAST, e)) return false;
 	if (time > e.spamtime)
 	{
 		e.spamtime = time;
-		_sound(e, chan, samp, vol, _atten);
+		sound(e, chan, samp, vol, _atten);
 		return true;
 	}
 	return false;
@@ -128,17 +136,13 @@ float spamsound(entity e, int chan, string samp, float vol, float _atten)
 void play2team(float t, string filename)
 {
 	if (autocvar_bot_sound_monopoly) return;
-	entity head;
-	FOR_EACH_REALPLAYER(head)
-	{
-		if (head.team == t) play2(head, filename);
-	}
+	FOREACH_CLIENT(IS_PLAYER(it) && IS_REAL_CLIENT(it) && it.team == t, play2(it, filename));
 }
 
 void play2all(string samp)
 {
 	if (autocvar_bot_sound_monopoly) return;
-	_sound(world, CH_INFO, samp, VOL_BASE, ATTEN_NONE);
+	_sound(NULL, CH_INFO, samp, VOL_BASE, ATTEN_NONE);
 }
 
 #endif

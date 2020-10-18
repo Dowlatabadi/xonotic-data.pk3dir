@@ -1,4 +1,19 @@
-// Notification area (#4)
+#include "notify.qh"
+
+#include <client/autocvars.qh>
+#include <client/draw.qh>
+
+// Notifications (#4)
+
+void HUD_Notify_Export(int fh)
+{
+	// allow saving cvars that aesthetically change the panel into hud skin files
+	HUD_Write_Cvar("hud_panel_notify_flip");
+	HUD_Write_Cvar("hud_panel_notify_fontsize");
+	HUD_Write_Cvar("hud_panel_notify_time");
+	HUD_Write_Cvar("hud_panel_notify_fadetime");
+	HUD_Write_Cvar("hud_panel_notify_icon_aspect");
+}
 
 void HUD_Notify_Push(string icon, string attacker, string victim)
 {
@@ -46,8 +61,13 @@ void HUD_Notify()
 		if (!autocvar_hud_panel_notify)
 			return;
 
-	HUD_Panel_UpdateCvars();
-	HUD_Panel_DrawBg(1);
+	HUD_Panel_LoadCvars();
+
+	if (autocvar_hud_panel_notify_dynamichud)
+		HUD_Scale_Enable();
+	else
+		HUD_Scale_Disable();
+	HUD_Panel_DrawBg();
 
 	if (!autocvar__hud_configure)
 		if (notify_count == 0)
@@ -75,7 +95,7 @@ void HUD_Notify()
 	float name_maxwidth = panel_width_half - icon_width_half - size.x * NOTIFY_ICON_MARGIN;
 
 	vector font_size = '0.5 0.5 0' * entry_height * autocvar_hud_panel_notify_fontsize;
-	vector icon_size = (eX * icon_aspect + eY) * entry_height;
+	vector icon_size = vec2(icon_aspect, 1) * entry_height;
 	vector icon_left = eX * (panel_width_half - icon_width_half);
 	vector attacker_right = eX * name_maxwidth;
 	vector victim_left = eX * (size.x - name_maxwidth);
@@ -106,7 +126,7 @@ void HUD_Notify()
 		{
 			attacker = sprintf(_("Player %d"), count + 1);
 			victim = sprintf(_("Player %d"), count + 2);
-			icon = Weapons_from(min(WEP_FIRST + count * 2, WEP_LAST)).model2;
+			icon = REGISTRY_GET(Weapons, min(WEP_FIRST + count * 2, WEP_LAST)).model2;
 			alpha = bound(0, 1.2 - count / entry_count, 1);
 		}
 		else
@@ -137,13 +157,13 @@ void HUD_Notify()
 			icon_pos = pos + icon_left + eY * i * entry_height;
 			drawpic_aspect_skin(icon_pos, icon, icon_size, '1 1 1', panel_fg_alpha * alpha, DRAWFLAG_NORMAL);
 
-			victim = textShortenToWidth(victim, name_maxwidth, font_size, stringwidth_colors);
+			victim = textShortenToWidth(ColorTranslateRGB(victim), name_maxwidth, font_size, stringwidth_colors);
 			victim_pos = pos + victim_left + name_top;
 			drawcolorcodedstring(victim_pos, victim, font_size, panel_fg_alpha * alpha, DRAWFLAG_NORMAL);
 
 			if (attacker != "")
 			{
-				attacker = textShortenToWidth(attacker, name_maxwidth, font_size, stringwidth_colors);
+				attacker = textShortenToWidth(ColorTranslateRGB(attacker), name_maxwidth, font_size, stringwidth_colors);
 				attacker_pos = pos + attacker_right - eX * stringwidth(attacker, true, font_size) + name_top;
 				drawcolorcodedstring(attacker_pos, attacker, font_size, panel_fg_alpha * alpha, DRAWFLAG_NORMAL);
 			}

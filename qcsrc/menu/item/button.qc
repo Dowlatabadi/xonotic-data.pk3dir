@@ -1,49 +1,13 @@
-#ifndef ITEM_BUTTON_H
-	#define ITEM_BUTTON_H
-	#include "label.qc"
-	CLASS(Button, Label)
-		METHOD(Button, configureButton, void(entity, string, float, string));
-		METHOD(Button, draw, void(entity));
-		METHOD(Button, showNotify, void(entity));
-		METHOD(Button, resizeNotify, void(entity, vector, vector, vector, vector));
-		METHOD(Button, keyDown, float(entity, float, float, float));
-		METHOD(Button, mousePress, float(entity, vector));
-		METHOD(Button, mouseDrag, float(entity, vector));
-		METHOD(Button, mouseRelease, float(entity, vector));
-		METHOD(Button, playClickSound, void(entity));
-		ATTRIB(Button, onClick, void(entity, entity), func_null)
-		ATTRIB(Button, onClickEntity, entity, NULL)
-		ATTRIB(Button, src, string, string_null)
-		ATTRIB(Button, srcSuffix, string, string_null)
-		ATTRIB(Button, src2, string, string_null) // is centered, same aspect, and stretched to label size
-		ATTRIB(Button, src2scale, float, 1)
-		ATTRIB(Button, srcMulti, float, 1)        // 0: button square left, text right; 1: button stretched, text over it
-		ATTRIB(Button, buttonLeftOfText, float, 0)
-		ATTRIB(Button, focusable, float, 1)
-		ATTRIB(Button, allowFocusSound, float, 1)
-		ATTRIB(Button, pressed, float, 0)
-		ATTRIB(Button, clickTime, float, 0)
-		ATTRIB(Button, disabled, float, 0)
-		ATTRIB(Button, disabledAlpha, float, 0.3)
-		ATTRIB(Button, forcePressed, float, 0)
-		ATTRIB(Button, color, vector, '1 1 1')
-		ATTRIB(Button, colorC, vector, '1 1 1')
-		ATTRIB(Button, colorF, vector, '1 1 1')
-		ATTRIB(Button, colorD, vector, '1 1 1')
-		ATTRIB(Button, color2, vector, '1 1 1')
-		ATTRIB(Button, alpha2, float, 1)
+#include "button.qh"
 
-		ATTRIB(Button, origin, vector, '0 0 0')
-		ATTRIB(Button, size, vector, '0 0 0')
-	ENDCLASS(Button)
-#endif
-
-#ifdef IMPLEMENTATION
 	void Button_resizeNotify(entity me, vector relOrigin, vector relSize, vector absOrigin, vector absSize)
 	{
 		if (me.srcMulti) me.keepspaceLeft = 0;
 		else me.keepspaceLeft = min(0.8, absSize.x == 0 ? 0 : (absSize.y / absSize.x));
 		SUPER(Button).resizeNotify(me, relOrigin, relSize, absOrigin, absSize);
+
+		if(me.disableOnClick)
+			me.disabled = true; // initially disabled
 	}
 	void Button_configureButton(entity me, string txt, float sz, string gfx)
 	{
@@ -54,8 +18,11 @@
 	{
 		if (key == K_ENTER || key == K_SPACE || key == K_KP_ENTER)
 		{
-			me.playClickSound(me);
-			me.clickTime = 0.1;  // delayed for effect
+			if(!me.disabled)
+			{
+				me.playClickSound(me);
+				me.clickTime = 0.1;  // delayed for effect
+			}
 			return 1;
 		}
 		return 0;
@@ -69,10 +36,10 @@
 		if (pos.y >= 1) me.pressed = 0;
 		return 1;
 	}
-	float Button_mousePress(entity me, vector pos)
+	METHOD(Button, mousePress, bool(Button this, vector pos))
 	{
-		me.mouseDrag(me, pos);  // verify coordinates
-		return 1;
+		this.mouseDrag(this, pos);  // verify coordinates
+		return true;
 	}
 	float Button_mouseRelease(entity me, vector pos)
 	{
@@ -82,7 +49,14 @@
 			if (!me.disabled)
 			{
 				me.playClickSound(me);
-				if (me.onClick) me.onClick(me, me.onClickEntity);
+				if (me.onClick)
+				{
+					if(me.applyButton)
+						me.applyButton.disabled = false;
+					me.onClick(me, me.onClickEntity);
+					if(me.disableOnClick)
+						me.disabled = true;
+				}
 			}
 			me.pressed = 0;
 		}
@@ -161,4 +135,3 @@
 		else if (me.onClick == Dialog_Close) m_play_click_sound(MENU_SOUND_CLOSE);
 		else m_play_click_sound(MENU_SOUND_EXECUTE);
 	}
-#endif

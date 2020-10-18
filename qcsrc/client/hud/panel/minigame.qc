@@ -1,3 +1,5 @@
-// Minigame
+#include "minigame.qh"
 
-#include "../../../common/minigames/cl_minigames_hud.qc"
+// Minigame (#17, #18, #19, #20)
+
+#include <common/minigames/cl_minigames_hud.qc>

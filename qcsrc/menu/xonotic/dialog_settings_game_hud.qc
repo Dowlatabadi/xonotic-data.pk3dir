@@ -1,21 +1,13 @@
-#ifndef DIALOG_SETTINGS_GAME_HUD_H
-#define DIALOG_SETTINGS_GAME_HUD_H
-#include "tab.qc"
-CLASS(XonoticGameHUDSettingsTab, XonoticTab)
-	METHOD(XonoticGameHUDSettingsTab, fill, void(entity));
-	METHOD(XonoticGameHUDSettingsTab, showNotify, void(entity));
-	ATTRIB(XonoticGameHUDSettingsTab, title, string, _("HUD"))
-	ATTRIB(XonoticGameHUDSettingsTab, intendedWidth, float, 0.9)
-	ATTRIB(XonoticGameHUDSettingsTab, rows, float, 13)
-	ATTRIB(XonoticGameHUDSettingsTab, columns, float, 6.2)
-ENDCLASS(XonoticGameHUDSettingsTab)
-entity makeXonoticGameHUDSettingsTab();
-void HUDSetup_Start(entity me, entity btn);
-#include "../gamesettings.qh"
-REGISTER_SETTINGS(HUD, makeXonoticGameHUDSettingsTab());
-#endif
+#include "dialog_settings_game_hud.qh"
 
-#ifdef IMPLEMENTATION
+#include "../item/modalcontroller.qh"
+#include "mainwindow.qh"
+#include "textlabel.qh"
+#include "slider.qh"
+#include "slider_sbfadetime.qh"
+#include "checkbox.qh"
+#include "button.qh"
+
 void HUDSetup_Check_Gamestatus(entity me, entity btn)
 {
 	if(!(gamestatus & (GAME_CONNECTED | GAME_ISSERVER))) // we're not in a match, ask the player if they want to start one anyway
@@ -47,25 +39,25 @@ void XonoticGameHUDSettingsTab_fill(entity me)
 	// threshold: hud_damage_pain_threshold_lower_health
 	// scoreboard_alpha*
 
-	//me.gotoRC(me, 0, 3.2); me.setFirstColumn(me, me.currentColumn);
 	me.TR(me);
 		me.TD(me, 1, 3, e = makeXonoticHeaderLabel(_("Scoreboard")));
-	//me.TR(me);
-	//	me.TD(me, 1, 0.8, e = makeXonoticTextLabel(0, _("Alpha:")));
-	//	me.TD(me, 1, 2, e = makeXonoticSlider(0, 1, 0.05, "scoreboard_alpha_bg"));
+	me.TR(me);
+	me.TD(me, 1, 1, e = makeXonoticTextLabel(0, _("Alpha:")));
+	me.TD(me, 1, 2, e = makeXonoticSlider(0, 1, 0.05, "hud_panel_scoreboard_bg_alpha"));
 	me.TR(me);
 		me.TD(me, 1, 1, e = makeXonoticTextLabel(0, _("Fading speed:")));
 		me.TD(me, 1, 2, e = makeXonoticScoreboardFadeTimeSlider());
 	me.TR(me);
-		me.TD(me, 1, 1, e = makeXonoticTextLabel(0, _("Side padding:")));
-		me.TD(me, 1, 2, e = makeXonoticSlider(0.05, 0.3, 0.01, "scoreboard_offset_left"));
-			makeMulti(e, "scoreboard_offset_right");
-
+		me.TD(me, 1, 3, e = makeXonoticCheckBox(0, "hud_panel_scoreboard_table_highlight", _("Enable rows / columns highlighting")));
 	me.TR(me);
-	//me.TR(me);
-		me.TD(me, 1, 3, e = makeXonoticCheckBox(0, "scoreboard_respawntime_decimals", _("Show decimals in respawn countdown")));
+		me.TD(me, 1, 3, e = makeXonoticCheckBox(0, "hud_panel_scoreboard_accuracy", _("Show accuracy underneath scoreboard")));
 	me.TR(me);
-		me.TD(me, 1, 3, e = makeXonoticCheckBox(0, "scoreboard_accuracy", _("Show accuracy underneath scoreboard")));
+		me.TD(me, 1, 1, e = makeXonoticTextLabel(0, _("Show team sizes:")));
+		me.TD(me, 1, 2, e = makeXonoticTextSlider_T("hud_panel_scoreboard_team_size_position", _("Team size position: Off=do not show; Left=on the left side of the scoreboard and move team scores to the right; Right=on the right of the scoreboard")));
+			e.addValue(e, _("Left"), "1");
+			e.addValue(e, _("Off"), "0");
+			e.addValue(e, _("Right"), "2");
+			e.configureXonoticTextSliderValues(e);
 
 	me.TR(me);
 	me.TR(me);
@@ -95,9 +87,12 @@ void XonoticGameHUDSettingsTab_fill(entity me)
 			setDependent(e, "cl_hidewaypoints", 0, 0);
 
 	me.TR(me);
-	//me.TR(me);
 		me.TDempty(me, 0.2);
 		me.TD(me, 1, 2.8, e = makeXonoticCheckBoxEx(0.25, 1, "g_waypointsprite_crosshairfadealpha", _("Fade when near the crosshair")));
+			setDependent(e, "cl_hidewaypoints", 0, 0);
+	me.TR(me);
+		me.TDempty(me, 0.2);
+		me.TD(me, 1, 2.8, e = makeXonoticCheckBox(0, "g_waypointsprite_text", _("Display names instead of icons")));
 			setDependent(e, "cl_hidewaypoints", 0, 0);
 
 	#if 0
@@ -168,6 +163,11 @@ void XonoticGameHUDSettingsTab_fill(entity me)
 		me.TD(me, 1, 1, e = makeXonoticTextLabel(0, _("Damage overlay:")));
 		me.TD(me, 1, 2, e = makeXonoticSlider(0, 1, 0.05, "hud_damage"));
 	me.TR(me);
+		me.TD(me, 1, 3, e = makeXonoticCheckBox_T(0, "hud_dynamic_follow", _("Dynamic HUD"),
+			_("HUD moves around following player's movement")));
+	me.TR(me);
+		me.TD(me, 1, 3, e = makeXonoticCheckBox(0, "hud_dynamic_shake", _("Shake the HUD when hurt")));
+	me.TR(me);
 	me.TR(me);
 		me.TDempty(me, 0.5);
 		me.TD(me, 1, 2, e = makeXonoticButton(_("Enter HUD editor"), '0 0 0'));
@@ -175,4 +175,3 @@ void XonoticGameHUDSettingsTab_fill(entity me)
 			e.onClickEntity = me;
 		// TODO: show hud config name with text here
 }
-#endif

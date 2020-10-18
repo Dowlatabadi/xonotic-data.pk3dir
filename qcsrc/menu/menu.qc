@@ -1,11 +1,26 @@
 #include "menu.qh"
-#include "classes.qc"
+
+#include "item.qh"
+
+#include "anim/animhost.qh"
+
+#include "item/dialog.qh"
+#include "item/listbox.qh"
+#include "item/nexposee.qh"
+
+#include "xonotic/commandbutton.qh"
+#include "xonotic/mainwindow.qh"
+#include "xonotic/serverlist.qh"
+#include "xonotic/slider_resolution.qh"
+
+.string cvarName;
+
 #include "xonotic/util.qh"
 
-#include "../common/items/all.qh"
-#include "../common/weapons/all.qh"
-#include "../common/mapinfo.qh"
-#include "../common/mutators/base.qh"
+#include <common/items/_mod.qh>
+#include <common/weapons/_all.qh>
+#include <common/mapinfo.qh>
+#include <common/mutators/base.qh>
 
 int mouseButtonsPressed;
 vector menuMousePos;
@@ -35,7 +50,7 @@ void m_gamestatus()
 	gamestatus = 0;
 	if (isserver()) gamestatus |= GAME_ISSERVER;
 	if (clientstate() == CS_CONNECTED || isdemo()) gamestatus |= GAME_CONNECTED;
-	if (cvar("developer")) gamestatus |= GAME_DEVELOPER;
+	if (cvar("developer") > 0) gamestatus |= GAME_DEVELOPER;
 }
 
 void m_init()
@@ -54,11 +69,11 @@ void m_init()
 	cvar_set("_menu_prvm_language", prvm_language);
 
 #ifdef WATERMARK
-		LOG_INFOF("^4MQC Build information: ^1%s\n", WATERMARK);
+		LOG_TRACEF("^4MQC Build information: ^1%s", WATERMARK);
 #endif
 
 	// list all game dirs (TEST)
-	if (cvar("developer"))
+	if (cvar("developer") > 0)
 	{
 		for (int i = 0; ; ++i)
 		{
@@ -202,8 +217,7 @@ void m_init_delayed()
 	if (m_goto_buffer)
 	{
 		m_goto(m_goto_buffer);
-		strunzone(m_goto_buffer);
-		m_goto_buffer = string_null;
+		strfree(m_goto_buffer);
 	}
 
 	if (Menu_Active) m_display();  // delayed menu display
@@ -222,7 +236,7 @@ void m_keyup(float key, float ascii)
 		if (mouseButtonsPressed < 0)
 		{
 			mouseButtonsPressed = 0;
-			LOG_TRACE("Warning: released an already released button\n");
+			LOG_TRACE("Warning: released an already released button");
 		}
 	}
 	if (key == K_ALT) menuShiftState &= ~S_ALT;
@@ -255,7 +269,8 @@ void m_keydown(float key, float ascii)
 	else
 	{
 		draw_reset_cropped();
-		if (!mouseButtonsPressed && key >= K_MOUSE1 && key <= K_MOUSE3) main.mousePress(main, menuMousePos);
+		if (!mouseButtonsPressed && key >= K_MOUSE1 && key <= K_MOUSE3)
+			main.mousePress(main, menuMousePos);
 		if (!main.keyDown(main, key, ascii, menuShiftState))
 		{
 			// disable menu on unhandled ESC
@@ -270,7 +285,7 @@ void m_keydown(float key, float ascii)
 		if (mouseButtonsPressed > 10)
 		{
 			mouseButtonsPressed = 10;
-			LOG_TRACE("Warning: pressed an already pressed button\n");
+			LOG_TRACE("Warning: pressed an already pressed button");
 		}
 	}
 	if (key == K_ALT) menuShiftState |= S_ALT;
@@ -320,7 +335,8 @@ void drawBackground(string img, float a, string algn, float force1)
 	if (main.mainNexposee.ModalController_state == 0) return;
 	vector v = '0 0 0';
 	int scalemode = SCALEMODE_CROP;
-	for (int i = 0, l = 0; i < strlen(algn); ++i)
+	int len = strlen(algn);
+	for (int i = 0, l = 0; i < len; ++i)
 	{
 		string c = substring(algn, i, 1);
 		switch (c)
@@ -384,7 +400,7 @@ void drawBackground(string img, float a, string algn, float force1)
 			draw_Picture_Aligned(v, scalemode, strcat(img, "_l", ftos(l + 1)), a);
 		}
 		++l;
-		: nopic
+LABEL(nopic)
 	}
 }
 
@@ -524,19 +540,17 @@ void m_tooltip(vector pos)
 	{
 		float f = bound(0, frametime * 2, 1);
 		menuTooltipAveragedMousePos = menuTooltipAveragedMousePos * (1 - f) + pos * f;
-		f = vlen(pos - menuTooltipAveragedMousePos);
-		if (f < 0.01)
+		if (vdist(pos - menuTooltipAveragedMousePos, <, 0.01))
 		{
 			it = m_findtooltipitem(main, pos);
 
-			if (it.instanceOfListBox && it.isScrolling(it)) it = world;
+			if (it.instanceOfListBox && it.isScrolling(it)) it = NULL;
 
 			if (it && prev_tooltip != it.tooltip)
 			{
 				// fade out if tooltip of a certain item has changed
 				menuTooltipState = 3;
-				if (prev_tooltip) strunzone(prev_tooltip);
-				prev_tooltip = strzone(it.tooltip);
+				strcpy(prev_tooltip, it.tooltip);
 			}
 			else if (menuTooltipItem && !m_testmousetooltipbox(pos))
 			{
@@ -569,14 +583,15 @@ void m_tooltip(vector pos)
 
 					menuTooltipOrigin.x = -1;  // unallocated
 
-					if (menuTooltipText) strunzone(menuTooltipText);
-					menuTooltipText = strzone(gettooltip());
+					strcpy(menuTooltipText, gettooltip());
 
 					int i = 0;
 					float w = 0;
-					for (getWrappedLine_remaining = menuTooltipText; getWrappedLine_remaining; ++i)
+					for (getWrappedLine_remaining = menuTooltipText; getWrappedLine_remaining && i <= 16; ++i)
 					{
 						string s = getWrappedLine(SKINWIDTH_TOOLTIP, fontsize, draw_TextWidth_WithoutColors);
+						if (i == 16)
+							s = "...";
 						float f = draw_TextWidth(s, false, fontsize);
 						if (f > w) w = f;
 					}
@@ -618,11 +633,7 @@ void m_tooltip(vector pos)
 
 	if (menuTooltipItem == NULL)
 	{
-		if (menuTooltipText)
-		{
-			strunzone(menuTooltipText);
-			menuTooltipText = string_null;
-		}
+		strfree(menuTooltipText);
 		return;
 	}
 	else
@@ -646,17 +657,36 @@ void m_tooltip(vector pos)
 			p = menuTooltipOrigin;
 			p.x += SKINMARGIN_TOOLTIP_x / conwidth;
 			p.y += SKINMARGIN_TOOLTIP_y / conheight;
-			for (getWrappedLine_remaining = menuTooltipText; getWrappedLine_remaining; p.y += fontsize.y)
+			int i = 0;
+			for (getWrappedLine_remaining = menuTooltipText; getWrappedLine_remaining && i <= 16; ++i, p.y += fontsize.y)
 			{
 				string s = getWrappedLine(SKINWIDTH_TOOLTIP, fontsize, draw_TextWidth_WithoutColors);
+				if (i == 16)
+					s = "...";
 				draw_Text(p, s, fontsize, SKINCOLOR_TOOLTIP, SKINALPHA_TOOLTIP * menuTooltipAlpha, false);
 			}
 		}
 	}
 }
 
+float autocvar_menu_force_on_disconnection;
 void m_draw(float width, float height)
 {
+	if (autocvar_menu_force_on_disconnection > 0)
+	{
+		static float connected_time;
+		if (clientstate() == CS_DISCONNECTED)
+		{
+			if (connected_time && time - connected_time > autocvar_menu_force_on_disconnection)
+			{
+				m_toggle(true);
+				connected_time = 0;
+			}
+		}
+		else
+			connected_time = time;
+	}
+
 	m_gamestatus();
 
 	execute_next_frame();
@@ -775,15 +805,11 @@ void m_draw(float width, float height)
 
 	draw_alpha *= menuAlpha;
 
-	if (!Menu_Active)
+	if (menuMouseMode)
 	{
-		// do not update mouse position
-		// it prevents mouse jumping to '0 0 0' when menu is fading out
-	}
-	else if (menuMouseMode)
-	{
-		vector newMouse = globalToBox(getmousepos(), draw_shift, draw_scale);
-		if (newMouse != '0 0 0' && newMouse != menuMousePos)
+		vector rawMousePos = getmousepos();
+		vector newMouse = globalToBox(rawMousePos, draw_shift, draw_scale);
+		if (rawMousePos != '0 0 0' && newMouse != menuMousePos)
 		{
 			menuMousePos = newMouse;
 			if (mouseButtonsPressed) main.mouseDrag(main, menuMousePos);
@@ -817,6 +843,7 @@ void m_draw(float width, float height)
 	postMenuDraw();
 
 	frametime = 0;
+	IL_ENDFRAME();
 }
 
 void m_display()
@@ -863,10 +890,10 @@ void m_toggle(int mode)
 void Shutdown()
 {
 	m_hide();
-	FOREACH_ENTITY_ORDERED(it.destroy, LAMBDA(
+	FOREACH_ENTITY_ORDERED(it.destroy, {
 		if (it.classname == "vtbl") continue;
 		it.destroy(it);
-	));
+	});
 }
 
 void m_focus_item_chain(entity outermost, entity innermost)
@@ -920,8 +947,7 @@ void m_goto(string itemname)
 {
 	if (!menuInitialized)
 	{
-		if (m_goto_buffer) strunzone(m_goto_buffer);
-		m_goto_buffer = strzone(itemname);
+		strcpy(m_goto_buffer, itemname);
 		return;
 	}
 	if (itemname == "")  // this can be called by GameCommand
@@ -944,6 +970,8 @@ void m_goto(string itemname)
 
 		if ((e) && (!e.requiresConnection || (gamestatus & (GAME_ISSERVER | GAME_CONNECTED))))
 		{
+			if(!Menu_Active)
+				e.hideMenuOnClose = true;
 			m_hide();
 			m_activate_window(e);
 			m_setpointerfocus(e);

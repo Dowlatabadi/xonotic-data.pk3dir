@@ -1,11 +1,12 @@
+#pragma once
+
 #ifdef CSQC
-#ifndef DRAW_H
-	#define DRAW_H
 
 	#include "i18n.qh"
 	#include "vector.qh"
 
-	#include "../client/defs.qh"
+	noref float vid_conwidth;
+	noref float vid_conheight;
 
 	void Draw_CylindricLine(vector from, vector to, float thickness, string texture, float aspect, float shift, vector rgb, float theAlpha, float drawflag, vector vieworg)
 	{
@@ -26,7 +27,7 @@
 		C = to + thickdir * (thickness / 2);
 		D = to - thickdir * (thickness / 2);
 
-		R_BeginPolygon(texture, drawflag);
+		R_BeginPolygon(texture, drawflag, false);
 		R_PolygonVertex(A, '0 0 0' + shift * '1 0 0', rgb, theAlpha);
 		R_PolygonVertex(B, '0 1 0' + shift * '1 0 0', rgb, theAlpha);
 		R_PolygonVertex(C, '0 1 0' + (shift + length_tex) * '1 0 0', rgb, theAlpha);
@@ -46,7 +47,7 @@
 	{
 		if (theBorderSize.x < 0 && theBorderSize.y < 0)  // draw whole image as it is
 		{
-			drawpic(theOrigin, pic, theSize, theColor, theAlpha, 0);
+			drawpic_builtin(theOrigin, pic, theSize, theColor, theAlpha, 0);
 			return;
 		}
 		if (theBorderSize.x == 0 && theBorderSize.y == 0)  // no border
@@ -117,17 +118,18 @@
 		}
 	}
 
+	ERASEABLE
 	void drawstringright(vector position, string text, vector theScale, vector rgb, float theAlpha, int flag)
 	{
 		position.x -= 2 / 3 * strlen(text) * theScale.x;
-		drawstring(position, text, theScale, rgb, theAlpha, flag);
+		drawstring_builtin(position, text, theScale, rgb, theAlpha, flag);
 	}
 
+	ERASEABLE
 	void drawstringcenter(vector position, string text, vector theScale, vector rgb, float theAlpha, int flag)
 	{
 		position.x = 0.5 * (vid_conwidth - 0.6025 * strlen(text) * theScale.x);
-		drawstring(position, text, theScale, rgb, theAlpha, flag);
+		drawstring_builtin(position, text, theScale, rgb, theAlpha, flag);
 	}
 
-#endif
 #endif

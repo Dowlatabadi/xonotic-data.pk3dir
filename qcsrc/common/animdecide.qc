@@ -1,55 +1,51 @@
 #include "animdecide.qh"
 
-#include "monsters/all.qh"
-
-#if defined(SVQC)
-    #include "util.qh"
-    #include "../server/defs.qh"
+#if defined(CSQC)
+	#include <common/monsters/_mod.qh>
+#elif defined(MENUQC)
+#elif defined(SVQC)
+	#include <common/monsters/_mod.qh>
+	#include <common/stats.qh>
+	#include <common/util.qh>
+	#include <common/weapons/_all.qh>
 #endif
 
-bool monsters_animoverride(entity e)
+bool monsters_animoverride(entity this)
 {
 	Monster monster_id = NULL;
-	for(int i = MON_FIRST; i <= MON_LAST; ++i)
-	{
-		entity mon = get_monsterinfo(i);
-
-		//if(substring(e.model, 0, strlen(mon.model) - 4) == substring(mon.model, 0, strlen(mon.model) - 4))
-		if(e.model == mon.model)
-		{
-			monster_id = mon;
-			break;
-		}
-	}
+	FOREACH(Monsters, it != MON_Null && it.m_model.model_str() == this.model, {
+        monster_id = it;
+        break;
+	});
 
 	if(!monster_id) { return false; }
 
-	monster_id.mr_anim(monster_id);
+	monster_id.mr_anim(monster_id, this);
 
 	vector none = '0 0 0';
-	e.anim_duckwalk = e.anim_walk;
-	e.anim_duckjump = animfixfps(e, '5 1 10', none);
-	e.anim_duckidle = e.anim_idle;
-	e.anim_jump = animfixfps(e, '8 1 10', none);
-	e.anim_taunt = animfixfps(e, '12 1 0.33', none);
-	e.anim_runbackwards = e.anim_run;
-	e.anim_strafeleft = e.anim_run;
-	e.anim_straferight = e.anim_run;
-	e.anim_forwardright = e.anim_run;
-	e.anim_forwardleft = e.anim_run;
-	e.anim_backright = e.anim_run;
-	e.anim_backleft  = e.anim_run;
-	e.anim_duckwalkbackwards = e.anim_walk;
-	e.anim_duckwalkstrafeleft = e.anim_walk;
-	e.anim_duckwalkstraferight = e.anim_walk;
-	e.anim_duckwalkforwardright = e.anim_walk;
-	e.anim_duckwalkforwardleft = e.anim_walk;
-	e.anim_duckwalkbackright = e.anim_walk;
-	e.anim_duckwalkbackleft  = e.anim_walk;
+	this.anim_duckwalk = this.anim_walk;
+	this.anim_duckjump = animfixfps(this, '5 1 10', none);
+	this.anim_duckidle = this.anim_idle;
+	this.anim_jump = animfixfps(this, '8 1 10', none);
+	this.anim_taunt = animfixfps(this, '12 1 0.33', none);
+	this.anim_runbackwards = this.anim_run;
+	this.anim_strafeleft = this.anim_run;
+	this.anim_straferight = this.anim_run;
+	this.anim_forwardright = this.anim_run;
+	this.anim_forwardleft = this.anim_run;
+	this.anim_backright = this.anim_run;
+	this.anim_backleft  = this.anim_run;
+	this.anim_duckwalkbackwards = this.anim_walk;
+	this.anim_duckwalkstrafeleft = this.anim_walk;
+	this.anim_duckwalkstraferight = this.anim_walk;
+	this.anim_duckwalkforwardright = this.anim_walk;
+	this.anim_duckwalkforwardleft = this.anim_walk;
+	this.anim_duckwalkbackright = this.anim_walk;
+	this.anim_duckwalkbackleft  = this.anim_walk;
 
 	// these anims ought to stay until stopped explicitly by weaponsystem
-	e.anim_shoot_z = 0.001;
-	e.anim_melee_z = 0.001;
+	this.anim_shoot_z = 0.001;
+	this.anim_melee_z = 0.001;
 
 	return true;
 }
@@ -217,9 +213,8 @@ vector animdecide_getloweranim(entity e)
 				return vec3(e.anim_duckwalkbackright.x, t, ANIMPRIO_CROUCH);
 			case ANIMIMPLICITSTATE_BACKWARDS | ANIMIMPLICITSTATE_LEFT:
 				return vec3(e.anim_duckwalkbackleft.x, t, ANIMPRIO_CROUCH);
-			default:
-				return vec3(e.anim_duckidle.x, t, ANIMPRIO_CROUCH);
 		}
+		return vec3(e.anim_duckidle.x, t, ANIMPRIO_CROUCH);
 	}
 	else
 	{
@@ -243,12 +238,11 @@ vector animdecide_getloweranim(entity e)
 				return vec3(e.anim_backright.x, t, ANIMPRIO_ACTIVE);
 			case ANIMIMPLICITSTATE_BACKWARDS | ANIMIMPLICITSTATE_LEFT:
 				return vec3(e.anim_backleft.x, t, ANIMPRIO_ACTIVE);
-			default:
-				return vec3(e.anim_idle.x, t, ANIMPRIO_IDLE);
 		}
+		return vec3(e.anim_idle.x, t, ANIMPRIO_IDLE);
 	}
 	// can't get here
-	return vec3(e.anim_idle.x, t, ANIMPRIO_IDLE);
+	//return vec3(e.anim_idle.x, t, ANIMPRIO_IDLE);
 }
 
 void animdecide_setimplicitstate(entity e, float onground)
@@ -271,7 +265,7 @@ void animdecide_setimplicitstate(entity e, float onground)
 	// it slightly less likely to "hit two keys at once", so let's do this
 	// here too
 
-	if(vlen(v) > 10)
+	if(vdist(v, >, 10))
 	{
 		if(v.x >  fabs(v.y) * 0.5)
 			s |= ANIMIMPLICITSTATE_FORWARD;

@@ -1,5 +1,6 @@
-#ifndef TEAMS_H
-#define TEAMS_H
+#pragma once
+
+const int NUM_TEAMS = 4; ///< Number of teams in the game.
 
 #ifdef TEAMNUMBERS_THAT_ARENT_STUPID
 const int NUM_TEAM_1 = 1;  // red
@@ -27,12 +28,26 @@ const string COL_TEAM_2 = "^4";
 const string COL_TEAM_3 = "^3";
 const string COL_TEAM_4 = "^6";
 // must be #defined, const globals drop the translation attribute
-#define NAME_TEAM_1 _("Red")
-#define NAME_TEAM_2 _("Blue")
-#define NAME_TEAM_3 _("Yellow")
-#define NAME_TEAM_4 _("Pink")
+#define NAME_TEAM_1 CTX(_("TEAM^Red"))
+#define NAME_TEAM_2 CTX(_("TEAM^Blue"))
+#define NAME_TEAM_3 CTX(_("TEAM^Yellow"))
+#define NAME_TEAM_4 CTX(_("TEAM^Pink"))
 #define NAME_TEAM _("Team")
 #define NAME_NEUTRAL _("Neutral")
+
+// items colors, so they are handled properly in languages which decline things with grammatical gender
+#define KEY_TEAM_1 CTX(_("KEY^Red"))
+#define KEY_TEAM_2 CTX(_("KEY^Blue"))
+#define KEY_TEAM_3 CTX(_("KEY^Yellow"))
+#define KEY_TEAM_4 CTX(_("KEY^Pink"))
+#define FLAG_TEAM_1 CTX(_("FLAG^Red"))
+#define FLAG_TEAM_2 CTX(_("FLAG^Blue"))
+#define FLAG_TEAM_3 CTX(_("FLAG^Yellow"))
+#define FLAG_TEAM_4 CTX(_("FLAG^Pink"))
+#define GENERATOR_TEAM_1 CTX(_("GENERATOR^Red"))
+#define GENERATOR_TEAM_2 CTX(_("GENERATOR^Blue"))
+#define GENERATOR_TEAM_3 CTX(_("GENERATOR^Yellow"))
+#define GENERATOR_TEAM_4 CTX(_("GENERATOR^Pink"))
 
 // used for replacement in filenames or such where the name CANNOT be allowed to be translated
 const string STATIC_NAME_TEAM_1 = "Red";
@@ -41,24 +56,24 @@ const string STATIC_NAME_TEAM_3 = "Yellow";
 const string STATIC_NAME_TEAM_4 = "Pink";
 
 #ifdef CSQC
-float teamplay;
-float myteam;
+bool teamplay;
+int myteam;
 #endif
 
-string Team_ColorCode(float teamid)
+string Team_ColorCode(int teamid)
 {
-    switch(teamid)
-    {
+	switch(teamid)
+	{
 		case NUM_TEAM_1: return COL_TEAM_1;
-    	case NUM_TEAM_2: return COL_TEAM_2;
-    	case NUM_TEAM_3: return COL_TEAM_3;
-    	case NUM_TEAM_4: return COL_TEAM_4;
+		case NUM_TEAM_2: return COL_TEAM_2;
+		case NUM_TEAM_3: return COL_TEAM_3;
+		case NUM_TEAM_4: return COL_TEAM_4;
 	}
 
 	return "^7";
 }
 
-vector Team_ColorRGB(float teamid)
+vector Team_ColorRGB(int teamid)
 {
 	switch(teamid)
 	{
@@ -71,28 +86,28 @@ vector Team_ColorRGB(float teamid)
     return '0 0 0';
 }
 
-string Team_ColorName(float teamid)
+string Team_ColorName(int teamid)
 {
-    switch(teamid)
-    {
+	switch(teamid)
+	{
 		case NUM_TEAM_1: return NAME_TEAM_1;
-    	case NUM_TEAM_2: return NAME_TEAM_2;
-    	case NUM_TEAM_3: return NAME_TEAM_3;
-    	case NUM_TEAM_4: return NAME_TEAM_4;
+		case NUM_TEAM_2: return NAME_TEAM_2;
+		case NUM_TEAM_3: return NAME_TEAM_3;
+		case NUM_TEAM_4: return NAME_TEAM_4;
 	}
 
     return NAME_NEUTRAL;
 }
 
 // used for replacement in filenames or such where the name CANNOT be allowed to be translated
-string Static_Team_ColorName(float teamid)
+string Static_Team_ColorName(int teamid)
 {
-    switch(teamid)
-    {
+	switch(teamid)
+	{
 		case NUM_TEAM_1: return STATIC_NAME_TEAM_1;
-    	case NUM_TEAM_2: return STATIC_NAME_TEAM_2;
-    	case NUM_TEAM_3: return STATIC_NAME_TEAM_3;
-    	case NUM_TEAM_4: return STATIC_NAME_TEAM_4;
+		case NUM_TEAM_2: return STATIC_NAME_TEAM_2;
+		case NUM_TEAM_3: return STATIC_NAME_TEAM_3;
+		case NUM_TEAM_4: return STATIC_NAME_TEAM_4;
 	}
 
     return NAME_NEUTRAL;
@@ -103,45 +118,105 @@ float Team_ColorToTeam(string team_color)
 	switch(strtolower(team_color))
 	{
 		case "red": return NUM_TEAM_1;
-    	case "blue": return NUM_TEAM_2;
-    	case "yellow": return NUM_TEAM_3;
-    	case "pink": return NUM_TEAM_4;
-    	case "auto": return 0;
+		case "blue": return NUM_TEAM_2;
+		case "yellow": return NUM_TEAM_3;
+		case "pink": return NUM_TEAM_4;
+		case "auto": return 0;
 	}
 
 	return -1;
 }
 
-float Team_NumberToTeam(float number)
+/// \brief Returns whether team value is valid.
+/// \param[in] team_num Team to check.
+/// \return True if team is valid, false otherwise.
+bool Team_IsValidTeam(int team_num)
 {
-	switch(number)
+	switch (team_num)
+	{
+		case NUM_TEAM_1:
+		case NUM_TEAM_2:
+		case NUM_TEAM_3:
+		case NUM_TEAM_4:
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+/// \brief Returns whether the team index is valid.
+/// \param[in] index Team index to check.
+/// \return True if team index is valid, false otherwise.
+bool Team_IsValidIndex(int index)
+{
+	switch (index)
+	{
+		case 1:
+		case 2:
+		case 3:
+		case 4:
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+/// \brief Converts team index into team value.
+/// \param[in] index Team index to convert.
+/// \return Team value.
+int Team_IndexToTeam(int index)
+{
+	switch (index)
 	{
 		case 1: return NUM_TEAM_1;
 		case 2: return NUM_TEAM_2;
 		case 3: return NUM_TEAM_3;
 		case 4: return NUM_TEAM_4;
 	}
-
 	return -1;
 }
 
-float Team_TeamToNumber(float teamid)
+/// \brief Converts team value into team index.
+/// \param[in] team_num Team value to convert.
+/// \return Team index.
+int Team_TeamToIndex(int team_num)
 {
-	switch(teamid)
+	switch (team_num)
 	{
 		case NUM_TEAM_1: return 1;
 		case NUM_TEAM_2: return 2;
 		case NUM_TEAM_3: return 3;
 		case NUM_TEAM_4: return 4;
 	}
-
 	return -1;
+}
+
+/// \brief Converts team value into bit value that is used in team bitmasks.
+/// \param[in] team_num Team value to convert.
+/// \return Team bit.
+int Team_TeamToBit(int team_num)
+{
+	if (!Team_IsValidTeam(team_num))
+	{
+		return 0;
+	}
+	return BIT(Team_TeamToIndex(team_num) - 1);
+}
+
+/// \brief Converts team index into bit value that is used in team bitmasks.
+/// \param[in] index Team index to convert.
+/// \return Team bit.
+int Team_IndexToBit(int index)
+{
+	return BIT(index - 1);
 }
 
 
 // legacy aliases for shitty code
-#define TeamByColor(teamid) (Team_TeamToNumber(teamid) - 1)
-#define ColorByTeam(number) Team_NumberToTeam(number + 1)
+#define TeamByColor(teamid) (Team_TeamToIndex(teamid) - 1)
+#define ColorByTeam(number) Team_IndexToTeam(number + 1)
 
 // useful aliases
 #define Team_ColorName_Lower(teamid) strtolower(Team_ColorName(teamid))
@@ -154,19 +229,12 @@ float Team_TeamToNumber(float teamid)
 #define Team_FullName(teamid) strcat(Team_ColorName(teamid), " ", NAME_TEAM, "^7")
 #define Team_ColoredFullName(teamid) strcat(Team_ColorCode(teamid), Team_ColorName(teamid), " ", NAME_TEAM, "^7")
 
-#define Team_NumberToFullName(number) Team_FullName(Team_NumberToTeam(number))
-#define Team_NumberToColoredFullName(number) Team_ColoredFullName(Team_NumberToTeam(number))
+#define Team_IndexToFullName(index) Team_FullName(Team_IndexToTeam(index))
+#define Team_IndexToColoredFullName(index) Team_ColoredFullName(Team_IndexToTeam(index))
 
 // replace these flags in a string with the strings provided
-#define TCR(input,teamcolor,teamtext) strreplace("^TC", teamcolor, strreplace("^TT", teamtext, input))
+#define TCR(input,type,team) strreplace("^TC", COL_TEAM_##team, strreplace("^TT", strtoupper(type##_TEAM_##team), input))
 
 // safe team comparisons
 #define SAME_TEAM(a,b) (teamplay ? (a.team == b.team) : (a == b))
 #define DIFF_TEAM(a,b) (teamplay ? (a.team != b.team) : (a != b))
-
-// used for notification system multi-team identifiers
-#define APP_TEAM_NUM_2(num,prefix) ((num == NUM_TEAM_1) ? prefix##RED : prefix##BLUE)
-#define APP_TEAM_NUM_4(num,prefix) ((num == NUM_TEAM_1) ? prefix##RED : ((num == NUM_TEAM_2) ? prefix##BLUE : ((num == NUM_TEAM_3) ? prefix##YELLOW : prefix##PINK)))
-#define APP_TEAM_ENT_2(ent,prefix) ((ent.team == NUM_TEAM_1) ? prefix##RED : prefix##BLUE)
-#define APP_TEAM_ENT_4(ent,prefix) ((ent.team == NUM_TEAM_1) ? prefix##RED : ((ent.team == NUM_TEAM_2) ? prefix##BLUE : ((ent.team == NUM_TEAM_3) ? prefix##YELLOW : prefix##PINK)))
-#endif

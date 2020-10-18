@@ -29,11 +29,10 @@
 .vector ivforward1, ivforward2;
 .vector ivup1, ivup2;
 .float itime1, itime2;
-void InterpolateOrigin_Reset()
+void InterpolateOrigin_Reset(entity this)
 {
-	SELFPARAM();
-	self.iflags &= ~IFLAG_INTERNALMASK;
-	self.itime1 = self.itime2 = 0;
+	this.iflags &= ~IFLAG_INTERNALMASK;
+	this.itime1 = this.itime2 = 0;
 }
 void InterpolateOrigin_Note(entity this)
 {
@@ -49,17 +48,18 @@ void InterpolateOrigin_Note(entity this)
 		this.iorigin2 = this.origin;
 	}
 
-	if (this.iflags & IFLAG_AUTOANGLES
+	if ((this.iflags & IFLAG_AUTOANGLES)
 	    && this.iorigin2
 	    != this.iorigin1) this.angles = vectoangles(this.iorigin2 - this.iorigin1);
 
-	if (this.iflags & IFLAG_AUTOVELOCITY
+	if ((this.iflags & IFLAG_AUTOVELOCITY)
 	    && this.itime2
 	    != this.itime1) this.velocity = (this.iorigin2 - this.iorigin1) * (1.0 / (this.itime2 - this.itime1));
 
 	if (this.iflags & IFLAG_ANGLES)
 	{
-		fixedmakevectors(this.angles);
+		vector forward, right, up;
+		FIXED_MAKE_VECTORS(this.angles, forward, right, up);
 		if (f0 & IFLAG_VALID)
 		{
 			this.iforward1 = this.iforward2;
@@ -67,16 +67,17 @@ void InterpolateOrigin_Note(entity this)
 		}
 		else
 		{
-			this.iforward1 = v_forward;
-			this.iup1 = v_up;
+			this.iforward1 = forward;
+			this.iup1 = up;
 		}
-		this.iforward2 = v_forward;
-		this.iup2 = v_up;
+		this.iforward2 = forward;
+		this.iup2 = up;
 	}
 
 	if (this.iflags & IFLAG_V_ANGLE)
 	{
-		fixedmakevectors(this.v_angle);
+		vector forward, right, up;
+		FIXED_MAKE_VECTORS(this.v_angle, forward, right, up);
 		if (f0 & IFLAG_VALID)
 		{
 			this.ivforward1 = this.ivforward2;
@@ -84,11 +85,11 @@ void InterpolateOrigin_Note(entity this)
 		}
 		else
 		{
-			this.ivforward1 = v_forward;
-			this.ivup1 = v_up;
+			this.ivforward1 = forward;
+			this.ivup1 = up;
 		}
-		this.ivforward2 = v_forward;
-		this.ivup2 = v_up;
+		this.ivforward2 = forward;
+		this.ivup2 = up;
 	}
 	else if (this.iflags & IFLAG_V_ANGLE_X)
 	{

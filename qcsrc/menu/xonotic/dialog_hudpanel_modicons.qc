@@ -1,24 +1,13 @@
-#ifndef DIALOG_HUDPANEL_MODICONS_H
-#define DIALOG_HUDPANEL_MODICONS_H
-#include "rootdialog.qc"
-CLASS(XonoticHUDModIconsDialog, XonoticRootDialog)
-	METHOD(XonoticHUDModIconsDialog, fill, void(entity));
-	ATTRIB(XonoticHUDModIconsDialog, title, string, _("Mod Icons Panel"))
-	ATTRIB(XonoticHUDModIconsDialog, color, vector, SKINCOLOR_DIALOG_TEAMSELECT)
-	ATTRIB(XonoticHUDModIconsDialog, intendedWidth, float, 0.4)
-	ATTRIB(XonoticHUDModIconsDialog, rows, float, 15)
-	ATTRIB(XonoticHUDModIconsDialog, columns, float, 4)
-	ATTRIB(XonoticHUDModIconsDialog, name, string, "HUDmodicons")
-	ATTRIB(XonoticHUDModIconsDialog, requiresConnection, float, true)
-ENDCLASS(XonoticHUDModIconsDialog)
-#endif
+#include "dialog_hudpanel_modicons.qh"
 
-#ifdef IMPLEMENTATION
+#include "checkbox.qh"
+
 void XonoticHUDModIconsDialog_fill(entity me)
 {
-	entity e;
+	//entity e;
 	string panelname = "modicons";
 
-	DIALOG_HUDPANEL_COMMON();
+	dialog_hudpanel_main_checkbox(me, panelname);
+
+	dialog_hudpanel_main_settings(me, panelname);
 }
-#endif

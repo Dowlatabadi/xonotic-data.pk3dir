@@ -1,56 +1,10 @@
-// Note:
-//   to use this, you FIRST call configureSliderVisuals, then configureSliderValues
-#ifndef ITEM_SLIDER_H
-	#define ITEM_SLIDER_H
-	#include "label.qc"
-	CLASS(Slider, Label)
-		METHOD(Slider, resizeNotify, void(entity, vector, vector, vector, vector));
-		METHOD(Slider, configureSliderVisuals, void(entity, float, float, float, string));
-		METHOD(Slider, configureSliderValues, void(entity, float, float, float, float, float, float));
-		METHOD(Slider, draw, void(entity));
-		METHOD(Slider, keyDown, float(entity, float, float, float));
-		METHOD(Slider, keyUp, float(entity, float, float, float));
-		METHOD(Slider, mousePress, float(entity, vector));
-		METHOD(Slider, mouseDrag, float(entity, vector));
-		METHOD(Slider, mouseRelease, float(entity, vector));
-		METHOD(Slider, valueToText, string(entity, float));
-		METHOD(Slider, toString, string(entity));
-		METHOD(Slider, setValue_allowAnim, void(entity, float, bool));
-		METHOD(Slider, setValue_noAnim, void(entity, float));
-		METHOD(Slider, setValue, void(entity, float));
-		METHOD(Slider, setSliderValue, void(entity, float));
-		METHOD(Slider, showNotify, void(entity));
-		ATTRIB(Slider, src, string, string_null)
-		ATTRIB(Slider, focusable, float, 1)
-		ATTRIB(Slider, allowFocusSound, float, 1)
-		ATTRIB(Slider, value, float, 0)
-		ATTRIB(Slider, animated, float, 1)
-		ATTRIB(Slider, sliderValue, float, 0)
-		ATTRIB(Slider, sliderAnim, entity, NULL)
-		ATTRIB(Slider, valueMin, float, 0)
-		ATTRIB(Slider, valueMax, float, 0)
-		ATTRIB(Slider, valueStep, float, 0)
-		ATTRIB(Slider, valueDigits, float, 0)
-		ATTRIB(Slider, valueKeyStep, float, 0)
-		ATTRIB(Slider, valuePageStep, float, 0)
-		ATTRIB(Slider, valueDisplayMultiplier, float, 1.0)
-		ATTRIB(Slider, textSpace, float, 0)
-		ATTRIB(Slider, controlWidth, float, 0)
-		ATTRIB(Slider, pressed, float, 0)
-		ATTRIB(Slider, pressOffset, float, 0)
-		ATTRIB(Slider, previousValue, float, 0)
-		ATTRIB(Slider, tolerance, vector, '0 0 0')
-		ATTRIB(Slider, disabled, float, 0)
-		ATTRIB(Slider, color, vector, '1 1 1')
-		ATTRIB(Slider, color2, vector, '1 1 1')
-		ATTRIB(Slider, colorD, vector, '1 1 1')
-		ATTRIB(Slider, colorC, vector, '1 1 1')
-		ATTRIB(Slider, colorF, vector, '1 1 1')
-		ATTRIB(Slider, disabledAlpha, float, 0.3)
-	ENDCLASS(Slider)
-#endif
+#include "slider.qh"
 
-#ifdef IMPLEMENTATION
+#include "../anim/easing.qh"
+#include "../anim/animhost.qh"
+
+.entity applyButton;
+
 	void Slider_setValue_allowAnim(entity me, float val, bool allowAnim)
 	{
 		if (allowAnim && me.animated)
@@ -118,40 +72,47 @@
 	float Slider_keyDown(entity me, float key, float ascii, float shift)
 	{
 		float inRange;
+		float ret_value = 0;
 		if (me.disabled) return 0;
 		inRange = (almost_in_bounds(me.valueMin, me.value, me.valueMax));
 		if (key == K_LEFTARROW || key == K_KP_LEFTARROW || key == K_MWHEELDOWN)
 		{
 			if (inRange) me.setValue(me, median(me.valueMin, me.value - me.valueKeyStep, me.valueMax));
 			else me.setValue(me, me.valueMax);
-			return 1;
+			ret_value = 1;
 		}
 		if (key == K_RIGHTARROW || key == K_KP_RIGHTARROW || key == K_MWHEELUP)
 		{
 			if (inRange) me.setValue(me, median(me.valueMin, me.value + me.valueKeyStep, me.valueMax));
 			else me.setValue(me, me.valueMin);
-			return 1;
+			ret_value = 1;
 		}
 		if (key == K_PGDN || key == K_KP_PGDN)
 		{
 			if (inRange) me.setValue(me, median(me.valueMin, me.value - me.valuePageStep, me.valueMax));
 			else me.setValue(me, me.valueMax);
-			return 1;
+			ret_value = 1;
 		}
 		if (key == K_PGUP || key == K_KP_PGUP)
 		{
 			if (inRange) me.setValue(me, median(me.valueMin, me.value + me.valuePageStep, me.valueMax));
 			else me.setValue(me, me.valueMin);
-			return 1;
+			ret_value = 1;
 		}
 		if (key == K_HOME || key == K_KP_HOME)
 		{
 			me.setValue(me, me.valueMin);
-			return 1;
+			ret_value = 1;
 		}
 		if (key == K_END || key == K_KP_END)
 		{
 			me.setValue(me, me.valueMax);
+			ret_value = 1;
+		}
+		if(ret_value == 1)
+		{
+			if(me.applyButton)
+				me.applyButton.disabled = false;
 			return 1;
 		}
 		// TODO more keys (NOTE also add them to Slider_keyUp)
@@ -196,9 +157,16 @@
 				// handle dragging
 				me.pressed = 2;
 
-				v = median(0, (pos.x - me.pressOffset - 0.5 * me.controlWidth) / (1 - me.textSpace - me.controlWidth), 1) * (me.valueMax - me.valueMin) + me.valueMin;
-				if (me.valueStep) v = floor(0.5 + v / me.valueStep) * me.valueStep;
+				float f = bound(0, (pos.x - me.pressOffset - 0.5 * me.controlWidth) / (1 - me.textSpace - me.controlWidth), 1);
+				v = f * (me.valueMax - me.valueMin) + me.valueMin;
+				// there's no need to round min and max value... also if we did, v could be set
+				// to an out of bounds value due to precision errors
+				if (f > 0 && f < 1 && me.valueStep)
+					v = floor(0.5 + v / me.valueStep) * me.valueStep;
 				me.setValue_noAnim(me, v);
+				if(me.applyButton)
+				if(me.previousValue != me.value)
+					me.applyButton.disabled = false;
 			}
 			else
 			{
@@ -208,53 +176,53 @@
 
 		return 1;
 	}
-	float Slider_mousePress(entity me, vector pos)
+	METHOD(Slider, mousePress, bool(Slider this, vector pos))
 	{
 		float controlCenter;
-		if (me.disabled) return 0;
-		if (pos.x < 0) return 0;
-		if (pos.y < 0) return 0;
-		if (pos.x >= 1 - me.textSpace) return 0;
-		if (pos.y >= 1) return 0;
-		controlCenter = (me.value - me.valueMin) / (me.valueMax - me.valueMin) * (1 - me.textSpace - me.controlWidth) + 0.5 * me.controlWidth;
-		if (fabs(pos.x - controlCenter) <= 0.5 * me.controlWidth)
+		if (this.disabled) return false;
+		if (pos.x < 0) return false;
+		if (pos.y < 0) return false;
+		if (pos.x >= 1 - this.textSpace) return false;
+		if (pos.y >= 1) return false;
+		controlCenter = (this.value - this.valueMin) / (this.valueMax - this.valueMin) * (1 - this.textSpace - this.controlWidth) + 0.5 * this.controlWidth;
+		if (fabs(pos.x - controlCenter) <= 0.5 * this.controlWidth)
 		{
-			me.pressed = 1;
-			me.pressOffset = pos.x - controlCenter;
-			me.previousValue = me.value;
-			// me.mouseDrag(me, pos);
+			this.pressed = 1;
+			this.pressOffset = pos.x - controlCenter;
+			this.previousValue = this.value;
+			// this.mouseDrag(this, pos);
 		}
 		else
 		{
 			float clickValue, pageValue, inRange;
-			clickValue = median(0, (pos.x - me.pressOffset - 0.5 * me.controlWidth) / (1 - me.textSpace - me.controlWidth), 1) * (me.valueMax - me.valueMin) + me.valueMin;
-			inRange = (almost_in_bounds(me.valueMin, me.value, me.valueMax));
+			clickValue = median(0, (pos.x - this.pressOffset - 0.5 * this.controlWidth) / (1 - this.textSpace - this.controlWidth), 1) * (this.valueMax - this.valueMin) + this.valueMin;
+			inRange = (almost_in_bounds(this.valueMin, this.value, this.valueMax));
 			if (pos.x < controlCenter)
 			{
-				pageValue = me.value - me.valuePageStep;
-				if (me.valueStep) clickValue = floor(clickValue / me.valueStep) * me.valueStep;
+				pageValue = this.value - this.valuePageStep;
+				if (this.valueStep) clickValue = floor(clickValue / this.valueStep) * this.valueStep;
 				pageValue = max(pageValue, clickValue);
-				if (inRange) me.setValue(me, median(me.valueMin, pageValue, me.valueMax));
-				else me.setValue(me, me.valueMax);
 			}
 			else
 			{
-				pageValue = me.value + me.valuePageStep;
-				if (me.valueStep) clickValue = ceil(clickValue / me.valueStep) * me.valueStep;
+				pageValue = this.value + this.valuePageStep;
+				if (this.valueStep) clickValue = ceil(clickValue / this.valueStep) * this.valueStep;
 				pageValue = min(pageValue, clickValue);
-				if (inRange) me.setValue(me, median(me.valueMin, pageValue, me.valueMax));
-				else me.setValue(me, me.valueMax);
 			}
+			if (inRange) this.setValue(this, median(this.valueMin, pageValue, this.valueMax));
+			else this.setValue(this, this.valueMax);
+			if(this.applyButton)
+				this.applyButton.disabled = false;
 			if (pageValue == clickValue)
 			{
-				controlCenter = (me.value - me.valueMin) / (me.valueMax - me.valueMin) * (1 - me.textSpace - me.controlWidth) + 0.5 * me.controlWidth;
-				me.pressed = 1;
-				me.pressOffset = pos.x - controlCenter;
-				me.previousValue = me.value;
-				// me.mouseDrag(me, pos);
+				controlCenter = (this.value - this.valueMin) / (this.valueMax - this.valueMin) * (1 - this.textSpace - this.controlWidth) + 0.5 * this.controlWidth;
+				this.pressed = 1;
+				this.pressOffset = pos.x - controlCenter;
+				this.previousValue = this.value;
+				// this.mouseDrag(this, pos);
 			}
 		}
-		return 1;
+		return true;
 	}
 	float Slider_mouseRelease(entity me, vector pos)
 	{
@@ -298,4 +266,3 @@
 		SUPER(Slider).draw(me);
 		me.text = string_null;  // TEMPSTRING!
 	}
-#endif

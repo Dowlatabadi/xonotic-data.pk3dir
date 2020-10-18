@@ -1,25 +1,23 @@
-#ifndef SORT_H
-#define SORT_H
+#pragma once
 
 /** is only ever called for i1 < i2 */
-typedef void (int i1, int i2, entity pass) swapfunc_t;
+USING(swapfunc_t, void (int i1, int i2, entity pass));
 /** <0 for <, ==0 for ==, >0 for > (like strcmp) */
-typedef int (int i1, int i2, entity pass) comparefunc_t;
+USING(comparefunc_t, int (int i1, int i2, entity pass));
 
+ERASEABLE
 void heapsort(int n, swapfunc_t swap, comparefunc_t cmp, entity pass)
 {
 	#define heapify(_count) \
 		MACRO_BEGIN \
-		{ \
 			for (int start = floor(((_count) - 2) / 2); start >= 0; --start) \
 			{ \
 				siftdown(start, (_count) - 1); \
 			} \
-		} MACRO_END
+		MACRO_END
 
 	#define siftdown(_start, _end) \
 		MACRO_BEGIN \
-		{ \
 			for (int root = (_start); root * 2 + 1 <= (_end); ) \
 			{ \
 				int child = root * 2 + 1; \
@@ -28,7 +26,7 @@ void heapsort(int n, swapfunc_t swap, comparefunc_t cmp, entity pass)
 				swap(root, child, pass); \
 				root = child; \
 			} \
-		} MACRO_END
+		MACRO_END
 
 	heapify(n);
 	int end = n - 1;
@@ -40,6 +38,7 @@ void heapsort(int n, swapfunc_t swap, comparefunc_t cmp, entity pass)
 	}
 }
 
+ERASEABLE
 void shuffle(float n, swapfunc_t swap, entity pass)
 {
 	for (int i = 1; i < n; ++i)
@@ -57,5 +56,3 @@ void shuffle(float n, swapfunc_t swap, entity pass)
 		if (j != i) swap(j, i, pass);
 	}
 }
-
-#endif

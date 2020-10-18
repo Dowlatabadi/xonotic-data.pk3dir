@@ -1,41 +1,7 @@
-#ifndef SOUNDLIST_H
-#define SOUNDLIST_H
-#include "listbox.qc"
-CLASS(XonoticSoundList, XonoticListBox)
-	METHOD(XonoticSoundList, configureXonoticSoundList, void(entity));
-	ATTRIB(XonoticSoundList, rowsPerItem, float, 1)
-	METHOD(XonoticSoundList, resizeNotify, void(entity, vector, vector, vector, vector));
-	METHOD(XonoticSoundList, drawListBoxItem, void(entity, int, vector, bool, bool));
-	METHOD(XonoticSoundList, getSounds, void(entity));
-	METHOD(XonoticSoundList, soundName, string(entity, float));
-	METHOD(XonoticSoundList, doubleClickListBoxItem, void(entity, float, vector));
-	METHOD(XonoticSoundList, keyDown, float(entity, float, float, float));
-	METHOD(XonoticSoundList, destroy, void(entity));
-	METHOD(XonoticSoundList, showNotify, void(entity));
+#include "soundlist.qh"
 
-	ATTRIB(XonoticSoundList, listSound, float, -1)
-	ATTRIB(XonoticSoundList, realFontSize, vector, '0 0 0')
-	ATTRIB(XonoticSoundList, columnNameOrigin, float, 0)
-	ATTRIB(XonoticSoundList, columnNameSize, float, 0)
-	ATTRIB(XonoticSoundList, columnNumberOrigin, float, 0)
-	ATTRIB(XonoticSoundList, columnNumberSize, float, 0)
-	ATTRIB(XonoticSoundList, realUpperMargin, float, 0)
-	ATTRIB(XonoticSoundList, origin, vector, '0 0 0')
-	ATTRIB(XonoticSoundList, itemAbsSize, vector, '0 0 0')
-
-	ATTRIB(XonoticSoundList, filterString, string, string_null)
-	ATTRIB(XonoticSoundList, playlist, entity, NULL)
-ENDCLASS(XonoticSoundList)
-
-entity makeXonoticSoundList();
-void SoundList_Filter_Change(entity box, entity me);
-void SoundList_Add(entity box, entity me);
-void SoundList_Add_All(entity box, entity me);
-void SoundList_Menu_Track_Change(entity box, entity me);
-void SoundList_Menu_Track_Reset(entity box, entity me);
-#endif
-
-#ifdef IMPLEMENTATION
+#include "inputbox.qh"
+#include "playlist.qh"
 
 entity makeXonoticSoundList()
 {
@@ -48,10 +14,10 @@ entity makeXonoticSoundList()
 void XonoticSoundList_configureXonoticSoundList(entity me)
 {
 	me.configureXonoticListBox(me);
-	me.getSounds(me);
+	me.nItems = 0;
 }
 
-string XonoticSoundList_soundName(entity me, float i )
+string XonoticSoundList_soundName(entity me, int i)
 {
 	string s;
 	s = search_getfilename(me.listSound, i);
@@ -75,10 +41,7 @@ void XonoticSoundList_getSounds(entity me)
 
 	me.listSound = search_begin(s, false, true);
 
-	if(me.listSound < 0)
-		me.nItems=0;
-	else
-		me.nItems=search_getsize(me.listSound);
+	me.nItems = (me.listSound < 0) ? 0 : search_getsize(me.listSound);
 }
 
 void XonoticSoundList_destroy(entity me)
@@ -92,8 +55,10 @@ void XonoticSoundList_resizeNotify(entity me, vector relOrigin, vector relSize, 
 	me.itemAbsSize = '0 0 0';
 	SUPER(XonoticSoundList).resizeNotify(me, relOrigin, relSize, absOrigin, absSize);
 
-	me.realFontSize_y = me.fontSize / (me.itemAbsSize_y = (absSize.y * me.itemHeight));
-	me.realFontSize_x = me.fontSize / (me.itemAbsSize_x = (absSize.x * (1 - me.controlWidth)));
+	me.itemAbsSize.y = absSize.y * me.itemHeight;
+	me.itemAbsSize.x = absSize.x * (1 - me.controlWidth);
+	me.realFontSize.y = me.fontSize / me.itemAbsSize.y;
+	me.realFontSize.x = me.fontSize / me.itemAbsSize.x;
 	me.realUpperMargin = 0.5 * (1 - me.realFontSize.y);
 
 	me.columnNumberOrigin = 0;
@@ -114,7 +79,7 @@ void XonoticSoundList_drawListBoxItem(entity me, int i, vector absSize, bool isS
 		draw_Fill('0 0 0', '1 1 0', SKINCOLOR_LISTBOX_FOCUSED, me.focusedItemAlpha);
 	}
 
-	s = me.soundName(me,i);
+	s = me.soundName(me, i);
 	if(s == cvar_string("menu_cdtrack")) // current menu track
 		draw_CenterText((me.columnNumberOrigin + 0.5 * me.columnNumberSize) * eX + me.realUpperMargin * eY, "[C]", me.realFontSize, '1 1 1', SKINALPHA_TEXT, 0);
 	else if(s == cvar_defstring("menu_cdtrack")) // default menu track
@@ -131,7 +96,7 @@ void XonoticSoundList_showNotify(entity me)
 
 void SoundList_Menu_Track_Change(entity box, entity me)
 {
-	cvar_set("menu_cdtrack", me.soundName(me,me.selectedItem));
+	cvar_set("menu_cdtrack", me.soundName(me, me.selectedItem));
 }
 
 void SoundList_Menu_Track_Reset(entity box, entity me)
@@ -141,13 +106,10 @@ void SoundList_Menu_Track_Reset(entity box, entity me)
 
 void SoundList_Filter_Change(entity box, entity me)
 {
-	if(me.filterString)
-		strunzone(me.filterString);
+	strfree(me.filterString);
 
 	if(box.text != "")
 		me.filterString = strzone(box.text);
-	else
-		me.filterString = string_null;
 
 	me.getSounds(me);
 }
@@ -159,12 +121,12 @@ void SoundList_Add(entity box, entity me)
 
 void SoundList_Add_All(entity box, entity me)
 {
-	float i;
+	int i;
 	for(i = 0; i < me.nItems; ++i)
 		me.playlist.addToPlayList(me.playlist, me.soundName(me, i));
 }
 
-void XonoticSoundList_doubleClickListBoxItem(entity me, float i, vector where)
+void XonoticSoundList_doubleClickListBoxItem(entity me, int i, vector where)
 {
 	me.playlist.addToPlayList(me.playlist, me.soundName(me, i));
 }
@@ -178,5 +140,3 @@ float XonoticSoundList_keyDown(entity me, float scan, float ascii, float shift)
 	else
 		return SUPER(XonoticSoundList).keyDown(me, scan, ascii, shift);
 }
-#endif
-

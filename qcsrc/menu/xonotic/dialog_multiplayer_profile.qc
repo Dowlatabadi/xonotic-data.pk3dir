@@ -1,19 +1,17 @@
-#ifndef DIALOG_MULTIPLAYER_PROFILE_H
-#define DIALOG_MULTIPLAYER_PROFILE_H
-#include "tab.qc"
-CLASS(XonoticProfileTab, XonoticTab)
-	METHOD(XonoticProfileTab, fill, void(entity));
-	METHOD(XonoticProfileTab, draw, void(entity));
-	ATTRIB(XonoticProfileTab, intendedWidth, float, 0.9)
-	ATTRIB(XonoticProfileTab, rows, float, 23)
-	ATTRIB(XonoticProfileTab, columns, float, 6.1) // added extra .2 for center space
-	ATTRIB(XonoticProfileTab, playerNameLabel, entity, NULL)
-	ATTRIB(XonoticProfileTab, playerNameLabelAlpha, float, SKINALPHA_HEADER)
-ENDCLASS(XonoticProfileTab)
-entity makeXonoticProfileTab();
-#endif
+#include "dialog_multiplayer_profile.qh"
 
-#ifdef IMPLEMENTATION
+#include "playermodel.qh"
+#include "statslist.qh"
+#include "languagelist.qh"
+#include "textlabel.qh"
+#include "commandbutton.qh"
+#include "inputbox.qh"
+#include "colorpicker.qh"
+#include "charmap.qh"
+#include "colorbutton.qh"
+#include "checkbox.qh"
+#include "radiobutton.qh"
+
 entity makeXonoticProfileTab()
 {
 	entity me;
@@ -29,10 +27,21 @@ void XonoticProfileTab_draw(entity me)
 		me.playerNameLabel.alpha = me.playerNameLabelAlpha;
 	SUPER(XonoticProfileTab).draw(me);
 }
+void language_selector_click(entity me, entity btn)
+{
+	localcmd("\nmenu_cmd languageselect\n");
+}
 void XonoticProfileTab_fill(entity me)
 {
 	entity e, pms, label, box;
 	float i;
+	entity profileApplyButton = makeXonoticCommandButton(_("Apply immediately"), '0 0 0',
+		"color -1 -1;" // apply colors contained in _cl_color
+		"name \"$_cl_name\";"
+		"playermodel $_cl_playermodel;"
+		"playerskin $_cl_playerskin;"
+		, COMMANDBUTTON_APPLY);
+	profileApplyButton.disableOnClick = true;
 
 	// ==============
 	//  NAME SECTION
@@ -55,6 +64,7 @@ void XonoticProfileTab_fill(entity me)
 			box.maxLength = -127; // negative means encoded length in bytes
 			box.saveImmediately = 0;  // Sorry, can't do this, it spams "name" commands.
 			box.enableClearButton = 0;
+			box.applyButton = profileApplyButton;
 			label.textEntity = box;
 	me.TR(me);
 		me.TD(me, 5, 1, e = makeXonoticColorpicker(box));
@@ -75,10 +85,12 @@ void XonoticProfileTab_fill(entity me)
 		me.TD(me, 1, 0.3, e = makeXonoticButton("<<", '0 0 0'));
 			e.onClick = PlayerModelSelector_Prev_Click;
 			e.onClickEntity = pms;
+			e.applyButton = profileApplyButton;
 		me.TD(me, 11.5, 1.4, pms);
 		me.TD(me, 1, 0.3, e = makeXonoticButton(">>", '0 0 0'));
 			e.onClick = PlayerModelSelector_Next_Click;
 			e.onClickEntity = pms;
+			e.applyButton = profileApplyButton;
 
 	//me.setFirstColumn(me, me.currentColumn + 2); // MODEL LEFT, COLOR RIGHT
 	me.gotoRC(me, me.currentRow, 0); me.setFirstColumn(me, me.currentColumn); // MODEL RIGHT, COLOR LEFT
@@ -89,6 +101,7 @@ void XonoticProfileTab_fill(entity me)
 			if(mod(i, 5) == 0)
 				me.TR(me);
 			me.TDNoMargin(me, 1, 0.2, e = makeXonoticColorButton(1, 0, i), '0 1 0');
+				e.applyButton = profileApplyButton;
 		}
 	me.TR(me);
 	me.TR(me);
@@ -98,6 +111,7 @@ void XonoticProfileTab_fill(entity me)
 			if(mod(i, 5) == 0)
 				me.TR(me);
 			me.TDNoMargin(me, 1, 0.2, e = makeXonoticColorButton(2, 1, i), '0 1 0');
+				e.applyButton = profileApplyButton;
 		}
 
 	// ====================
@@ -111,11 +125,18 @@ void XonoticProfileTab_fill(entity me)
 	me.TR(me);
 		me.TDempty(me, 0.25);
 		me.TD(me, 1, 2.5, e = makeXonoticCheckBox(0, "cl_allow_uidtracking", _("Allow player statistics to track your client")));
+			e.sendCvars = true;
 	me.TR(me);
 		me.TDempty(me, 0.25);
 		me.TD(me, 1, 2.5, e = makeXonoticCheckBox(0, "cl_allow_uid2name", _("Allow player statistics to use your nickname")));
-		setDependent(e, "cl_allow_uidtracking", 1, 1);
-	me.gotoRC(me, 4, 3.1); // TOP RIGHT
+			e.sendCvars = true;
+			setDependent(e, "cl_allow_uidtracking", 1, 1);
+	me.TR(me);
+		me.TDempty(me, 0.25);
+		me.TD(me, 1, 2.5, e = makeXonoticCheckBox(0, "cl_allow_uidranking", _("Allow player statistics to rank you in leaderboards")));
+			e.sendCvars = true;
+			setDependent(e, "cl_allow_uidtracking", 1, 1);
+	me.gotoRC(me, 4.5, 3.1); // TOP RIGHT
 	//me.gotoRC(me, 12.5, 3.1); // BOTTOM RIGHT
 	//me.gotoRC(me, 12.5, 0); // BOTTOM LEFT
 		me.TDempty(me, 0.25);
@@ -131,8 +152,14 @@ void XonoticProfileTab_fill(entity me)
 		me.TD(me, 1, 3, e = makeXonoticHeaderLabel(_("Country")));
 
 	me.TR(me);
+		me.TDempty(me, 0.75);
+		me.TD(me, 1, 1.5, e = makeXonoticButton(_("Select language..."), '0 0 0'));
+			e.onClick = language_selector_click;
+			e.onClickEntity = me;
+		/*
 		me.TDempty(me, 0.5);
 		me.TD(me, 4.5, 2, e = makeXonoticLanguageList()); // todo: cl_country: create proper country list
+		*/
 
 
 	// ================
@@ -161,6 +188,5 @@ void XonoticProfileTab_fill(entity me)
 	#endif
 
 	me.gotoRC(me, me.rows - 1, 0);
-		me.TD(me, 1, me.columns, makeXonoticCommandButton(_("Apply immediately"), '0 0 0', "color -1 -1;name \"$_cl_name\";sendcvar cl_autoswitch;sendcvar cl_forceplayermodels;sendcvar cl_forceplayermodelsfromxonotic;playermodel $_cl_playermodel;playerskin $_cl_playerskin", COMMANDBUTTON_APPLY));
+		me.TD(me, 1, me.columns, profileApplyButton);
 }
-#endif

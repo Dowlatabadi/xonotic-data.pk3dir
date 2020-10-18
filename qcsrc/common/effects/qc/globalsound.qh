@@ -1,5 +1,13 @@
-#ifndef GLOBALSOUND_H
-#define GLOBALSOUND_H
+#pragma once
+
+#if defined(SVQC)
+	#include <server/chat.qh>
+#endif
+
+#ifdef SVQC
+	/** Use new sound handling. TODO: use when sounds play correctly on clients */
+	bool autocvar_g_debug_globalsounds = false;
+#endif
 
 // player sounds, voice messages
 
@@ -7,24 +15,22 @@
 ..string m_playersoundfld;
 
 REGISTRY(PlayerSounds, BITS(8) - 1)
-#define PlayerSounds_from(i) _PlayerSounds_from(i, NULL)
 #define REGISTER_PLAYERSOUND(id) \
 	.string _playersound_##id; \
-	REGISTER(PlayerSounds, playersound, id, m_id, new(PlayerSound)) \
+	REGISTER(PlayerSounds, playersound, id, m_id, new_pure(PlayerSound)) \
 	{ \
-		make_pure(this); \
 		this.m_playersoundstr = #id; \
 		this.m_playersoundfld = _playersound_##id; \
 	}
 REGISTER_REGISTRY(PlayerSounds)
 REGISTRY_SORT(PlayerSounds)
+
+REGISTRY_DEFINE_GET(PlayerSounds, NULL)
 STATIC_INIT(PlayerSounds_renumber)
 {
-	FOREACH(PlayerSounds, true, LAMBDA(it.m_id = i));
+	FOREACH(PlayerSounds, true, it.m_id = i);
 }
 REGISTRY_CHECK(PlayerSounds)
-
-// TODO implement fall and falling
 
 REGISTER_PLAYERSOUND(death)
 REGISTER_PLAYERSOUND(drown)
@@ -39,12 +45,11 @@ REGISTER_PLAYERSOUND(pain75)
 
 .bool instanceOfVoiceMessage;
 .int m_playersoundvt;
-#define REGISTER_VOICEMSG(id, vt) \
+#define REGISTER_VOICEMSG(id, vt, listed) \
 	.string _playersound_##id; \
-	REGISTER(PlayerSounds, playersound, id, m_id, new(VoiceMessage)) \
+	REGISTER(PlayerSounds, playersound, id, m_id, new_pure(VoiceMessage)) \
 	{ \
-		make_pure(this); \
-		this.instanceOfVoiceMessage = true; \
+		this.instanceOfVoiceMessage = listed; \
 		this.m_playersoundstr = #id; \
 		this.m_playersoundfld = _playersound_##id; \
 		this.m_playersoundvt = vt; \
@@ -57,51 +62,51 @@ const int VOICETYPE_LASTATTACKER_ONLY = 13;
 const int VOICETYPE_AUTOTAUNT = 14;
 const int VOICETYPE_TAUNT = 15;
 
-REGISTER_VOICEMSG(attack, VOICETYPE_TEAMRADIO)
-REGISTER_VOICEMSG(attackinfive, VOICETYPE_TEAMRADIO)
-REGISTER_VOICEMSG(coverme, VOICETYPE_TEAMRADIO)
-REGISTER_VOICEMSG(defend, VOICETYPE_TEAMRADIO)
-REGISTER_VOICEMSG(freelance, VOICETYPE_TEAMRADIO)
-REGISTER_VOICEMSG(incoming, VOICETYPE_TEAMRADIO)
-REGISTER_VOICEMSG(meet, VOICETYPE_TEAMRADIO)
-REGISTER_VOICEMSG(needhelp, VOICETYPE_TEAMRADIO)
-REGISTER_VOICEMSG(seenflag, VOICETYPE_TEAMRADIO)
-REGISTER_VOICEMSG(taunt, VOICETYPE_TAUNT)
-REGISTER_VOICEMSG(teamshoot, VOICETYPE_LASTATTACKER)
+REGISTER_VOICEMSG(attack, VOICETYPE_TEAMRADIO, true)
+REGISTER_VOICEMSG(attackinfive, VOICETYPE_TEAMRADIO, true)
+REGISTER_VOICEMSG(coverme, VOICETYPE_TEAMRADIO, true)
+REGISTER_VOICEMSG(defend, VOICETYPE_TEAMRADIO, true)
+REGISTER_VOICEMSG(freelance, VOICETYPE_TEAMRADIO, true)
+REGISTER_VOICEMSG(incoming, VOICETYPE_TEAMRADIO, true)
+REGISTER_VOICEMSG(meet, VOICETYPE_TEAMRADIO, true)
+REGISTER_VOICEMSG(needhelp, VOICETYPE_TEAMRADIO, true)
+REGISTER_VOICEMSG(seenflag, VOICETYPE_TEAMRADIO, true)
+REGISTER_VOICEMSG(taunt, VOICETYPE_TAUNT, true)
+REGISTER_VOICEMSG(teamshoot, VOICETYPE_LASTATTACKER, true)
 
-// reserved sound names for the future (some models lack sounds for them):
-// _VOICEMSG(flagcarriertakingdamage)
-// _VOICEMSG(getflag)
-// reserved sound names for the future (ALL models lack sounds for them):
-// _VOICEMSG(affirmative)
-// _VOICEMSG(attacking)
-// _VOICEMSG(defending)
-// _VOICEMSG(roaming)
-// _VOICEMSG(onmyway)
-// _VOICEMSG(droppedflag)
-// _VOICEMSG(negative)
-// _VOICEMSG(seenenemy)
+//NOTE: some models lack sounds for these:
+REGISTER_VOICEMSG(flagcarriertakingdamage, VOICETYPE_TEAMRADIO, false)
+REGISTER_VOICEMSG(getflag, VOICETYPE_TEAMRADIO, false)
+//NOTE: ALL models lack sounds for these (only available in default sounds currently):
+REGISTER_VOICEMSG(affirmative, VOICETYPE_TEAMRADIO, false)
+REGISTER_VOICEMSG(attacking, VOICETYPE_TEAMRADIO, false)
+REGISTER_VOICEMSG(defending, VOICETYPE_TEAMRADIO, false)
+REGISTER_VOICEMSG(roaming, VOICETYPE_TEAMRADIO, false)
+REGISTER_VOICEMSG(onmyway, VOICETYPE_TEAMRADIO, false)
+REGISTER_VOICEMSG(droppedflag, VOICETYPE_TEAMRADIO, false)
+REGISTER_VOICEMSG(negative, VOICETYPE_TEAMRADIO, false)
+REGISTER_VOICEMSG(seenenemy, VOICETYPE_TEAMRADIO, false)
 
 .string m_globalsoundstr;
 REGISTRY(GlobalSounds, BITS(8) - 1)
-#define GlobalSounds_from(i) _GlobalSounds_from(i, NULL)
 #define REGISTER_GLOBALSOUND(id, str) \
-	REGISTER(GlobalSounds, GS, id, m_id, new(GlobalSound)) \
+	REGISTER(GlobalSounds, GS, id, m_id, new_pure(GlobalSound)) \
 	{ \
-		make_pure(this); \
 		this.m_globalsoundstr = str; \
 	}
 REGISTER_REGISTRY(GlobalSounds)
 REGISTRY_SORT(GlobalSounds)
+
+REGISTRY_DEFINE_GET(GlobalSounds, NULL)
 STATIC_INIT(GlobalSounds_renumber)
 {
-	FOREACH(GlobalSounds, true, LAMBDA(it.m_id = i));
+	FOREACH(GlobalSounds, true, it.m_id = i);
 }
 REGISTRY_CHECK(GlobalSounds)
 void PrecacheGlobalSound(string samplestring);
 PRECACHE(GlobalSounds)
 {
-	FOREACH(GlobalSounds, true, LAMBDA(PrecacheGlobalSound(it.m_globalsoundstr)));
+	FOREACH(GlobalSounds, true, PrecacheGlobalSound(it.m_globalsoundstr));
 }
 
 REGISTER_GLOBALSOUND(STEP, "misc/footstep0 6")
@@ -111,34 +116,43 @@ REGISTER_GLOBALSOUND(FALL_METAL, "misc/metalhitground 4")
 
 bool GetPlayerSoundSampleField_notFound;
 void PrecachePlayerSounds(string f);
-#ifdef CSQC
+//#ifdef CSQC
 	.string GetVoiceMessageSampleField(string type);
 	.string GetPlayerSoundSampleField(string type);
 	void ClearPlayerSounds(entity this);
 	float LoadPlayerSounds(entity this, string f, bool strict);
 	void UpdatePlayerSounds(entity this);
-#endif
+//#endif
+entity GetVoiceMessage(string type);
+
+string GlobalSound_sample(string pair, float r);
+
+float GlobalSound_pitch(float _pitch);
 
 #ifdef SVQC
 
-	void _GlobalSound(entity this, entity gs, entity ps, string sample, float chan, float voicetype, bool fake);
-	#define GlobalSound(this, def, chan, voicetype) _GlobalSound(this, def, NULL, string_null, chan, voicetype, false)
-	#define GlobalSound_string(this, def, chan, voicetype) _GlobalSound(this, NULL, NULL, def, chan, voicetype, false)
-	#define PlayerSound(this, def, chan, voicetype) _GlobalSound(this, NULL, def, string_null, chan, voicetype, false)
+	void _GlobalSound(entity this, entity gs, entity ps, string sample, float chan, float vol, float voicetype, bool fake);
+	#define GlobalSound(this, def, chan, vol, voicetype) _GlobalSound(this, def, NULL, string_null, chan, vol, voicetype, false)
+	#define GlobalSound_string(this, def, chan, vol, voicetype) _GlobalSound(this, NULL, NULL, def, chan, vol, voicetype, false)
+	#define PlayerSound(this, def, chan, vol, voicetype) _GlobalSound(this, NULL, def, string_null, chan, vol, voicetype, false)
 	#define VoiceMessage(this, def, msg) \
 		MACRO_BEGIN \
-		{ \
 			entity VM = def; \
 			int voicetype = VM.m_playersoundvt; \
 			bool ownteam = (voicetype == VOICETYPE_TEAMRADIO); \
-			int flood = Say(this, ownteam, world, msg, true); \
+			int flood = Say(this, ownteam, NULL, msg, true); \
 			bool fake; \
 			if (IS_SPEC(this) || IS_OBSERVER(this) || flood < 0) fake = true; \
 			else if (flood > 0) fake = false; \
 			else break; \
-			_GlobalSound(this, NULL, VM, string_null, CH_VOICE, voicetype, fake); \
-		} MACRO_END
+			_GlobalSound(this, NULL, VM, string_null, CH_VOICE, VOL_BASEVOICE, voicetype, fake); \
+		MACRO_END
 
 #endif
 
-#endif
+string allvoicesamples;
+STATIC_INIT(allvoicesamples)
+{
+    FOREACH(PlayerSounds, it.instanceOfVoiceMessage, allvoicesamples = strcat(allvoicesamples, " ", it.m_playersoundstr));
+    allvoicesamples = strzone(substring(allvoicesamples, 1, -1));
+}

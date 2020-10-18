@@ -1,11 +1,3 @@
-electro
-{
-	dpreflectcube cubemaps/default/sky
- 	{
-		map textures/electro.tga
-		rgbgen lightingDiffuse
-	}
-}
 nexgun
 {
 	dpreflectcube cubemaps/default/sky
@@ -23,19 +15,11 @@ uzi
 		rgbgen lightingDiffuse
 	}
 }
-glauncher
+hagar
 {
 	dpreflectcube cubemaps/default/sky
  	{
-		map textures/glauncher.tga
-		rgbgen lightingDiffuse
-	}
-}
-hagar2
-{
-	dpreflectcube cubemaps/default/sky
- 	{
-		map textures/hagar2.tga
+		map textures/hagar.tga
 		rgbgen lightingDiffuse
 	}
 }
@@ -52,14 +36,6 @@ shotgun2
 	dpreflectcube cubemaps/default/sky
  	{
 		map textures/shotgun2.tga
-		rgbgen lightingDiffuse
-	}
-}
-rl
-{
-	dpreflectcube cubemaps/default/sky
- 	{
-		map textures/rl.tga
 		rgbgen lightingDiffuse
 	}
 }
@@ -108,6 +84,14 @@ shotgun
 	dpreflectcube cubemaps/default/sky
 	{
 		map textures/arc.tga
+		rgbgen lightingDiffuse
+	}
+}
+SniperRifle
+{
+	dpreflectcube cubemaps/default/sky
+ 	{
+		map textures/sniperrifle.tga
 		rgbgen lightingDiffuse
 	}
 }

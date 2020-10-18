@@ -1,47 +1,8 @@
-#ifndef VEHICLE_RACER_WEAPON_H
-#define VEHICLE_RACER_WEAPON_H
-
-#include "../../weapons/all.qh"
-
-CLASS(RacerAttack, PortoLaunch)
-/* flags     */ ATTRIB(RacerAttack, spawnflags, int, WEP_TYPE_OTHER | WEP_FLAG_HIDDEN | WEP_FLAG_MUTATORBLOCKED);
-/* impulse   */ ATTRIB(RacerAttack, impulse, int, 3);
-/* refname   */ ATTRIB(RacerAttack, netname, string, "racercannon");
-/* wepname   */ ATTRIB(RacerAttack, m_name, string, _("Racer cannon"));
-ENDCLASS(RacerAttack)
-REGISTER_WEAPON(RACER, NEW(RacerAttack));
-
-// TODO: move into implementation
-#ifdef SVQC
-float autocvar_g_vehicle_racer_rocket_refire;
-void racer_fire_rocket(entity player, vector org, vector dir, entity trg);
-#endif
-
-#endif
-
-#ifdef IMPLEMENTATION
+#include "racer_weapon.qh"
 
 #ifdef SVQC
 
-float autocvar_g_vehicle_racer_cannon_cost;
-float autocvar_g_vehicle_racer_cannon_damage;
-float autocvar_g_vehicle_racer_cannon_radius;
-float autocvar_g_vehicle_racer_cannon_refire;
-float autocvar_g_vehicle_racer_cannon_speed;
-float autocvar_g_vehicle_racer_cannon_spread;
-float autocvar_g_vehicle_racer_cannon_force;
-
-float autocvar_g_vehicle_racer_rocket_accel;
-float autocvar_g_vehicle_racer_rocket_damage;
-float autocvar_g_vehicle_racer_rocket_radius;
-float autocvar_g_vehicle_racer_rocket_force;
-float autocvar_g_vehicle_racer_rocket_speed;
-float autocvar_g_vehicle_racer_rocket_turnrate;
-
-float autocvar_g_vehicle_racer_rocket_climbspeed;
-float autocvar_g_vehicle_racer_rocket_locked_maxangle;
-
-void racer_fire_rocket(entity player, vector org, vector dir, entity trg);
+void racer_fire_rocket(entity this, entity player, vector org, vector dir, entity trg);
 METHOD(RacerAttack, wr_think, void(entity thiswep, entity actor, .entity weaponentity, int fire))
 {
     bool isPlayer = IS_PLAYER(actor);
@@ -53,10 +14,23 @@ METHOD(RacerAttack, wr_think, void(entity thiswep, entity actor, .entity weapone
             veh.vehicle_energy -= autocvar_g_vehicle_racer_cannon_cost;
             veh.wait = time;
         }
-        if (isPlayer) W_SetupShot_Dir(player, v_forward, false, 0, SND(Null), CH_WEAPON_B, 0);
+        if(!isPlayer)
+        {
+            string tagname = (veh.cnt)
+                ? (veh.cnt = 0, "tag_fire1")
+                : (veh.cnt = 1, "tag_fire2");
+            vector vshotorg = gettaginfo(veh, gettagindex(veh, tagname));
+            w_shotorg = vshotorg;
+            w_shotdir = v_forward;
+
+            // Fix z-aim (for chase mode)
+            crosshair_trace(player);
+            w_shotdir.z = normalize(trace_endpos - vshotorg).z * 0.5;
+        }
+        if (isPlayer) W_SetupShot_Dir(player, weaponentity, v_forward, false, 0, SND_Null, CH_WEAPON_B, 0, DEATH_VH_WAKI_GUN.m_id);
         vector org = w_shotorg;
         vector dir = w_shotdir;
-        entity bolt = vehicles_projectile(EFFECT_RACER_MUZZLEFLASH.eent_eff_name, SND(LASERGUN_FIRE),
+        entity bolt = vehicles_projectile(((veh) ? veh : player), EFFECT_RACER_MUZZLEFLASH, SND_LASERGUN_FIRE,
                                org, normalize(v_forward + randomvec() * autocvar_g_vehicle_racer_cannon_spread) * autocvar_g_vehicle_racer_cannon_speed,
                                autocvar_g_vehicle_racer_cannon_damage, autocvar_g_vehicle_racer_cannon_radius, autocvar_g_vehicle_racer_cannon_force,  0,
                                DEATH_VH_WAKI_GUN.m_id, PROJECTILE_WAKICANNON, 0, true, true, player);
@@ -65,27 +39,26 @@ METHOD(RacerAttack, wr_think, void(entity thiswep, entity actor, .entity weapone
     }
     if (fire & 2)
     if (!isPlayer || weapon_prepareattack(thiswep, actor, weaponentity, false, 0.2)) {
-        if (isPlayer) W_SetupShot_Dir(actor, v_forward, false, 0, SND(Null), CH_WEAPON_B, 0);
-        racer_fire_rocket(player, w_shotorg, w_shotdir, NULL);
+        if (isPlayer) W_SetupShot_Dir(actor, weaponentity, v_forward, false, 0, SND_Null, CH_WEAPON_B, 0, DEATH_VH_WAKI_ROCKET.m_id);
+        racer_fire_rocket(((veh) ? veh : player), player, w_shotorg, w_shotdir, NULL);
         weapon_thinkf(actor, weaponentity, WFRAME_FIRE2, 0, w_ready);
     }
 }
 
-METHOD(RacerAttack, wr_checkammo1, bool(RacerAttack thiswep))
+METHOD(RacerAttack, wr_checkammo1, bool(RacerAttack thiswep, entity actor, .entity weaponentity))
 {
-    SELFPARAM();
-    bool isPlayer = IS_PLAYER(self);
-    entity player = isPlayer ? self : self.owner;
+    bool isPlayer = IS_PLAYER(actor);
+    entity player = isPlayer ? actor : actor.owner;
     entity veh = player.vehicle;
     return isPlayer || veh.vehicle_energy >= autocvar_g_vehicle_racer_cannon_cost;
 }
 
-void racer_rocket_tracker();
-void racer_rocket_groundhugger();
+void racer_rocket_tracker(entity this);
+void racer_rocket_groundhugger(entity this);
 
-void racer_fire_rocket(entity player, vector org, vector dir, entity trg)
-{SELFPARAM();
-    entity rocket = vehicles_projectile(EFFECT_RACER_ROCKETLAUNCH.eent_eff_name, SND(ROCKET_FIRE),
+void racer_fire_rocket(entity this, entity player, vector org, vector dir, entity trg)
+{
+    entity rocket = vehicles_projectile(this, EFFECT_RACER_ROCKETLAUNCH, SND_ROCKET_FIRE,
                            org, dir * autocvar_g_vehicle_racer_rocket_speed,
                            autocvar_g_vehicle_racer_rocket_damage, autocvar_g_vehicle_racer_rocket_radius, autocvar_g_vehicle_racer_rocket_force, 3,
                            DEATH_VH_WAKI_ROCKET.m_id, PROJECTILE_WAKIROCKET, 20, false, false, player);
@@ -97,115 +70,113 @@ void racer_fire_rocket(entity player, vector org, vector dir, entity trg)
     rocket.cnt			  = time + 15;
 
     if(trg)
-        rocket.think			= racer_rocket_tracker;
+        setthink(rocket, racer_rocket_tracker);
     else
-        rocket.think			= racer_rocket_groundhugger;
+        setthink(rocket, racer_rocket_groundhugger);
 }
 
-void racer_rocket_tracker()
-{SELFPARAM();
+void racer_rocket_tracker(entity this)
+{
     vector olddir, newdir;
     float oldvel, newvel;
 
-    self.nextthink  = time;
+    this.nextthink  = time;
 
-    if (self.owner.deadflag != DEAD_NO || self.cnt < time)
+    if (IS_DEAD(this.owner) || this.cnt < time)
     {
-        self.use();
+        this.use(this, NULL, NULL);
         return;
     }
 
-    if(!self.realowner.vehicle)
+    if(!this.realowner.vehicle)
     {
-        UpdateCSQCProjectile(self);
+        UpdateCSQCProjectile(this);
         return;
     }
 
-    olddir = normalize(self.velocity);
-    oldvel = vlen(self.velocity);
-    newvel = oldvel + self.lip;
+    olddir = normalize(this.velocity);
+    oldvel = vlen(this.velocity);
+    newvel = oldvel + this.lip;
     makevectors(vectoangles(olddir));
 
-    float time_to_impact = min(vlen(self.enemy.origin - self.origin) / vlen(self.velocity), 1);
-    vector predicted_origin = self.enemy.origin + self.enemy.velocity * time_to_impact;
+    float time_to_impact = min(vlen(this.enemy.origin - this.origin) / vlen(this.velocity), 1);
+    vector predicted_origin = this.enemy.origin + this.enemy.velocity * time_to_impact;
 
-    traceline(self.origin, self.origin + v_forward * 64 - '0 0 32', MOVE_NORMAL, self);
-    newdir = normalize(predicted_origin - self.origin);
+    traceline(this.origin, this.origin + v_forward * 64 - '0 0 32', MOVE_NORMAL, this);
+    newdir = normalize(predicted_origin - this.origin);
 
     //vector
-    float height_diff = predicted_origin_z - self.origin_z;
+    float height_diff = predicted_origin_z - this.origin_z;
 
-    if(vlen(newdir - v_forward) > autocvar_g_vehicle_racer_rocket_locked_maxangle)
+    if(vdist(newdir - v_forward, >, autocvar_g_vehicle_racer_rocket_locked_maxangle))
     {
         //bprint("Target lost!\n");
         //dprint("OF:", ftos(vlen(newdir - v_forward)), "\n");
-        self.think = racer_rocket_groundhugger;
+        setthink(this, racer_rocket_groundhugger);
         return;
     }
 
-    if(trace_fraction != 1.0 && trace_ent != self.enemy)
+    if(trace_fraction != 1.0 && trace_ent != this.enemy)
         newdir_z += 16 * sys_frametime;
 
-    self.velocity = normalize(olddir + newdir * autocvar_g_vehicle_racer_rocket_turnrate) * newvel;
-    self.velocity_z -= 800 * sys_frametime;
-    self.velocity_z += max(height_diff, autocvar_g_vehicle_racer_rocket_climbspeed) * sys_frametime ;
+    this.velocity = normalize(olddir + newdir * autocvar_g_vehicle_racer_rocket_turnrate) * newvel;
+    this.velocity_z -= 800 * sys_frametime;
+    this.velocity_z += max(height_diff, autocvar_g_vehicle_racer_rocket_climbspeed) * sys_frametime ;
 
-    UpdateCSQCProjectile(self);
+    UpdateCSQCProjectile(this);
     return;
 }
 
-void racer_rocket_groundhugger()
-{SELFPARAM();
+void racer_rocket_groundhugger(entity this)
+{
     vector olddir, newdir;
     float oldvel, newvel;
 
-    self.nextthink  = time;
+    this.nextthink  = time;
 
-    if(self.owner.deadflag != DEAD_NO || self.cnt < time)
+    if(IS_DEAD(this.owner) || this.cnt < time)
     {
-        self.use();
+        this.use(this, NULL, NULL);
         return;
     }
 
-    if(!self.realowner.vehicle)
+    if(!this.realowner.vehicle)
     {
-        UpdateCSQCProjectile(self);
+        UpdateCSQCProjectile(this);
         return;
     }
 
-    olddir = normalize(self.velocity);
-    oldvel = vlen(self.velocity);
-    newvel = oldvel + self.lip;
+    olddir = normalize(this.velocity);
+    oldvel = vlen(this.velocity);
+    newvel = oldvel + this.lip;
 
-    tracebox(self.origin, self.mins, self.maxs, self.origin + olddir * 64, MOVE_WORLDONLY,self);
+    tracebox(this.origin, this.mins, this.maxs, this.origin + olddir * 64, MOVE_WORLDONLY,this);
     if(trace_fraction <= 0.5)
     {
         // Hitting somethign soon, just speed ahead
-        self.velocity = olddir * newvel;
-        UpdateCSQCProjectile(self);
+        this.velocity = olddir * newvel;
+        UpdateCSQCProjectile(this);
         return;
     }
 
-    traceline(trace_endpos, trace_endpos - '0 0 64', MOVE_NORMAL, self);
+    traceline(trace_endpos, trace_endpos - '0 0 64', MOVE_NORMAL, this);
     if(trace_fraction != 1.0)
     {
-        newdir = normalize(trace_endpos + '0 0 64' - self.origin) * autocvar_g_vehicle_racer_rocket_turnrate;
-        self.velocity = normalize(olddir + newdir) * newvel;
+        newdir = normalize(trace_endpos + '0 0 64' - this.origin) * autocvar_g_vehicle_racer_rocket_turnrate;
+        this.velocity = normalize(olddir + newdir) * newvel;
     }
     else
     {
-        self.velocity = olddir * newvel;
-        self.velocity_z -= 1600 * sys_frametime; // 2x grav looks better for this one
+        this.velocity = olddir * newvel;
+        this.velocity_z -= 1600 * sys_frametime; // 2x grav looks better for this one
     }
 
-    int cont = pointcontents(self.origin - '0 0 32');
+    int cont = pointcontents(this.origin - '0 0 32');
     if(cont == CONTENT_WATER || cont == CONTENT_LAVA || cont == CONTENT_SLIME)
-        self.velocity_z += 200;
+        this.velocity_z += 200;
 
-    UpdateCSQCProjectile(self);
+    UpdateCSQCProjectile(this);
     return;
 }
-
-#endif
 
 #endif

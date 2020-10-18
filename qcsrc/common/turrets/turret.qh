@@ -1,29 +1,28 @@
-#ifndef TURRET_H
-#define TURRET_H
+#pragma once
 
-#include "../weapons/all.qh"
+#include <common/weapons/_all.qh>
 
 CLASS(Turret, Object)
-    ATTRIB(Turret, m_id, int, 0)
+    ATTRIB(Turret, m_id, int, 0);
 
     /** short name */
-    ATTRIB(Turret, netname, string, string_null)
+    ATTRIB(Turret, netname, string);
     /** human readable name */
-    ATTRIB(Turret, turret_name, string, _("Turret"))
+    ATTRIB(Turret, turret_name, string, _("Turret"));
     /** currently a copy of the model */
-    ATTRIB(Turret, mdl, string, string_null)
+    ATTRIB(Turret, mdl, string);
     /** full name of model */
-    ATTRIB(Turret, model, string, string_null)
+    ATTRIB(Turret, model, string);
     /** full name of tur_head model */
-    ATTRIB(Turret, head_model, string, string_null)
+    ATTRIB(Turret, head_model, string);
 
-    ATTRIB(Turret, spawnflags, int, 0)
+    ATTRIB(Turret, spawnflags, int, 0);
     /** turret hitbox size */
-    ATTRIB(Turret, mins, vector, '-0 -0 -0')
+    ATTRIB(Turret, m_mins, vector, '-0 -0 -0');
     /** turret hitbox size */
-    ATTRIB(Turret, maxs, vector, '0 0 0')
+    ATTRIB(Turret, m_maxs, vector, '0 0 0');
 
-    METHOD(Turret, display, void(entity this, void(string name, string icon) returns)) {
+    METHOD(Turret, display, void(Turret this, void(string name, string icon) returns)) {
         returns(this.turret_name, string_null);
     }
     /** (BOTH) setup turret data */
@@ -31,7 +30,7 @@ CLASS(Turret, Object)
 
     }
     /** (SERVER) logic to run every frame */
-    METHOD(Turret, tr_think, void(Turret this)) {
+    METHOD(Turret, tr_think, void(Turret this, entity it)) {
 
     }
     /** (SERVER) called when turret dies */
@@ -42,19 +41,17 @@ CLASS(Turret, Object)
     METHOD(Turret, tr_precache, void(Turret this)) {
 
     }
-    ATTRIB(Turret, m_weapon, Weapon, WEP_Null)
+    ATTRIB(Turret, m_weapon, Weapon);
 #ifdef SVQC
     /** (SERVER) called when turret attacks */
-    METHOD(Turret, tr_attack, void(Turret this)) {
+    METHOD(Turret, tr_attack, void(Turret this, entity it)) {
         Weapon w = this.m_weapon;
         .entity weaponentity = weaponentities[0];
-        w.wr_think(w, self, weaponentity, 1);
+        w.wr_think(w, it, weaponentity, 1);
     }
 #endif
-    /** (ALL) */
-    METHOD(Turret, tr_config, void(Turret this)) {
-        // TODO
-    }
+	/** (SERVER) dump turret cvars to config in data directory (see: sv_cmd dumpturrets) */
+	METHOD(Turret, tr_config, void(Turret this)) { }
 ENDCLASS(Turret)
 
 // fields:
@@ -63,19 +60,20 @@ ENDCLASS(Turret)
 // target selection flags
 .int target_select_flags;
 .int target_validate_flags;
-const int TFL_TARGETSELECT_NO = 2; // don't automatically find targets
-const int TFL_TARGETSELECT_LOS = 4; // require line of sight to find targets
-const int TFL_TARGETSELECT_PLAYERS = 8; // target players
-const int TFL_TARGETSELECT_MISSILES = 16; // target projectiles
-const int TFL_TARGETSELECT_TRIGGERTARGET = 32; // respond to turret_trigger_target events
-const int TFL_TARGETSELECT_ANGLELIMITS = 64; // apply extra angular limits to target selection
-const int TFL_TARGETSELECT_RANGELIMITS = 128; // limit target selection range
-const int TFL_TARGETSELECT_TEAMCHECK = 256; // don't attack teammates
-const int TFL_TARGETSELECT_NOBUILTIN = 512; // only attack targets when triggered
-const int TFL_TARGETSELECT_OWNTEAM = 1024; // only attack teammates
-const int TFL_TARGETSELECT_NOTURRETS = 2048; // don't attack other turrets
-const int TFL_TARGETSELECT_FOV = 4096; // extra limits to attack range
-const int TFL_TARGETSELECT_MISSILESONLY = 8192; // only attack missiles
+const int TFL_TARGETSELECT_NO = BIT(1); // don't automatically find targets
+const int TFL_TARGETSELECT_LOS = BIT(2); // require line of sight to find targets
+const int TFL_TARGETSELECT_PLAYERS = BIT(3); // target players
+const int TFL_TARGETSELECT_MISSILES = BIT(4); // target projectiles
+const int TFL_TARGETSELECT_TRIGGERTARGET = BIT(5); // respond to turret_trigger_target events
+const int TFL_TARGETSELECT_ANGLELIMITS = BIT(6); // apply extra angular limits to target selection
+const int TFL_TARGETSELECT_RANGELIMITS = BIT(7); // limit target selection range
+const int TFL_TARGETSELECT_TEAMCHECK = BIT(8); // don't attack teammates
+const int TFL_TARGETSELECT_NOBUILTIN = BIT(9); // only attack targets when triggered
+const int TFL_TARGETSELECT_OWNTEAM = BIT(10); // only attack teammates
+const int TFL_TARGETSELECT_NOTURRETS = BIT(11); // don't attack other turrets
+const int TFL_TARGETSELECT_FOV = BIT(12); // extra limits to attack range
+const int TFL_TARGETSELECT_MISSILESONLY = BIT(13); // only attack missiles
+const int TFL_TARGETSELECT_VEHICLES = BIT(14); // target manned vehicles
 
 // aim flags
 .int aim_flags;
@@ -176,5 +174,3 @@ const int TNSF_MOVE         = 64;
 const int TNSF_ANIM         = 128;
 
 const int TNSF_FULL_UPDATE  = 16777215;
-
-#endif

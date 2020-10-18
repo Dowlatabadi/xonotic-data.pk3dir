@@ -1,5 +1,4 @@
-#ifndef DPEXTENSIONS_H
-#define DPEXTENSIONS_H
+#pragma once
 
 #pragma noref 1
 
@@ -63,6 +62,8 @@ int(string s1, string s2, int len) _strncasecmp = #230;
 int() _buf_create = #460;
 #define buf_create _buf_create
 
-#pragma noref 0
+vector(float skel, float bonenum) _skel_get_boneabs_hidden = #270;
+void(float skel, float bonenum, vector org) _skel_set_bone_hidden = #271;
+vector(entity ent, float tagindex) _gettaginfo_hidden = #452;
 
-#endif
+#pragma noref 0

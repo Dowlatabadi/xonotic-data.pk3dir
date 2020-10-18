@@ -1,20 +1,30 @@
-#include "../../common/command/command.qh"
 #include "getreplies.qh"
 
-#include "../race.qh"
-
-#include "../../common/constants.qh"
-#include "../../common/mapinfo.qh"
-#include "../../common/util.qh"
-
-#include "../../common/monsters/all.qh"
+#include <common/command/_mod.qh>
+#include <common/constants.qh>
+#include <common/gamemodes/_mod.qh>
+#include <common/monsters/_mod.qh>
+#include <common/net_linked.qh>
+#include <common/notifications/all.qh>
+#include <common/playerstats.qh>
+#include <common/stats.qh>
+#include <common/util.qh>
+#include <common/weapons/_all.qh>
+#include <common/wepent.qh>
+#include <server/command/getreplies.qh>
+#include <server/intermission.qh>
+#include <server/main.qh>
+#include <server/mutators/_mod.qh>
+#include <server/race.qh>
+#include <server/weapons/selection.qh>
+#include <server/world.qh>
 
 // =========================================================
 //  Reply messages for common commands, re-worked by Samual
 //  Last updated: December 30th, 2011
 // =========================================================
 
-// These strings are set usually during init in g_world.qc,
+// These strings are set usually during init in world.qc,
 // or also by some game modes or other functions manually,
 // and their purpose is to output information to clients
 // without using any extra processing time.
@@ -26,12 +36,13 @@ string getrecords(int page)  // 50 records per page
 	string s = "";
 
 	MUTATOR_CALLHOOK(GetRecords, page, s);
-	s = ret_string;
+	s = M_ARGV(1, string);
 
 	MapInfo_ClearTemps();
 
-	if (s == "" && page == 0) return "No records are available on this server.\n";
-	else return s;
+	if (s == "" && page == 0)
+		return "No records are available on this server for the current game mode.\n";
+	return s;
 }
 
 string getrankings()
@@ -240,22 +251,24 @@ string getmaplist()
 	return sprintf("^7Maps in list: %s\n", maplist);
 }
 
-
+const int LSMAPS_MAX = 250;
 string getlsmaps()
 {
 	string lsmaps = "", col;
-	float i, newmaps = 0;
+	bool newmaps = false;
+	int added = 0;
 
-	for (i = 0; i < MapInfo_count; ++i)
+	for (int i = 0; i < MapInfo_count; ++i)
 	{
 		if ((MapInfo_Get_ByID(i)) && !(MapInfo_Map_flags & MapInfo_ForbiddenFlags()))
 		{
+			++added;
+
+			if(added > LSMAPS_MAX)
+				continue; // we still get the added count, but skip the actual processing
+
 			// todo: Check by play count of maps for other game types?
-			if (
-			    (g_race && !stof(db_get(ServerProgsDB, strcat(MapInfo_Map_bspname, RACE_RECORD, "time"))))
-			    ||
-			    (g_cts && !stof(db_get(ServerProgsDB, strcat(MapInfo_Map_bspname, CTS_RECORD, "time"))))
-			   )
+			if((g_race || g_cts) && !race_readTime(MapInfo_Map_bspname, 1))
 			{
 				newmaps = true;
 				if (i % 2) col = "^4*"; else col = "^5*";
@@ -269,19 +282,156 @@ string getlsmaps()
 		}
 	}
 
+	if(added > LSMAPS_MAX)
+		lsmaps = sprintf("%s^7(%d not listed)", lsmaps, added - LSMAPS_MAX);
+
 	MapInfo_ClearTemps();
-	return sprintf("^7Maps available (%d)%s: %s\n", tokenize_console(lsmaps), (newmaps ? " (New maps have asterisks marked in blue)" : ""), lsmaps);
+	return sprintf("^7Maps available (%d)%s: %s\n", added, (newmaps ? " (New maps have asterisks marked in blue)" : ""), lsmaps);
 }
 
 string getmonsterlist()
 {
-	string monsterlist = "", col;
+	string monsterlist = "";
 
-	for (int i = MON_FIRST; i <= MON_LAST; ++i)
+	FOREACH(Monsters, it != MON_Null && !(it.spawnflags & MON_FLAG_HIDDEN),
 	{
-		if (i % 2) col = "^2"; else col = "^3";
-		monsterlist = sprintf("%s%s%s ", monsterlist, col, (get_monsterinfo(i)).netname);
-	}
+		string col = ((i % 2) ? "^2" : "^3");
+		monsterlist = sprintf("%s%s%s ", monsterlist, col, it.netname);
+	});
 
 	return sprintf("^7Monsters available: %s\n", monsterlist);
+}
+
+/*
+=============
+GetCvars
+=============
+Called with:
+  0:  sends the request
+  >0: receives a cvar from name=argv(f) value=argv(f+1)
+*/
+void GetCvars_handleString(entity this, entity store, string thisname, float f, .string field, string name)
+{
+	if (f < 0)
+	{
+		strfree(store.(field));
+	}
+	else if (f > 0)
+	{
+		if (thisname == name)
+		{
+			strcpy(store.(field), argv(f + 1));
+		}
+	}
+	else
+		stuffcmd(this, strcat("cl_cmd sendcvar ", name, "\n"));
+}
+void GetCvars_handleString_Fixup(entity this, entity store, string thisname, float f, .string field, string name, string(entity, string) func)
+{
+	GetCvars_handleString(this, store, thisname, f, field, name);
+	if (f >= 0) // also initialize to the fitting value for "" when sending cvars out
+		if (thisname == name)
+		{
+			string s = func(this, strcat1(store.(field)));
+			if (s != store.(field))
+			{
+				strcpy(store.(field), s);
+			}
+		}
+}
+void GetCvars_handleFloat(entity this, entity store, string thisname, float f, .float field, string name)
+{
+	if (f < 0)
+	{
+	}
+	else if (f > 0)
+	{
+		if (thisname == name)
+			store.(field) = stof(argv(f + 1));
+	}
+	else
+		stuffcmd(this, strcat("cl_cmd sendcvar ", name, "\n"));
+}
+void GetCvars_handleFloatOnce(entity this, entity store, string thisname, float f, .float field, string name)
+{
+	if (f < 0)
+	{
+	}
+	else if (f > 0)
+	{
+		if (thisname == name)
+		{
+			if (!store.(field))
+			{
+				store.(field) = stof(argv(f + 1));
+				if (!store.(field))
+					store.(field) = -1;
+			}
+		}
+	}
+	else
+	{
+		if (!store.(field))
+			stuffcmd(this, strcat("cl_cmd sendcvar ", name, "\n"));
+	}
+}
+string W_FixWeaponOrder_ForceComplete_AndBuildImpulseList(entity this, string wo)
+{
+	string o = W_FixWeaponOrder_ForceComplete(wo);
+	strcpy(CS(this).weaponorder_byimpulse, W_FixWeaponOrder_BuildImpulseList(o));
+	return o;
+}
+
+/**
+ * @param f -1: cleanup, 0: request, 1: receive
+ */
+void GetCvars(entity this, entity store, int f)
+{
+	string s = string_null;
+
+	if (f == 0)
+		LOG_INFO("Warning: requesting cvar values is deprecated. Client should send them automatically using REPLICATE.\n");
+
+	if (f > 0)
+		s = strcat1(argv(f));
+
+	get_cvars_f = f;
+	get_cvars_s = s;
+	MUTATOR_CALLHOOK(GetCvars);
+
+	Notification_GetCvars(this);
+
+	ReplicateVars(this, store, s, f);
+
+	GetCvars_handleString_Fixup(this, store, s, f, cvar_cl_weaponpriority, "cl_weaponpriority", W_FixWeaponOrder_ForceComplete_AndBuildImpulseList);
+	GetCvars_handleString_Fixup(this, store, s, f, cvar_cl_weaponpriorities[0], "cl_weaponpriority0", W_FixWeaponOrder_AllowIncomplete);
+	GetCvars_handleString_Fixup(this, store, s, f, cvar_cl_weaponpriorities[1], "cl_weaponpriority1", W_FixWeaponOrder_AllowIncomplete);
+	GetCvars_handleString_Fixup(this, store, s, f, cvar_cl_weaponpriorities[2], "cl_weaponpriority2", W_FixWeaponOrder_AllowIncomplete);
+	GetCvars_handleString_Fixup(this, store, s, f, cvar_cl_weaponpriorities[3], "cl_weaponpriority3", W_FixWeaponOrder_AllowIncomplete);
+	GetCvars_handleString_Fixup(this, store, s, f, cvar_cl_weaponpriorities[4], "cl_weaponpriority4", W_FixWeaponOrder_AllowIncomplete);
+	GetCvars_handleString_Fixup(this, store, s, f, cvar_cl_weaponpriorities[5], "cl_weaponpriority5", W_FixWeaponOrder_AllowIncomplete);
+	GetCvars_handleString_Fixup(this, store, s, f, cvar_cl_weaponpriorities[6], "cl_weaponpriority6", W_FixWeaponOrder_AllowIncomplete);
+	GetCvars_handleString_Fixup(this, store, s, f, cvar_cl_weaponpriorities[7], "cl_weaponpriority7", W_FixWeaponOrder_AllowIncomplete);
+	GetCvars_handleString_Fixup(this, store, s, f, cvar_cl_weaponpriorities[8], "cl_weaponpriority8", W_FixWeaponOrder_AllowIncomplete);
+	GetCvars_handleString_Fixup(this, store, s, f, cvar_cl_weaponpriorities[9], "cl_weaponpriority9", W_FixWeaponOrder_AllowIncomplete);
+
+	GetCvars_handleFloat(this, store, s, f, cvar_cl_allow_uidtracking, "cl_allow_uidtracking");
+
+	// fixup of switchweapon (needed for LMS or when spectating is disabled, as PutClientInServer comes too early)
+	if (f > 0)
+	{
+		if (s == "cl_weaponpriority")
+		{
+			for(int slot = 0; slot < MAX_WEAPONSLOTS; ++slot)
+			{
+				.entity weaponentity = weaponentities[slot];
+				if (this.(weaponentity) && (this.(weaponentity).m_weapon != WEP_Null || slot == 0))
+					this.(weaponentity).m_switchweapon = w_getbestweapon(this, weaponentity);
+			}
+		}
+		if (s == "cl_allow_uidtracking")
+			PlayerStats_GameReport_AddPlayer(this);
+		//if (s == "cl_gunalign")
+			//W_ResetGunAlign(this, store.cvar_cl_gunalign);
+	}
 }

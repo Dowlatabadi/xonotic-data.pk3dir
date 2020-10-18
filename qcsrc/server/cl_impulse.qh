@@ -1,5 +1,0 @@
-#ifndef CL_IMPULSE_H
-#define CL_IMPULSE_H
-
-void ImpulseCommands(entity this);
-#endif

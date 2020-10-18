@@ -1,0 +1,16 @@
+#pragma once
+#include "../panel.qh"
+
+bool scoreboard_showscores;
+
+bool scoreboard_active;
+float scoreboard_fade_alpha;
+float scoreboard_acc_fade_alpha;
+
+void Cmd_Scoreboard_SetFields(int argc);
+void Scoreboard_Draw();
+void Scoreboard_InitScores();
+void Scoreboard_UpdatePlayerTeams();
+void Scoreboard_UpdatePlayerPos(entity pl);
+void Scoreboard_UpdateTeamPos(entity Team);
+bool Scoreboard_WouldDraw();

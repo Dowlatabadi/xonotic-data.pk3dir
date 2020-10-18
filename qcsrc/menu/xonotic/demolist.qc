@@ -1,41 +1,6 @@
-#ifndef DEMOLIST_H
-#define DEMOLIST_H
-#include "listbox.qc"
-CLASS(XonoticDemoList, XonoticListBox)
-	METHOD(XonoticDemoList, configureXonoticDemoList, void(entity));
-	ATTRIB(XonoticDemoList, rowsPerItem, float, 1)
-	METHOD(XonoticDemoList, resizeNotify, void(entity, vector, vector, vector, vector));
-	METHOD(XonoticDemoList, drawListBoxItem, void(entity, int, vector, bool, bool));
-	METHOD(XonoticDemoList, getDemos, void(entity));
-	METHOD(XonoticDemoList, startDemo, void(entity));
-	METHOD(XonoticDemoList, timeDemo, void(entity));
-	METHOD(XonoticDemoList, demoName, string(entity, float));
-	METHOD(XonoticDemoList, doubleClickListBoxItem, void(entity, float, vector));
-	METHOD(XonoticDemoList, keyDown, float(entity, float, float, float));
-	METHOD(XonoticDemoList, destroy, void(entity));
-	METHOD(XonoticDemoList, showNotify, void(entity));
+#include "demolist.qh"
 
-	ATTRIB(XonoticDemoList, listDemo, float, -1)
-	ATTRIB(XonoticDemoList, realFontSize, vector, '0 0 0')
-	ATTRIB(XonoticDemoList, columnNameOrigin, float, 0)
-	ATTRIB(XonoticDemoList, columnNameSize, float, 0)
-	ATTRIB(XonoticDemoList, realUpperMargin, float, 0)
-	ATTRIB(XonoticDemoList, origin, vector, '0 0 0')
-	ATTRIB(XonoticDemoList, itemAbsSize, vector, '0 0 0')
-
-	ATTRIB(XonoticDemoList, filterString, string, string_null)
-ENDCLASS(XonoticDemoList)
-
-#ifndef IMPLEMENTATION
-// public:
-entity demolist; // for reference elsewhere
-entity makeXonoticDemoList();
-#endif
-void DemoList_Refresh_Click(entity btn, entity me);
-void DemoList_Filter_Change(entity box, entity me);
-#endif
-
-#ifdef IMPLEMENTATION
+#include "inputbox.qh"
 
 entity makeXonoticDemoList()
 {
@@ -48,7 +13,7 @@ entity makeXonoticDemoList()
 void XonoticDemoList_configureXonoticDemoList(entity me)
 {
 	me.configureXonoticListBox(me);
-	me.getDemos(me);
+	me.nItems = 0;
 }
 
 string XonoticDemoList_demoName(entity me, float i)
@@ -127,8 +92,10 @@ void XonoticDemoList_resizeNotify(entity me, vector relOrigin, vector relSize, v
 	me.itemAbsSize = '0 0 0';
 	SUPER(XonoticDemoList).resizeNotify(me, relOrigin, relSize, absOrigin, absSize);
 
-	me.realFontSize_y = me.fontSize / (me.itemAbsSize_y = (absSize.y * me.itemHeight));
-	me.realFontSize_x = me.fontSize / (me.itemAbsSize_x = (absSize.x * (1 - me.controlWidth)));
+	me.itemAbsSize.y = absSize.y * me.itemHeight;
+	me.itemAbsSize.x = absSize.x * (1 - me.controlWidth);
+	me.realFontSize.y = me.fontSize / me.itemAbsSize.y;
+	me.realFontSize.x = me.fontSize / me.itemAbsSize.x;
 	me.realUpperMargin = 0.5 * (1 - me.realFontSize.y);
 
 	me.columnNameOrigin = me.realFontSize.x;
@@ -164,8 +131,7 @@ void DemoList_Refresh_Click(entity btn, entity me)
 
 void DemoList_Filter_Change(entity box, entity me)
 {
-	if(me.filterString)
-		strunzone(me.filterString);
+	strfree(me.filterString);
 
 	if(box.text != "")
 	{
@@ -232,5 +198,3 @@ float XonoticDemoList_keyDown(entity me, float scan, float ascii, float shift)
 		return SUPER(XonoticDemoList).keyDown(me, scan, ascii, shift);
 	}
 }
-#endif
-
