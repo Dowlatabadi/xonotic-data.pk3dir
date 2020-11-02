@@ -17,6 +17,8 @@ CLASS(XonoticEntryList, XonoticListBox)
 
     METHOD(XonoticEntryList, drawListBoxItem, void(entity, int, vector, bool, bool));
     METHOD(XonoticEntryList, keyDown, float(entity, float, float, float));
+    ATTRIB(XonoticEntryList, onChange, void(entity, entity));
+    ATTRIB(XonoticEntryList, onChangeEntity, entity);
     METHOD(XonoticEntryList, refilter, void(entity));
     METHOD(XonoticEntryList, resizeNotify, void(entity, vector, vector, vector, vector));
     METHOD(XonoticEntryList, setSelected, void(entity, int));

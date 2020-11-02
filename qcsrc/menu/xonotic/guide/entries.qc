@@ -1,5 +1,9 @@
 #include "entries.qh"
 
+#include <menu/xonotic/listbox.qh>
+#include <menu/xonotic/inputbox.qh>
+#include <menu/xonotic/mainwindow.qh>
+
 string XonoticEntryList_cb_name, XonoticEntryList_cb_icon;
 void XonoticEntryList_cb(string _name, string _icon) {
     XonoticEntryList_cb_name = _name;

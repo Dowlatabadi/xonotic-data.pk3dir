@@ -1,5 +1,9 @@
 #include "tab.qh"
 
+#include <menu/xonotic/inputbox.qh>
+#include <menu/xonotic/maplist.qh>
+#include <menu/xonotic/textlabel.qh>
+
 void XonoticGuideTab_fill(entity this)
 {
     entity topics = this.topicList;

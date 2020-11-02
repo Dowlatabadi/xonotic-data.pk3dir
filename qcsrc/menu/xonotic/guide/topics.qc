@@ -1,5 +1,7 @@
 #include "topics.qh"
 
+#include "entries.qh"
+
 void XonoticTopicList_clickListBoxItem(entity this, float i, vector where)
 {
     m_play_click_sound(MENU_SOUND_SELECT);

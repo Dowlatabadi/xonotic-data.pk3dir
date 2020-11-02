@@ -1,5 +1,7 @@
 #pragma once
 
+#include <common/items/item.qh>
+#include <menu/anim/animhost.qh>
 #include <menu/xonotic/datasource.qh>
 
 #define TOPICS(X) \
@@ -150,6 +152,7 @@ CLASS(XonoticGuideTab, XonoticTab)
     METHOD(XonoticGuideTab, topicChangeNotify, void(entity, entity));
     METHOD(XonoticGuideTab, entryChangeNotify, void(entity, entity));
 
+    ATTRIB(XonoticGuideTab, controlledTextbox, entity);
     ATTRIB(XonoticGuideTab, topicList, entity, NEW(XonoticTopicList, NEW(TopicSource)));
     ATTRIB(XonoticGuideTab, entryList, entity, NEW(XonoticEntryList, NULL));
     ATTRIB(XonoticGuideTab, descriptionPane, entity, NEW(XonoticGuideDescription));
