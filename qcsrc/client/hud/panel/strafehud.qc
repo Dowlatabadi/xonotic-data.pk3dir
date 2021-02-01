@@ -13,6 +13,15 @@
 #include <common/physics/player.qh>
 #include <lib/csqcmodel/cl_player.qh>
 
+AUTOCVAR_SAVE(hud_panel_strafehud_pos, string, "0.320000 0.570000", "position of this base of the panel");
+AUTOCVAR_SAVE(hud_panel_strafehud_size, string, "0.360000 0.020000", "size of this panel");
+AUTOCVAR_SAVE(hud_panel_strafehud_bg, string, "0", "if set to something else than \"\" = override default background");
+AUTOCVAR_SAVE(hud_panel_strafehud_bg_color, string, "", "if set to something else than \"\" = override default panel background color");
+AUTOCVAR_SAVE(hud_panel_strafehud_bg_color_team, string, "", "override panel color with team color in team based games");
+AUTOCVAR_SAVE(hud_panel_strafehud_bg_alpha, string, "0.7", "if set to something else than \"\" = override default panel background alpha");
+AUTOCVAR_SAVE(hud_panel_strafehud_bg_border, string, "", "if set to something else than \"\" = override default size of border around the background");
+AUTOCVAR_SAVE(hud_panel_strafehud_bg_padding, string, "", "if set to something else than \"\" = override default padding of contents from border");
+
 // StrafeHUD (#25)
 
 void HUD_StrafeHUD_Export(int fh)
@@ -44,21 +53,22 @@ float jumpheight_prev = 0;
 float jumpspeed_prev = 0;
 bool  jumprestart = true;
 
-// provide basic panel cvars to old clients
-// TODO remove them after a future release (0.8.2+)
-noref string autocvar_hud_panel_strafehud_pos = "0.320000 0.570000";
-noref string autocvar_hud_panel_strafehud_size = "0.360000 0.020000";
-noref string autocvar_hud_panel_strafehud_bg = "0";
-noref string autocvar_hud_panel_strafehud_bg_color = "";
-noref string autocvar_hud_panel_strafehud_bg_color_team = "";
-noref string autocvar_hud_panel_strafehud_bg_alpha = "0.7";
-noref string autocvar_hud_panel_strafehud_bg_border = "";
-noref string autocvar_hud_panel_strafehud_bg_padding = "";
-
 void HUD_StrafeHUD()
 {
     entity strafeplayer;
     bool islocal;
+
+    if(false)
+    {
+        autocvar_hud_panel_strafehud_pos = autocvar_hud_panel_strafehud_pos;
+        autocvar_hud_panel_strafehud_size = autocvar_hud_panel_strafehud_size;
+        autocvar_hud_panel_strafehud_bg = autocvar_hud_panel_strafehud_bg;
+        autocvar_hud_panel_strafehud_bg_color = autocvar_hud_panel_strafehud_bg_color;
+        autocvar_hud_panel_strafehud_bg_color_team = autocvar_hud_panel_strafehud_bg_color_team;
+        autocvar_hud_panel_strafehud_bg_alpha = autocvar_hud_panel_strafehud_bg_alpha;
+        autocvar_hud_panel_strafehud_bg_border = autocvar_hud_panel_strafehud_bg_border;
+        autocvar_hud_panel_strafehud_bg_padding = autocvar_hud_panel_strafehud_bg_padding;
+    }
 
     // generic hud routines
     if(!autocvar__hud_configure)
@@ -627,7 +637,7 @@ void HUD_StrafeHUD()
         if(autocvar_hud_panel_strafehud_startspeed_fade > 0)
         {
             float text_alpha = 0;
-            if(race_checkpoint == 254) // checkpoint 254 is the start trigger
+            if(race_nextcheckpoint == 1) // check if the start trigger was hit since the checkpoint after the start trigger is always checkpoint 1
             {
                 if(starttime != race_checkpointtime)
                 {
