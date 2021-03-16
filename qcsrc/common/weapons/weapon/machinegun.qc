@@ -62,6 +62,7 @@ void W_MachineGun_Attack_Frame(Weapon thiswep, entity actor, .entity weaponentit
 void W_MachineGun_Attack_Auto(Weapon thiswep, entity actor, .entity weaponentity, int fire)
 {
 	float machinegun_spread;
+	float machinegun_spread_accumulation;
 
 	if(!(fire & 1) || !weapon_prepareattack_check(thiswep, actor, weaponentity, false, -1))
 	{
@@ -86,10 +87,16 @@ void W_MachineGun_Attack_Auto(Weapon thiswep, entity actor, .entity weaponentity
 		actor.punchangle_y = random() - 0.5;
 	}
 
-	machinegun_spread = bound(WEP_CVAR(machinegun, spread_min), WEP_CVAR(machinegun, spread_min) + (WEP_CVAR(machinegun, spread_add) * actor.(weaponentity).misc_bulletcounter), WEP_CVAR(machinegun, spread_max));
+	machinegun_spread_accumulation = machinegun_spread_accumulation - ((newTime - oldTime) * WEP_CVAR(machinegun, spread_decay);
+	if(machinegun_spread_accumulation < 0){
+		machinegun_spread_accumulation = 0;
+	}
+
+	machinegun_spread = bound(WEP_CVAR(machinegun, spread_min), WEP_CVAR(machinegun, spread_min) + (WEP_CVAR(machinegun, spread_add) * machinegun_spread_accumulation), WEP_CVAR(machinegun, spread_max));
 	fireBullet(actor, weaponentity, w_shotorg, w_shotdir, machinegun_spread, WEP_CVAR(machinegun, solidpenetration), WEP_CVAR(machinegun, sustained_damage), 0, WEP_CVAR(machinegun, sustained_force), thiswep.m_id, EFFECT_BULLET);
 
 	actor.(weaponentity).misc_bulletcounter = actor.(weaponentity).misc_bulletcounter + 1;
+	machinegun_spread_accumulation = machinegun_spread_accumulation + 1;
 
 	W_MuzzleFlash(thiswep, actor, weaponentity, w_shotorg, w_shotdir);
 
