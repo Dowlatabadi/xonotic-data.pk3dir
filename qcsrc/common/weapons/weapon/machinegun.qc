@@ -2,8 +2,7 @@
 
 #ifdef SVQC
 
-float machinegun_spread_accumulation;
-float oldTime;
+.float machinegun_spread_accumulation;
 
 void W_MachineGun_Attack(Weapon thiswep, int deathtype, entity actor, .entity weaponentity)
 {
@@ -64,9 +63,10 @@ void W_MachineGun_Attack_Frame(Weapon thiswep, entity actor, .entity weaponentit
 
 void W_MachineGun_Attack_Auto(Weapon thiswep, entity actor, .entity weaponentity, int fire)
 {
-	float machinegun_spread;
+	float machinegun_spread = 0;
 	
-	
+	float oldTime = -1;
+	float newTime = -1;
 
 	if(!(fire & 1) || !weapon_prepareattack_check(thiswep, actor, weaponentity, false, -1))
 	{
@@ -90,8 +90,17 @@ void W_MachineGun_Attack_Auto(Weapon thiswep, entity actor, .entity weaponentity
 		actor.punchangle_x = random() - 0.5;
 		actor.punchangle_y = random() - 0.5;
 	}
-
-	machinegun_spread_accumulation = max(machinegun_spread_accumulation - ((time - oldTime) * WEP_CVAR(machinegun, spread_decay)), 0);
+	
+	if(oldTime == -1){
+		oldTime = time;
+	}
+	newTime = time;
+	machinegun_spread_accumulation = machinegun_spread_accumulation - ((newTime - oldTime) * WEP_CVAR(machinegun, spread_decay));
+	if(machinegun_spread_accumulation < 0){
+		machinegun_spread_accumulation = 0;
+		print("spread was <0\n");
+	}
+	print("decay was checked\n");
 	oldTime = time;
 
 	machinegun_spread = bound(WEP_CVAR(machinegun, spread_min), WEP_CVAR(machinegun, spread_min) + (WEP_CVAR(machinegun, spread_add) * machinegun_spread_accumulation), WEP_CVAR(machinegun, spread_max));
