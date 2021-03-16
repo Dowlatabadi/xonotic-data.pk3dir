@@ -2,6 +2,9 @@
 
 #ifdef SVQC
 
+float machinegun_spread_accumulation;
+float oldTime;
+
 void W_MachineGun_Attack(Weapon thiswep, int deathtype, entity actor, .entity weaponentity)
 {
 	W_SetupShot(actor, weaponentity, true, 0, SND_UZI_FIRE, CH_WEAPON_A, ((actor.(weaponentity).misc_bulletcounter == 1) ? WEP_CVAR(machinegun, first_damage) : WEP_CVAR(machinegun, sustained_damage)), deathtype);
@@ -62,7 +65,8 @@ void W_MachineGun_Attack_Frame(Weapon thiswep, entity actor, .entity weaponentit
 void W_MachineGun_Attack_Auto(Weapon thiswep, entity actor, .entity weaponentity, int fire)
 {
 	float machinegun_spread;
-	float machinegun_spread_accumulation;
+	
+	
 
 	if(!(fire & 1) || !weapon_prepareattack_check(thiswep, actor, weaponentity, false, -1))
 	{
@@ -87,10 +91,8 @@ void W_MachineGun_Attack_Auto(Weapon thiswep, entity actor, .entity weaponentity
 		actor.punchangle_y = random() - 0.5;
 	}
 
-	machinegun_spread_accumulation = machinegun_spread_accumulation - ((newTime - oldTime) * WEP_CVAR(machinegun, spread_decay);
-	if(machinegun_spread_accumulation < 0){
-		machinegun_spread_accumulation = 0;
-	}
+	machinegun_spread_accumulation = max(machinegun_spread_accumulation - ((time - oldTime) * WEP_CVAR(machinegun, spread_decay)), 0);
+	oldTime = time;
 
 	machinegun_spread = bound(WEP_CVAR(machinegun, spread_min), WEP_CVAR(machinegun, spread_min) + (WEP_CVAR(machinegun, spread_add) * machinegun_spread_accumulation), WEP_CVAR(machinegun, spread_max));
 	fireBullet(actor, weaponentity, w_shotorg, w_shotdir, machinegun_spread, WEP_CVAR(machinegun, solidpenetration), WEP_CVAR(machinegun, sustained_damage), 0, WEP_CVAR(machinegun, sustained_force), thiswep.m_id, EFFECT_BULLET);
@@ -130,6 +132,7 @@ void W_MachineGun_Attack_Burst(Weapon thiswep, entity actor, .entity weaponentit
 	}
 
 	actor.(weaponentity).misc_bulletcounter = actor.(weaponentity).misc_bulletcounter + 1;
+	machinegun_spread_accumulation = machinegun_spread_accumulation + 1;
 	if(actor.(weaponentity).misc_bulletcounter == 0)
 	{
 		ATTACK_FINISHED(actor, weaponentity) = time + WEP_CVAR(machinegun, burst_refire2) * W_WeaponRateFactor(actor);
