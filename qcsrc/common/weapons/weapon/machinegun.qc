@@ -63,10 +63,10 @@ void W_MachineGun_Attack_Frame(Weapon thiswep, entity actor, .entity weaponentit
 
 void W_MachineGun_Attack_Auto(Weapon thiswep, entity actor, .entity weaponentity, int fire)
 {
-	float machinegun_spread = 0;
+	float machinegun_spread;
 	
-	float oldTime = -1;
-	float newTime = -1;
+	static float oldTime = 0;
+	static float newTime = 0;
 
 	if(!(fire & 1) || !weapon_prepareattack_check(thiswep, actor, weaponentity, false, -1))
 	{
@@ -91,23 +91,39 @@ void W_MachineGun_Attack_Auto(Weapon thiswep, entity actor, .entity weaponentity
 		actor.punchangle_y = random() - 0.5;
 	}
 	
-	if(oldTime == -1){
-		oldTime = time;
-	}
 	newTime = time;
-	machinegun_spread_accumulation = machinegun_spread_accumulation - ((newTime - oldTime) * WEP_CVAR(machinegun, spread_decay));
-	if(machinegun_spread_accumulation < 0){
-		machinegun_spread_accumulation = 0;
-		print("spread was <0\n");
+	print("\n Current time: ");
+	print(sprintf("%f ", newTime));
+	
+	float seconds = (newTime - oldTime);
+	print("\n seconds between last time and this time: ");
+	print(sprintf("%f ", seconds));
+	
+	float spreadReduction = seconds * WEP_CVAR(machinegun, spread_decay);
+	print("\n reduced spread: ");
+	print(sprintf("%f ", spreadReduction));
+	
+	thiswep.machinegun_spread_accumulation = thiswep.machinegun_spread_accumulation - spreadReduction;
+	print("\n current spread: ");
+	ftos(thiswep.machinegun_spread_accumulation);
+	print(sprintf("%f ", thiswep.machinegun_spread_accumulation));
+	
+	if(thiswep.machinegun_spread_accumulation < 0){
+		print("\n spread was <0");
+		thiswep.machinegun_spread_accumulation = 0;
 	}
-	print("decay was checked\n");
 	oldTime = time;
+	print("\n Old time: ");
+	print(sprintf("%f ", oldTime));
 
-	machinegun_spread = bound(WEP_CVAR(machinegun, spread_min), WEP_CVAR(machinegun, spread_min) + (WEP_CVAR(machinegun, spread_add) * machinegun_spread_accumulation), WEP_CVAR(machinegun, spread_max));
+	machinegun_spread = bound(WEP_CVAR(machinegun, spread_min), WEP_CVAR(machinegun, spread_min) + thiswep.machinegun_spread_accumulation, WEP_CVAR(machinegun, spread_max));
 	fireBullet(actor, weaponentity, w_shotorg, w_shotdir, machinegun_spread, WEP_CVAR(machinegun, solidpenetration), WEP_CVAR(machinegun, sustained_damage), 0, WEP_CVAR(machinegun, sustained_force), thiswep.m_id, EFFECT_BULLET);
 
 	actor.(weaponentity).misc_bulletcounter = actor.(weaponentity).misc_bulletcounter + 1;
-	machinegun_spread_accumulation = machinegun_spread_accumulation + 1;
+	thiswep.machinegun_spread_accumulation = thiswep.machinegun_spread_accumulation + WEP_CVAR(machinegun, spread_add);
+	if(thiswep.machinegun_spread_accumulation > WEP_CVAR(machinegun, spread_max)){
+		thiswep.machinegun_spread_accumulation = WEP_CVAR(machinegun, spread_max);
+	}
 
 	W_MuzzleFlash(thiswep, actor, weaponentity, w_shotorg, w_shotdir);
 
@@ -141,7 +157,10 @@ void W_MachineGun_Attack_Burst(Weapon thiswep, entity actor, .entity weaponentit
 	}
 
 	actor.(weaponentity).misc_bulletcounter = actor.(weaponentity).misc_bulletcounter + 1;
-	machinegun_spread_accumulation = machinegun_spread_accumulation + 1;
+	thiswep.machinegun_spread_accumulation = thiswep.machinegun_spread_accumulation + WEP_CVAR(machinegun, spread_add);
+	if(thiswep.machinegun_spread_accumulation > WEP_CVAR(machinegun, spread_max)){
+		thiswep.machinegun_spread_accumulation = WEP_CVAR(machinegun, spread_max);
+	}
 	if(actor.(weaponentity).misc_bulletcounter == 0)
 	{
 		ATTACK_FINISHED(actor, weaponentity) = time + WEP_CVAR(machinegun, burst_refire2) * W_WeaponRateFactor(actor);
