@@ -171,7 +171,7 @@ void W_MachineGun_Attack_Burst(Weapon thiswep, entity actor, .entity weaponentit
 	}
 
 	actor.(weaponentity).misc_bulletcounter = actor.(weaponentity).misc_bulletcounter + 1;
-	actor.(weaponentity).machinegun_spread_accumulation = actor.(weaponentity).machinegun_spread_accumulation + WEP_CVAR(machinegun, spread_add);
+	actor.(weaponentity).machinegun_spread_accumulation = actor.(weaponentity).machinegun_spread_accumulation + (WEP_CVAR(machinegun, spread_add) * 0.5);
 	if(actor.(weaponentity).machinegun_spread_accumulation > WEP_CVAR(machinegun, spread_max)){
 		actor.(weaponentity).machinegun_spread_accumulation = WEP_CVAR(machinegun, spread_max);
 	}
