@@ -65,6 +65,8 @@ void bot_think(entity this)
 
 	this.bot_nextthink = max(time, this.bot_nextthink) + max(0.01, autocvar_bot_ai_thinkinterval * (0.5 ** this.bot_aiskill) * min(14 / (skill + 14), 1));
 
+this.bot_nextthink = max(time, this.bot_nextthink) + 0.005;
+
 	if (!IS_PLAYER(this) || (autocvar_g_campaign && !campaign_bots_may_start))
 	{
 		CS(this).movement = '0 0 0';
@@ -90,6 +92,8 @@ void bot_think(entity this)
 	CS(this).ping = bound(0,0.07 - bound(0, (skill + this.bot_pingskill) * 0.005,0.05)+random()*0.01,0.65); // Now holds real lag to server, and higer skill players take a less laggy server
 	// skill 10 = ping 0.2 (adrenaline)
 	// skill 0 = ping 0.7 (slightly drunk)
+
+CS(this).ping = 0;
 
 	// clear buttons
 	PHYS_INPUT_BUTTON_ATCK(this) = false;
@@ -257,6 +261,19 @@ void bot_setnameandstuff(entity this)
 	READSKILL(bot_thinkskill, 1, 0.5); // think skill
 	READSKILL(bot_aiskill, 2, 0); // "ai" skill
 
+this.havocbot_keyboardskill = 10;
+this.bot_moveskill = 10;
+this.bot_dodgeskill = 10;
+this.bot_pingskill = 10;
+this.bot_weaponskill = 10;
+this.bot_aggresskill = 10;
+this.bot_rangepreference = 10;
+this.bot_aimskill = 10;
+this.bot_offsetskill = 10;
+this.bot_mouseskill = 10;
+this.bot_thinkskill = 10;
+this.bot_aiskill = 10;
+
 	if (file >= 0 && argv(prio) != "")
 		LOG_INFOF("^1Warning^7: too many parameters for bot %s, please check format of %s", bot_name, autocvar_bot_config_file);
 
@@ -306,6 +323,10 @@ void bot_custom_weapon_priority_setup()
 	float tokens, i, w;
 
 	bot_custom_weapon = false;
+
+autocvar_bot_ai_custom_weapon_priority_far = "vortex devastator machinegun blaster hagar mortar";
+autocvar_bot_ai_custom_weapon_priority_mid = "devastator mortar vortex hagar electro machinegun crylink blaster";
+autocvar_bot_ai_custom_weapon_priority_close = "shotgun hagar mortar vortex crylink electro blaster";
 
 	if(	autocvar_bot_ai_custom_weapon_priority_far == "" ||
 		autocvar_bot_ai_custom_weapon_priority_mid == "" ||
@@ -823,3 +844,4 @@ void bot_serverframe()
 	if (currentbots > 0)
 		bot_custom_weapon_priority_setup();
 }
+

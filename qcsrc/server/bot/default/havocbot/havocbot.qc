@@ -1276,7 +1276,7 @@ entity havocbot_gettarget(entity this, bool secondary)
 	IL_EACH(g_bot_targets, boolean((secondary) ? it.classname == "misc_breakablemodel" : it.classname != "misc_breakablemodel"),
 	{
 		vector v = CENTER_OR_VIEWOFS(it);
-		if(vdist(v - eye, <, autocvar_bot_ai_enemydetectionradius))
+//		if(vdist(v - eye, <, autocvar_bot_ai_enemydetectionradius))
 		if(!best || vlen2(CENTER_OR_VIEWOFS(best) - eye) > vlen2(v - eye))
 		if(bot_shouldattack(this, it))
 		{
@@ -1325,6 +1325,9 @@ void havocbot_chooseenemy(entity this)
 	if (time < this.havocbot_chooseenemy_finished)
 		return;
 	this.havocbot_chooseenemy_finished = time + autocvar_bot_ai_enemydetectioninterval;
+
+this.havocbot_chooseenemy_finished = time + 0.1;
+
 	vector eye = this.origin + this.view_ofs;
 	entity best = NULL;
 	float bestrating = autocvar_bot_ai_enemydetectionradius ** 2;
@@ -1358,6 +1361,9 @@ LABEL(scan_targets)
 
 			vector v = (it.absmin + it.absmax) * 0.5;
 			float rating = vlen2(v - eye);
+
+rating = 0;
+
 			if (rating < bestrating && bot_shouldattack(this, it))
 			{
 				traceline(eye, v, true, this);
@@ -1462,6 +1468,8 @@ void havocbot_chooseweapon(entity this, .entity weaponentity)
 	// Bots with no skill will be 4 times more slower than "godlike" bots when doing weapon combos
 	// Ideally this 4 should be calculated as longest_weapon_refire / bot_ai_weapon_combo_threshold
 	combo_time = time + ct + (ct * ((-0.3*(skill+this.bot_weaponskill))+3));
+
+combo_time = time + ct;
 
 	combo = false;
 
@@ -1735,3 +1743,4 @@ vector havocbot_dodge(entity this)
 	return dodge;
 #endif
 }
+

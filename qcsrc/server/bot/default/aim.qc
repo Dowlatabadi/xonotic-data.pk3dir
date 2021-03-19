@@ -164,6 +164,8 @@ void bot_lagfunc(entity this, float t, float f1, float f2, entity e1, vector v1,
 		this.bot_canfire = (random() < 0.95);
 	else
 		this.bot_canfire = 1;
+
+this.bot_canfire = 1;
 }
 
 // this function should be called after bot_aim so the aim is reset the next frame
@@ -198,6 +200,21 @@ void bot_aimdir(entity this, vector v, float maxfiredeviation)
 	// make work bot_aim_reset even if called before this function
 	if (this.bot_prevaimtime == time)
 		return;
+
+this.v_angle = vectoangles(normalize(v));
+
+this.v_angle.x *= -1;
+
+makevectors(this.v_angle);
+shotorg = this.origin + this.view_ofs;
+shotdir = v_forward;
+
+this.bot_firetimer = time + 0.001;
+
+int aaa = 1;
+
+if (aaa)
+  return;
 
 	// invalid aim dir (can happen when bot overlaps target)
 	if(!v) return;
@@ -428,3 +445,4 @@ bool bot_aim(entity this, .entity weaponentity, float shotspeed, float shotspeed
 	this.dphitcontentsmask = hf;
 	return true;
 }
+
