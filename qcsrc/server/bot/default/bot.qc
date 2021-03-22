@@ -324,10 +324,6 @@ void bot_custom_weapon_priority_setup()
 
 	bot_custom_weapon = false;
 
-autocvar_bot_ai_custom_weapon_priority_far = "vortex devastator machinegun blaster hagar mortar";
-autocvar_bot_ai_custom_weapon_priority_mid = "devastator mortar vortex hagar electro machinegun crylink blaster";
-autocvar_bot_ai_custom_weapon_priority_close = "shotgun hagar mortar vortex crylink electro blaster";
-
 	if(	autocvar_bot_ai_custom_weapon_priority_far == "" ||
 		autocvar_bot_ai_custom_weapon_priority_mid == "" ||
 		autocvar_bot_ai_custom_weapon_priority_close == "" ||
