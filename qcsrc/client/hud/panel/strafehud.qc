@@ -40,10 +40,8 @@ bool state_strafekeys = false;
 float state_strafekeys_time = 0;
 bool turn = false;
 float turnangle;
+float turnspeed;
 bool fwd = true;
-bool state_fwd = true;
-bool state_fwd_prev = true;
-float state_fwd_time = 0;
 float starttime = 0;
 float startspeed = -1;
 float jumptime = 0;
@@ -118,12 +116,13 @@ void HUD_StrafeHUD()
         bool   swimming                      = strafeplayer.waterlevel >= WATERLEVEL_SWIMMING;
         bool   spectating                    = entcs_GetSpecState(strafeplayer.sv_entnum) == ENTCS_SPEC_PURE;
         float  speed                         = !autocvar__hud_configure ? vlen(vec2(csqcplayer.velocity)) : 1337; // use local csqcmodel entity for this even when spectating, flickers too much otherwise
-        float  maxspeed_crouch_mod           = IS_DUCKED(strafeplayer) && !swimming ? .5 : 1;
+        float  maxspeed_crouch_mod           = IS_DUCKED(csqcplayer) && !swimming ? .5 : 1;
         float  maxspeed_water_mod            = swimming ? .7 : 1; // very simplified water physics, the hud will not work well (and is not supposed to) while swimming
         float  maxspeed_phys                 = onground ? PHYS_MAXSPEED(strafeplayer) : PHYS_MAXAIRSPEED(strafeplayer);
         float  maxspeed                      = !autocvar__hud_configure ? maxspeed_phys * maxspeed_crouch_mod * maxspeed_water_mod : 320;
-        float  vel_angle                     = vectoangles(strafeplayer.velocity).y;
-        float  view_angle                    = PHYS_INPUT_ANGLES(strafeplayer).y + 180;
+        float  movespeed;
+        float  vel_angle                     = vectoangles(strafeplayer.velocity).y - (vectoangles(strafeplayer.velocity).y > 180 ? 360 : 0); // change the range from 0° - 360° to -180° - 180° to match how view_angle represents angles
+        float  view_angle                    = PHYS_INPUT_ANGLES(strafeplayer).y;
         float  angle;
         vector movement                      = PHYS_INPUT_MOVEVALUES(strafeplayer);
         int    keys                          = STAT(PRESSED_KEYS);
@@ -257,7 +256,7 @@ void HUD_StrafeHUD()
             }
         }
 
-        strafekeys = fabs(wishangle) == 90;
+        strafekeys = fabs(wishangle) > 45;
 
         // determine minimum required angle to display full strafe range
         range_minangle = fabs(wishangle) % 90; // maximum range is 90 degree
@@ -297,7 +296,7 @@ void HUD_StrafeHUD()
         }
         state_strafekeys = strafekeys;
 
-        if((keys & KEY_FORWARD) || (keys & KEY_BACKWARD) || swimming || autocvar__hud_configure)
+        if((!strafekeys && vlen(vec2(movement)) > 0) || swimming || autocvar__hud_configure)
         {
             turn = false;
         }
@@ -316,6 +315,21 @@ void HUD_StrafeHUD()
                 {
                     turn = true; // CPMA turning
                     turnangle = wishangle;
+
+                    // calculate the maximum air strafe speed
+                    if(PHYS_MAXAIRSPEED(strafeplayer) == 0){
+                        maxspeed = 0;
+                    }
+                    else if(PHYS_MAXAIRSTRAFESPEED(strafeplayer) == 0 || PHYS_MAXAIRSPEED(strafeplayer) <= PHYS_MAXAIRSTRAFESPEED(strafeplayer)){
+                        maxspeed = PHYS_MAXAIRSPEED(strafeplayer);
+                    }
+                    else{
+                        maxspeed = PHYS_MAXAIRSPEED(strafeplayer) * pow(fabs(PHYS_MAXAIRSTRAFESPEED(strafeplayer) / PHYS_MAXAIRSPEED(strafeplayer)), 1 - (90 - fabs(wishangle)) / 45); // no modifiers here because they don't affect air strafing
+                    }
+
+                    turnspeed = vlen(vec2(movement));
+                    if(turnspeed == 0) turnspeed = maxspeed;
+                    else turnspeed = min(turnspeed, maxspeed);
                 }
             }
             else if((time - state_strafekeys_time) >= autocvar_hud_panel_strafehud_timeout_turn) // timeout for jumping with strafe keys only
@@ -323,13 +337,18 @@ void HUD_StrafeHUD()
                 turn = false;
             }
         }
-        if(turn)
+        if(turn && (onground || !strafekeys)) // retain last state until strafe turning times out
         {
-            maxspeed = PHYS_MAXAIRSTRAFESPEED(strafeplayer); // no modifiers here because they don't affect air strafing
             wishangle = turnangle;
+            movespeed = turnspeed;
+        }
+        else{
+            movespeed = vlen(vec2(movement));
+            if(movespeed == 0) movespeed = maxspeed;
+            else movespeed = min(movespeed, maxspeed);
         }
 
-        minspeed = autocvar_hud_panel_strafehud_switch_minspeed < 0 ? maxspeed + antiflicker_speed : autocvar_hud_panel_strafehud_switch_minspeed;
+        minspeed = autocvar_hud_panel_strafehud_switch_minspeed < 0 ? movespeed + antiflicker_speed : autocvar_hud_panel_strafehud_switch_minspeed;
 
         // get current strafing angle ranging from -180° to +180°
         if(!autocvar__hud_configure)
@@ -339,29 +358,25 @@ void HUD_StrafeHUD()
                 // calculate view angle relative to the players current velocity direction
                 angle = vel_angle - view_angle;
 
-                // if the angle goes above 180° or below -180° wrap it to the opposite side
+                // if the angle goes above 180° or below -180° wrap it to the opposite side since we want the interior angle
                 if (angle > 180) angle -= 360;
                 else if(angle < -180) angle += 360;
 
-                // shift the strafe angle by 180° for hud calculations
-                if(angle < 0) angle += 180;
-                else angle -= 180;
-
                 // determine whether the player is strafing forwards or backwards
                 // if the player isn't strafe turning use forwards/backwards keys to determine direction
-                if(!strafekeys)
+                if(fabs(wishangle) != 90)
                 {
                     if(keys_fwd > 0)
                     {
-                        state_fwd = true;
+                        fwd = true;
                     }
                     else if(keys_fwd < 0)
                     {
-                        state_fwd = false;
+                        fwd = false;
                     }
                     else
                     {
-                        state_fwd = fabs(angle) <= 90;
+                        fwd = fabs(angle) <= 90;
                     }
                 }
                 // otherwise determine by examining the strafe angle
@@ -369,23 +384,12 @@ void HUD_StrafeHUD()
                 {
                     if(wishangle < 0) // detect direction using wishangle since the direction is not yet set
                     {
-                        state_fwd = angle <= -wishangle;
+                        fwd = angle <= -wishangle;
                     }
                     else
                     {
-                        state_fwd = angle >= -wishangle;
+                        fwd = angle >= -wishangle;
                     }
-                }
-
-                if(state_fwd_prev != state_fwd)
-                {
-                    state_fwd_time = time;
-                }
-                state_fwd_prev = state_fwd;
-
-                if((time - state_fwd_time) >= autocvar_hud_panel_strafehud_timeout_direction || speed < maxspeed || (strafekeys && mode == 0)) // timeout when changing between forwards and backwards movement
-                {
-                    fwd = state_fwd;
                 }
 
                 // shift the strafe angle by 180° when strafing backwards
@@ -446,7 +450,7 @@ void HUD_StrafeHUD()
         }
 
         // best angle to strafe at
-        bestangle = (speed > maxspeed ? acos(maxspeed / speed) : 0) * RAD2DEG * (direction < 0 ? -1 : 1);
+        bestangle = (speed > movespeed ? acos(movespeed / speed) : 0) * RAD2DEG * (direction < 0 ? -1 : 1);
         odd_bestangle = -bestangle - wishangle;
         bestangle -= wishangle;
 
@@ -572,15 +576,11 @@ void HUD_StrafeHUD()
 
             if(speed >= minspeed) // only draw indicators if minspeed is reached
             {
-                // draw best angles for acceleration
+                // draw the switch indicator(s)
                 float offset = !odd_angles ? bestangle_offset : odd_bestangle_offset;
                 float switch_offset = !odd_angles ? switch_bestangle_offset : switch_odd_bestangle_offset;
-                // both indicators are inactive if no direction can be determined
-                vector switch_color = direction != 0 ? autocvar_hud_panel_strafehud_switch_active_color : autocvar_hud_panel_strafehud_switch_inactive_color;
-                float switch_alpha = direction != 0 ? autocvar_hud_panel_strafehud_switch_active_alpha : autocvar_hud_panel_strafehud_switch_inactive_alpha;
-                // draw the switch indicators
-                HUD_Panel_DrawStrafeHUD(switch_offset, bestangle_width, autocvar_hud_panel_strafehud_switch_inactive_color, autocvar_hud_panel_strafehud_switch_inactive_alpha * panel_fg_alpha, 0, 0);
-                HUD_Panel_DrawStrafeHUD(offset, bestangle_width, switch_color, switch_alpha * panel_fg_alpha, 0, 0);
+                HUD_Panel_DrawStrafeHUD(switch_offset, bestangle_width, autocvar_hud_panel_strafehud_switch_color, autocvar_hud_panel_strafehud_switch_alpha * panel_fg_alpha, 0, 0);
+                if(direction == 0) HUD_Panel_DrawStrafeHUD(offset, bestangle_width, autocvar_hud_panel_strafehud_switch_color, autocvar_hud_panel_strafehud_switch_alpha * panel_fg_alpha, 0, 0);
             }
         }
 
@@ -591,7 +591,7 @@ void HUD_StrafeHUD()
             float slicksteps = 90 / pow(2, bound(0, autocvar_hud_panel_strafehud_slickdetector_granularity, 4));
             bool slickdetected = false;
 
-            slickdetected = IS_ONSLICK(strafeplayer); // don't need to traceline if already touching slick
+            if(islocal) slickdetected = IS_ONSLICK(strafeplayer); // don't need to traceline if already touching slick
 
             // traceline into every direction
             trace_dphitq3surfaceflags = 0;
@@ -609,14 +609,14 @@ void HUD_StrafeHUD()
                         slickoffset.y = cos(j * DEG2RAD) * slickrotate;
 
                         traceline(strafeplayer.origin, strafeplayer.origin + slickoffset, MOVE_WORLDONLY, NULL);
-                        if(trace_dphitq3surfaceflags & Q3SURFACEFLAG_SLICK) slickdetected = true;
+                        if((PHYS_FRICTION(strafeplayer) == 0 && trace_fraction < 1) || trace_dphitq3surfaceflags & Q3SURFACEFLAG_SLICK) slickdetected = true;
                     }
                 }
                 else
                 {
                     slickoffset.x = slickoffset.y = 0;
                     traceline(strafeplayer.origin, strafeplayer.origin + slickoffset, MOVE_WORLDONLY, NULL);
-                    if(trace_dphitq3surfaceflags & Q3SURFACEFLAG_SLICK) slickdetected = true;
+                    if((PHYS_FRICTION(strafeplayer) == 0 && trace_fraction < 1) || trace_dphitq3surfaceflags & Q3SURFACEFLAG_SLICK) slickdetected = true;
                 }
             }
 
@@ -632,94 +632,7 @@ void HUD_StrafeHUD()
             }
         }
 
-        draw_beginBoldFont();
-        // show speed when crossing the start trigger
-        if(autocvar_hud_panel_strafehud_startspeed_fade > 0)
-        {
-            float text_alpha = 0;
-            if(race_nextcheckpoint == 1) // check if the start trigger was hit since the checkpoint after the start trigger is always checkpoint 1
-            {
-                if(starttime != race_checkpointtime)
-                {
-                    starttime = race_checkpointtime;
-                    startspeed = speed;
-                }
-            }
-            if(startspeed >= 0)
-            {
-                text_alpha = cos(((time - starttime) / autocvar_hud_panel_strafehud_startspeed_fade) * 90 * DEG2RAD); // fade non-linear like the physics panel does
-                if((time - starttime) > autocvar_hud_panel_strafehud_startspeed_fade)
-                {
-                    startspeed = -1;
-                }
-            }
-            if(startspeed >= 0 && text_alpha > 0 && autocvar_hud_panel_strafehud_startspeed_size > 0)
-            {
-                vector startspeed_size = panel_size;
-                startspeed_size.y = panel_size.y * min(autocvar_hud_panel_strafehud_startspeed_size, 5);
-                drawstring_aspect(panel_pos + eY * panel_size.y, strcat(ftos_decimals(startspeed * speed_conversion_factor, 2), autocvar_hud_panel_strafehud_unit_show ? speed_unit : ""), startspeed_size, autocvar_hud_panel_strafehud_startspeed_color, text_alpha * panel_fg_alpha, DRAWFLAG_NORMAL);
-            }
-        }
-        else
-        {
-            starttime = 0;
-            startspeed = -1;
-        }
-
-        // experimental: show height achieved by a single jump (doesn't work in low gravity and may not be 100% accurate)
-        if(autocvar_hud_panel_strafehud_jumpheight_fade > 0)
-        {
-            float text_alpha = 0;
-            float jumpheight_min = max(autocvar_hud_panel_strafehud_jumpheight_min, 0);
-            float jumpheight_current = strafeplayer.origin.z;
-            float jumpspeed_current = strafeplayer.velocity.z;
-            if(jumpspeed_prev <= jumpspeed_current || jumpheight_prev > jumpheight_current || IS_ONGROUND(strafeplayer) || swimming || IS_DEAD(strafeplayer) || spectating)
-            {
-                // tries to catch kill and spectate but those are not reliable, should just hook to kill/spectate/teleport and reset jump height there
-                jumprestart = true;
-            }
-            else
-            {
-                if(jumpheight < 0 || jumprestart)
-                {
-                    jumprestart = false;
-                    jumpheight = 0;
-                }
-                else
-                {
-                    jumpheight += jumpheight_current - jumpheight_prev;
-                }
-                if((jumpheight * length_conversion_factor) > jumpheight_min && jumpheight > jumpheight_persistent)
-                {
-                    jumptime = time;
-                    jumpheight_persistent = jumpheight;
-                }
-            }
-            jumpheight_prev = jumpheight_current;
-            jumpspeed_prev = jumpspeed_current;
-            if(jumpheight_persistent > 0)
-            {
-                text_alpha = cos(((time - jumptime) / autocvar_hud_panel_strafehud_jumpheight_fade) * 90 * DEG2RAD); // fade non-linear like the physics panel does
-                if((time - jumptime) > autocvar_hud_panel_strafehud_jumpheight_fade)
-                {
-                    jumpheight_persistent = -1;
-                }
-            }
-            if(jumpheight_persistent > 0 && text_alpha > 0 && autocvar_hud_panel_strafehud_jumpheight_size > 0)
-            {
-                vector jumpheight_size = panel_size;
-                jumpheight_size.y = panel_size.y * min(autocvar_hud_panel_strafehud_jumpheight_size, 5);
-                drawstring_aspect(panel_pos - eY * jumpheight_size.y, strcat(ftos_decimals(jumpheight_persistent * length_conversion_factor, length_decimals), autocvar_hud_panel_strafehud_unit_show ? length_unit : ""), jumpheight_size, autocvar_hud_panel_strafehud_jumpheight_color, text_alpha * panel_fg_alpha, DRAWFLAG_NORMAL);
-            }
-        }
-        else
-        {
-            jumpheight_prev = jumpspeed_prev = 0;
-            jumpheight = jumpheight_persistent = -1;
-        }
-        draw_endBoldFont();
-
-        if(speed < (maxspeed + antiflicker_speed) && !immobile)
+        if(speed < (movespeed + antiflicker_speed) && !immobile)
         {
             bestangle_anywhere = true; // moving forward should suffice to gain speed
         }
@@ -779,8 +692,128 @@ void HUD_StrafeHUD()
 
         if(currentangle_size.x > 0 && currentangle_size.y > 0 && autocvar_hud_panel_strafehud_angle_alpha * panel_fg_alpha > 0)
         {
-            drawfill(panel_pos - eY * ((currentangle_size.y - panel_size.y) / 2) + eX * (currentangle_offset - currentangle_size.x/2), currentangle_size, currentangle_color, autocvar_hud_panel_strafehud_angle_alpha * panel_fg_alpha, DRAWFLAG_NORMAL);
+            switch(autocvar_hud_panel_strafehud_angle_style)
+            {
+                case 1:
+                    drawfill(panel_pos - eY * ((currentangle_size.y - panel_size.y) / 2) + eX * (currentangle_offset - currentangle_size.x/2), currentangle_size, currentangle_color, autocvar_hud_panel_strafehud_angle_alpha * panel_fg_alpha, DRAWFLAG_NORMAL);
+                    break;
+                case 2:
+                    vector line_size = currentangle_size;
+                    line_size.y = currentangle_size.y / (bound(2, autocvar_hud_panel_strafehud_angle_dashes, currentangle_size.y)*2-1);
+                    for(float i = 0; i < currentangle_size.y; i += line_size.y*2)
+                    {
+                        if(i + line_size.y*2 >= currentangle_size.y) line_size.y = currentangle_size.y - i;
+                        drawfill(panel_pos - eY * ((currentangle_size.y - panel_size.y) / 2 - i) + eX * (currentangle_offset - line_size.x/2), line_size, currentangle_color, autocvar_hud_panel_strafehud_angle_alpha * panel_fg_alpha, DRAWFLAG_NORMAL);
+                    }
+                    break;
+                case 0:
+                default:
+            }
+
+            if(autocvar_hud_panel_strafehud_angle_arrow > 0)
+            {
+                vector arrow_size = currentangle_size;
+                arrow_size.x = max(panel_size.x * autocvar_hud_panel_strafehud_angle_arrow_width, 1);
+                arrow_size.y = max(panel_size.y * min(autocvar_hud_panel_strafehud_angle_arrow_height, 1), 1);
+                vector arrow_fragment = '0 0.25 0';
+
+                for(float i = arrow_size.y; i > 0; i -= arrow_fragment.y)
+                {
+                    arrow_fragment.x = arrow_size.x * (i/arrow_size.y);
+                    if(autocvar_hud_panel_strafehud_angle_arrow == 1 || autocvar_hud_panel_strafehud_angle_arrow >= 3)
+                        drawfill(panel_pos - eY * ((currentangle_size.y - panel_size.y) / 2 + i) + eX * (currentangle_offset - arrow_fragment.x/2), arrow_fragment, currentangle_color, autocvar_hud_panel_strafehud_angle_alpha * panel_fg_alpha, DRAWFLAG_NORMAL);
+                    if(autocvar_hud_panel_strafehud_angle_arrow >= 2)
+                        drawfill(panel_pos + eY * (-(currentangle_size.y - panel_size.y) / 2 + currentangle_size.y + i - arrow_fragment.y) + eX * (currentangle_offset - arrow_fragment.x/2), arrow_fragment, currentangle_color, autocvar_hud_panel_strafehud_angle_alpha * panel_fg_alpha, DRAWFLAG_NORMAL);
+                }
+            }
         }
+
+        draw_beginBoldFont();
+        // show speed when crossing the start trigger
+        if(autocvar_hud_panel_strafehud_startspeed_fade > 0)
+        {
+            float text_alpha = 0;
+            if((race_nextcheckpoint == 1) || (race_checkpoint == 254 && race_nextcheckpoint == 255)) // check if the start trigger was hit (will also trigger if the finish trigger was hit if those have the same ID)
+            {
+                if(starttime != race_checkpointtime)
+                {
+                    starttime = race_checkpointtime;
+                    startspeed = speed;
+                }
+            }
+            if(startspeed >= 0)
+            {
+                text_alpha = cos(((time - starttime) / autocvar_hud_panel_strafehud_startspeed_fade) * 90 * DEG2RAD); // fade non-linear like the physics panel does
+                if((time - starttime) > autocvar_hud_panel_strafehud_startspeed_fade)
+                {
+                    startspeed = -1;
+                }
+            }
+            if(startspeed >= 0 && text_alpha > 0 && autocvar_hud_panel_strafehud_startspeed_size > 0)
+            {
+                vector startspeed_size = panel_size;
+                startspeed_size.y = panel_size.y * min(autocvar_hud_panel_strafehud_startspeed_size, 5);
+                drawstring_aspect(panel_pos + eY * panel_size.y, strcat(ftos_decimals(startspeed * speed_conversion_factor, 2), autocvar_hud_panel_strafehud_unit_show ? speed_unit : ""), startspeed_size, autocvar_hud_panel_strafehud_startspeed_color, text_alpha * panel_fg_alpha, DRAWFLAG_NORMAL);
+            }
+        }
+        else
+        {
+            starttime = 0;
+            startspeed = -1;
+        }
+
+        // experimental: show height achieved by a single jump (doesn't work in low gravity and may not be 100% accurate)
+        if(autocvar_hud_panel_strafehud_jumpheight_fade > 0)
+        {
+            float text_alpha = 0;
+            float jumpheight_min = max(autocvar_hud_panel_strafehud_jumpheight_min, 0);
+            float jumpheight_current = strafeplayer.origin.z;
+            float jumpspeed_current = strafeplayer.velocity.z;
+            if(jumpspeed_prev <= jumpspeed_current || jumpheight_prev > jumpheight_current || onground || swimming || IS_DEAD(strafeplayer) || spectating)
+            {
+                // tries to catch kill and spectate but those are not reliable, should just hook to kill/spectate/teleport and reset jump height there
+                jumprestart = true;
+            }
+            else
+            {
+                if(jumpheight < 0 || jumprestart)
+                {
+                    jumprestart = false;
+                    jumpheight = 0;
+                }
+                else
+                {
+                    jumpheight += jumpheight_current - jumpheight_prev;
+                }
+                if((jumpheight * length_conversion_factor) > jumpheight_min && jumpheight > jumpheight_persistent)
+                {
+                    jumptime = time;
+                    jumpheight_persistent = jumpheight;
+                }
+            }
+            jumpheight_prev = jumpheight_current;
+            jumpspeed_prev = jumpspeed_current;
+            if(jumpheight_persistent > 0)
+            {
+                text_alpha = cos(((time - jumptime) / autocvar_hud_panel_strafehud_jumpheight_fade) * 90 * DEG2RAD); // fade non-linear like the physics panel does
+                if((time - jumptime) > autocvar_hud_panel_strafehud_jumpheight_fade)
+                {
+                    jumpheight_persistent = -1;
+                }
+            }
+            if(jumpheight_persistent > 0 && text_alpha > 0 && autocvar_hud_panel_strafehud_jumpheight_size > 0)
+            {
+                vector jumpheight_size = panel_size;
+                jumpheight_size.y = panel_size.y * min(autocvar_hud_panel_strafehud_jumpheight_size, 5);
+                drawstring_aspect(panel_pos - eY * jumpheight_size.y, strcat(ftos_decimals(jumpheight_persistent * length_conversion_factor, length_decimals), autocvar_hud_panel_strafehud_unit_show ? length_unit : ""), jumpheight_size, autocvar_hud_panel_strafehud_jumpheight_color, text_alpha * panel_fg_alpha, DRAWFLAG_NORMAL);
+            }
+        }
+        else
+        {
+            jumpheight_prev = jumpspeed_prev = 0;
+            jumpheight = jumpheight_persistent = -1;
+        }
+        draw_endBoldFont();
     }
 }
 
@@ -790,9 +823,11 @@ void HUD_Panel_DrawStrafeHUD(float offset, float width, vector color, float alph
     float mirror_offset, mirror_width;
     vector size = panel_size;
     vector mirror_size = panel_size;
+    int gradient_start;
+    float gradient_offset, gradient_mirror_offset;
+    float overflow_width = 0, overflow_mirror_width = 0;
 
     float original_width = width;
-    float hiddencolor_width;
 
     if(alpha <= 0 && type != 2 || width <= 0) return;
 
@@ -810,8 +845,11 @@ void HUD_Panel_DrawStrafeHUD(float offset, float width, vector color, float alph
         mirror_width = min(offset + width - panel_size.x - hidden_width, width);
         mirror_offset = max(offset - panel_size.x - hidden_width, 0);
     }
+
+    if(width < 0) width = 0;
     if((offset + width) > panel_size.x)
     {
+        overflow_width = (offset + width) - panel_size.x;
         width = panel_size.x - offset;
     }
     if(mirror_offset < 0)
@@ -819,14 +857,13 @@ void HUD_Panel_DrawStrafeHUD(float offset, float width, vector color, float alph
         mirror_width += mirror_offset;
         mirror_offset = 0;
     }
+
+    if(mirror_width < 0) mirror_width = 0;
     if((mirror_offset + mirror_width) > panel_size.x)
     {
+        overflow_mirror_width = (mirror_offset + mirror_width) - panel_size.x;
         mirror_width = panel_size.x - mirror_offset;
     }
-
-    if(width < 0) width = 0;
-    if(mirror_width < 0) mirror_width = 0;
-    hiddencolor_width = original_width - width - mirror_width;
 
     if(direction < 0) // swap mirror and non-mirror values if direction points left
     {
@@ -837,6 +874,10 @@ void HUD_Panel_DrawStrafeHUD(float offset, float width, vector color, float alph
         width += mirror_width;
         mirror_width = width - mirror_width;
         width -= mirror_width;
+
+        overflow_width += overflow_mirror_width;
+        overflow_mirror_width = overflow_width - overflow_mirror_width;
+        overflow_width -= overflow_mirror_width;
     }
 
     size.x = width;
@@ -856,8 +897,28 @@ void HUD_Panel_DrawStrafeHUD(float offset, float width, vector color, float alph
             break;
 
         case 2: // gradient style (types: 1 = left, 2 = right, 3 = both)
-            StrafeHUD_drawGradient(color, autocvar_hud_panel_strafehud_bar_neutral_color, mirror_size, original_width, mirror_offset, alpha, width + (mirror_offset == 0 ? hiddencolor_width : 0), gradientType);
-            StrafeHUD_drawGradient(color, autocvar_hud_panel_strafehud_bar_neutral_color, size, original_width, offset, alpha, (offset == 0 ? hiddencolor_width : 0), gradientType);
+            // determine whether the gradient starts in the mirrored or the non-mirrored area
+            if(offset == 0 && mirror_offset == 0) gradient_start = width > mirror_width ? 2 : 1;
+            else if(offset == 0) gradient_start = 2;
+            else if(mirror_offset == 0) gradient_start = 1;
+            else gradient_start = 0;
+
+            switch(gradient_start){
+                default:
+                case 0: // no offset required
+                    gradient_offset = gradient_mirror_offset = 0;
+                    break;
+                case 1: // offset starts in non-mirrored area, mirrored area requires offset
+                    gradient_offset = 0;
+                    gradient_mirror_offset = original_width - (mirror_width + overflow_mirror_width);
+                    break;
+                case 2: // offset starts in mirrored area, non-mirrored area requires offset
+                    gradient_offset = original_width - (width + overflow_width);
+                    gradient_mirror_offset = 0;
+            }
+
+            StrafeHUD_drawGradient(color, autocvar_hud_panel_strafehud_bar_neutral_color, mirror_size, original_width, mirror_offset, alpha, gradient_mirror_offset, gradientType);
+            StrafeHUD_drawGradient(color, autocvar_hud_panel_strafehud_bar_neutral_color, size, original_width, offset, alpha, gradient_offset, gradientType);
     }
 }
 
@@ -898,27 +959,27 @@ void StrafeHUD_drawGradient(vector color1, vector color2, vector size, float ori
 // length unit conversion (km and miles are only included to match the GetSpeedUnit* functions)
 float GetLengthUnitFactor(int length_unit)
 {
-	switch(length_unit)
-	{
-		default:
-		case 1: return 1.0;
-		case 2: return 0.0254;
-		case 3: return 0.0254 * 0.001;
-		case 4: return 0.0254 * 0.001 * 0.6213711922;
-		case 5: return 0.0254 * 0.001 * 0.5399568035;
-	}
+    switch(length_unit)
+    {
+        default:
+        case 1: return 1.0;
+        case 2: return 0.0254;
+        case 3: return 0.0254 * 0.001;
+        case 4: return 0.0254 * 0.001 * 0.6213711922;
+        case 5: return 0.0254 * 0.001 * 0.5399568035;
+    }
 }
 
 string GetLengthUnit(int length_unit)
 {
-	switch(length_unit)
-	{
-		// translator-friendly strings without the initial space
-		default:
-		case 1: return strcat(" ", _("qu"));
-		case 2: return strcat(" ", _("m"));
-		case 3: return strcat(" ", _("km"));
-		case 4: return strcat(" ", _("mi"));
-		case 5: return strcat(" ", _("nmi"));
-	}
+    switch(length_unit)
+    {
+        // translator-friendly strings without the initial space
+        default:
+        case 1: return strcat(" ", _("qu"));
+        case 2: return strcat(" ", _("m"));
+        case 3: return strcat(" ", _("km"));
+        case 4: return strcat(" ", _("mi"));
+        case 5: return strcat(" ", _("nmi"));
+    }
 }
