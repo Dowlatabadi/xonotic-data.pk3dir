@@ -297,10 +297,10 @@ void W_Electro_Orb_Stick(entity this, entity to)
 	IL_PUSH(g_bot_dodge, newproj);
 
 	// check if limits are enabled (we can tell by checking if the original orb is listed) and push it to the list if so
-	if(IL_CONTAINS(g_electrorubble, this))
+	if(IL_CONTAINS(g_rubble, this))
 	{
-		float mandatoryTimeFloatForCompiler = this.creationtime;
-		ElectroRubbleNew(newproj, mandatoryTimeFloatForCompiler, newproj.owner);
+		newproj.creationtime = this.creationtime;
+		IL_PUSH(g_rubble, newproj);
 	}
 
 	delete(this);
@@ -423,8 +423,8 @@ void W_Electro_Attack_Orb(Weapon thiswep, entity actor, .entity weaponentity)
 
 	if(WEP_CVAR_SEC(electro, limit) > 0)
 	{
-		ElectroRubbleNew(proj, time, actor);
-		ElectroRubbleLimit("electro_orb", WEP_CVAR_SEC(electro, limit), adaptor_think2use_hittype_splash, actor);
+		RubbleNew(proj);
+		RubbleLimit("electro_orb", WEP_CVAR_SEC(electro, limit), adaptor_think2use_hittype_splash);
 	}
 
 	CSQCProjectile(proj, true, PROJECTILE_ELECTRO, false); // no culling, it has sound
