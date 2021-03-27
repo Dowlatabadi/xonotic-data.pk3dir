@@ -15,8 +15,8 @@ void ElectroRubbleLimit(string cname, int limit, void(entity) deleteproc, entity
 		// compare to all other matching entities
 		IL_EACH(g_electrorubble, it.classname == cname,
 		{
-			++c;
 			if(shooter == it.owner){
+				++c;
 				if(!oldest || oldesttime > it.creationtime)
 				{
 					oldest = it;
@@ -33,10 +33,10 @@ void ElectroRubbleLimit(string cname, int limit, void(entity) deleteproc, entity
 	}
 }
 
-entity ElectroRubbleNew(entity e, float giventime, entity owner)
+entity ElectroRubbleNew(entity e, float giventime, entity shooter)
 {
 	e.creationtime = giventime;
-	e.owner = owner;
+	e.owner = shooter;
 	IL_PUSH(g_electrorubble, e);
 	return e;
 }
