@@ -351,6 +351,7 @@ void cvar_changes_init()
 		BADCVAR("g_chatsounds");
 		BADCVAR("g_ca_point_leadlimit");
 		BADCVAR("g_ca_point_limit");
+		BADCVAR("g_ca_spectate_enemies");
 		BADCVAR("g_ctf_captimerecord_always");
 		BADCVAR("g_ctf_flag_glowtrails");
 		BADCVAR("g_ctf_dynamiclights");
@@ -764,6 +765,9 @@ spawnfunc(worldspawn)
 	delete_fn = remove_safely; // during spawning, watch what you remove!
 
 	cvar_changes_init(); // do this very early now so it REALLY matches the server config
+
+	// default to RACE_RECORD, can be overwritten by gamemodes
+	record_type = RACE_RECORD;
 
 	// needs to be done so early because of the constants they create
 	static_init();

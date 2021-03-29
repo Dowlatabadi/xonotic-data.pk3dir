@@ -395,6 +395,9 @@ void PutObserverInServer(entity this)
 		SetPlayerTeam(this, -1, TEAM_CHANGE_SPECTATOR);
 		this.frags = FRAGS_SPECTATOR;
 	}
+
+	bot_relinkplayerlist();
+
 	if (CS(this).just_joined)
 		CS(this).just_joined = false;
 }
@@ -825,6 +828,8 @@ void PutClientInServer(entity this)
 	} else if (IS_PLAYER(this)) {
 		PutPlayerInServer(this);
 	}
+
+	bot_relinkplayerlist();
 }
 
 // TODO do we need all these fields, or should we stop autodetecting runtime
@@ -2347,6 +2352,8 @@ void ObserverOrSpectatorThink(entity this)
 				TRANSMUTE(Observer, this);
 				PutClientInServer(this);
 			}
+			else
+				this.would_spectate = false; // unable to spectate anyone
 			if (is_spec)
 				CS(this).impulse = 0;
 		} else if (is_spec) {
@@ -2370,7 +2377,10 @@ void ObserverOrSpectatorThink(entity this)
 			}
 		}
 		else {
-			int preferred_movetype = ((!PHYS_INPUT_BUTTON_USE(this) ? CS_CVAR(this).cvar_cl_clippedspectating : !CS_CVAR(this).cvar_cl_clippedspectating) ? MOVETYPE_FLY_WORLDONLY : MOVETYPE_NOCLIP);
+			bool wouldclip = CS_CVAR(this).cvar_cl_clippedspectating;
+			if (PHYS_INPUT_BUTTON_USE(this))
+				wouldclip = !wouldclip;
+			int preferred_movetype = (wouldclip ? MOVETYPE_FLY_WORLDONLY : MOVETYPE_NOCLIP);
 			set_movetype(this, preferred_movetype);
 		}
 	} else { // jump pressed
