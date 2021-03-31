@@ -61,6 +61,8 @@ void W_Crylink_LinkExplode(entity e, entity e2, entity directhitentity)
 	float a;
 
 	if(e == e2)
+		e2.classname = "spike_oktoremove";
+		delete(e2);
 		return;
 
 	a = bound(0, 1 - (time - e.fade_time) * e.fade_rate, 1);
@@ -261,9 +263,11 @@ void W_Crylink_Touch(entity this, entity toucher)
 		.entity weaponentity = this.weaponentity_fld;
 		if(this == this.crylink_owner.(weaponentity).crylink_lastgroup)
 			this.crylink_owner.(weaponentity).crylink_lastgroup = NULL;
-		W_Crylink_LinkExplode(this.queuenext, this, toucher);
-		this.classname = "spike_oktoremove";
-		delete(this);
+		
+		//can't call fun(ent, ent, ent), find a proper call method or introduce a delay inside the function but don't delay other activations outside of the first call per shot.
+		setthink(this, W_Crylink_LinkExplode);
+		this.nextthink = time + WEP_CVAR(crylink, linkexplodedelay);
+		
 		return;
 	}
 	else if(finalhit)
