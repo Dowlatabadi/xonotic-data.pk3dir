@@ -56,30 +56,41 @@ void W_Crylink_Reset(entity this)
 }
 
 // force projectile to explode
-void W_Crylink_LinkExplode(entity e, entity e2, entity directhitentity)
+void W_Crylink_LinkExplode(entity this)
 {
 	float a;
+	static entity directhitentity;
 
-	if(e == e2)
-		e2.classname = "spike_oktoremove";
-		delete(e2);
+	//this.linkExplodeTriggerer can't be used for this check or the loop would exit on first call
+	if(this.linkExplodeLoopEnder){
+		this.classname = "spike_oktoremove";
+		delete(this);
 		return;
+	}
 
-	a = bound(0, 1 - (time - e.fade_time) * e.fade_rate, 1);
+	//quaranteed to be set for the first loop's entity as the function has as the argument as it's set right before calling
+	if(this.toucherForLinkExplode){
+		directhitentity = this.toucherForLinkExplode;
+	}
 
-	.entity weaponentity = e.weaponentity_fld;
-	if(e == e.crylink_owner.(weaponentity).crylink_lastgroup)
-		e.crylink_owner.(weaponentity).crylink_lastgroup = NULL;
+	a = bound(0, 1 - (time - this.fade_time) * this.fade_rate, 1);
 
-	float isprimary = !(e.projectiledeathtype & HITTYPE_SECONDARY);
+	.entity weaponentity = this.weaponentity_fld;
+	if(this == this.crylink_owner.(weaponentity).crylink_lastgroup)
+		this.crylink_owner.(weaponentity).crylink_lastgroup = NULL;
 
-	RadiusDamage(e, e.realowner, WEP_CVAR_BOTH(crylink, isprimary, damage) * a, WEP_CVAR_BOTH(crylink, isprimary, edgedamage) * a, WEP_CVAR_BOTH(crylink, isprimary, radius),
-				NULL, NULL, WEP_CVAR_BOTH(crylink, isprimary, force) * a, e.projectiledeathtype, e.weaponentity_fld, directhitentity);
+	float isprimary = !(this.projectiledeathtype & HITTYPE_SECONDARY);
 
-	W_Crylink_LinkExplode(e.queuenext, e2, directhitentity);
+	RadiusDamage(this, this.realowner, WEP_CVAR_BOTH(crylink, isprimary, damage) * a, WEP_CVAR_BOTH(crylink, isprimary, edgedamage) * a, WEP_CVAR_BOTH(crylink, isprimary, radius),
+				NULL, NULL, WEP_CVAR_BOTH(crylink, isprimary, force) * a, this.projectiledeathtype, this.weaponentity_fld, directhitentity);
 
-	e.classname = "spike_oktoremove";
-	delete(e);
+	//set the boolean for exiting the loop
+	if(this.linkExplodeTriggerer)this.linkExplodeLoopEnder = true;
+	
+	W_Crylink_LinkExplode(this.queuenext);
+
+	this.classname = "spike_oktoremove";
+	delete(this);
 }
 
 // adjust towards center
@@ -263,11 +274,12 @@ void W_Crylink_Touch(entity this, entity toucher)
 		.entity weaponentity = this.weaponentity_fld;
 		if(this == this.crylink_owner.(weaponentity).crylink_lastgroup)
 			this.crylink_owner.(weaponentity).crylink_lastgroup = NULL;
-		
-		//can't call fun(ent, ent, ent), find a proper call method or introduce a delay inside the function but don't delay other activations outside of the first call per shot.
+		this.toucherForLinkExplode = toucher;
+		this.linkExplodeTriggerer = true;
+		this.linkExplodeLoopEnder = false; //will be set to true based on linkExplodeTriggerer before first loop run ends to avoid exiting on the first run instead of doing a full loop
 		setthink(this, W_Crylink_LinkExplode);
-		this.nextthink = time + WEP_CVAR(crylink, linkexplodedelay);
-		
+									//calculate the time difference with (units to travel divided by travel speed)
+		this.nextthink = time + (WEP_CVAR(crylink, linkexplodedelayinunits) / WEP_CVAR_BOTH(crylink, isprimary, speed)); 
 		return;
 	}
 	else if(finalhit)
@@ -320,6 +332,8 @@ void W_Crylink_Attack(Weapon thiswep, entity actor, .entity weaponentity)
 		proj.reset = W_Crylink_Reset;
 		proj.realowner = proj.owner = actor;
 		proj.crylink_owner = actor;
+		proj.linkExplodeLoopEnder = false;
+		proj.linkExplodeTriggerer = false;
 		proj.weaponentity_fld = weaponentity;
 		proj.bot_dodge = true;
 		proj.bot_dodgerating = WEP_CVAR_PRI(crylink, damage);
@@ -434,6 +448,8 @@ void W_Crylink_Attack2(Weapon thiswep, entity actor, .entity weaponentity)
 		proj.reset = W_Crylink_Reset;
 		proj.realowner = proj.owner = actor;
 		proj.crylink_owner = actor;
+		proj.linkExplodeLoopEnder = false;
+		proj.linkExplodeTriggerer = false;
 		proj.bot_dodge = true;
 		proj.bot_dodgerating = WEP_CVAR_SEC(crylink, damage);
 		if(shots == 1) {
