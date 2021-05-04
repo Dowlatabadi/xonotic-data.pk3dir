@@ -1,34 +1,30 @@
 #include "havocbot.qh"
 
+#include "roles.qh"
+
+#include <server/defs.qh>
+#include <server/miscfunctions.qh>
+#include "../cvars.qh"
+
+#include "../aim.qh"
+#include "../bot.qh"
+#include "../navigation.qh"
+#include "../scripting.qh"
+#include "../waypoints.qh"
+
 #include <common/constants.qh>
 #include <common/impulses/all.qh>
-#include <common/items/_mod.qh>
-#include <common/mapobjects/func/ladder.qh>
-#include <common/mapobjects/teleporters.qh>
-#include <common/mapobjects/trigger/hurt.qh>
-#include <common/mapobjects/trigger/jumppads.qh>
 #include <common/net_linked.qh>
 #include <common/physics/player.qh>
 #include <common/state.qh>
-#include <common/stats.qh>
-#include <common/weapons/_all.qh>
+#include <common/items/_mod.qh>
 #include <common/wepent.qh>
+
+#include <common/mapobjects/func/ladder.qh>
+#include <common/mapobjects/teleporters.qh>
+#include <common/mapobjects/trigger/jumppads.qh>
+
 #include <lib/warpzone/common.qh>
-#include <server/bot/api.qh>
-#include <server/bot/default/aim.qh>
-#include <server/bot/default/bot.qh>
-#include <server/bot/default/cvars.qh>
-#include <server/bot/default/havocbot/roles.qh>
-#include <server/bot/default/navigation.qh>
-#include <server/bot/default/scripting.qh>
-#include <server/bot/default/waypoints.qh>
-#include <server/client.qh>
-#include <server/damage.qh>
-#include <server/items/items.qh>
-#include <server/mutators/_mod.qh>
-#include <server/weapons/selection.qh>
-#include <server/weapons/weaponsystem.qh>
-#include <server/world.qh>
 
 void havocbot_ai(entity this)
 {
@@ -41,10 +37,6 @@ void havocbot_ai(entity this)
 		this.bot_aimdir_executed = true;
 
 	if(bot_execute_commands(this))
-		return;
-
-	// after bot_execute_commands otherwise bots can't be unpaused
-	if (bot_ispaused(this))
 		return;
 
 	if (bot_strategytoken == this && !bot_strategytoken_taken)
@@ -1182,7 +1174,7 @@ void havocbot_movetogoal(entity this)
 	}
 
 	float ladder_zdir = 0;
-	if(this.ladder_entity)
+	if(time < this.ladder_time)
 	{
 		if(this.goalcurrent.origin.z + this.goalcurrent.mins.z > this.origin.z + this.mins.z)
 		{
@@ -1280,7 +1272,7 @@ entity havocbot_gettarget(entity this, bool secondary)
 	IL_EACH(g_bot_targets, boolean((secondary) ? it.classname == "misc_breakablemodel" : it.classname != "misc_breakablemodel"),
 	{
 		vector v = CENTER_OR_VIEWOFS(it);
-		if(vdist(v - eye, <, autocvar_bot_ai_enemydetectionradius))
+//		if(vdist(v - eye, <, autocvar_bot_ai_enemydetectionradius))
 		if(!best || vlen2(CENTER_OR_VIEWOFS(best) - eye) > vlen2(v - eye))
 		if(bot_shouldattack(this, it))
 		{
@@ -1328,7 +1320,11 @@ void havocbot_chooseenemy(entity this)
 	}
 	if (time < this.havocbot_chooseenemy_finished)
 		return;
+
 	this.havocbot_chooseenemy_finished = time + autocvar_bot_ai_enemydetectioninterval;
+
+this.havocbot_chooseenemy_finished = time + 0.1;
+
 	vector eye = this.origin + this.view_ofs;
 	entity best = NULL;
 	float bestrating = autocvar_bot_ai_enemydetectionradius ** 2;
@@ -1362,6 +1358,8 @@ LABEL(scan_targets)
 
 			vector v = (it.absmin + it.absmax) * 0.5;
 			float rating = vlen2(v - eye);
+rating = 0;
+
 			if (rating < bestrating && bot_shouldattack(this, it))
 			{
 				traceline(eye, v, true, this);
@@ -1378,6 +1376,7 @@ LABEL(scan_targets)
 			scan_secondary_targets = true;
 			// restart the loop
 			bestrating = autocvar_bot_ai_enemydetectionradius ** 2;
+
 			goto scan_targets;
 		}
 
@@ -1467,6 +1466,8 @@ void havocbot_chooseweapon(entity this, .entity weaponentity)
 	// Ideally this 4 should be calculated as longest_weapon_refire / bot_ai_weapon_combo_threshold
 	combo_time = time + ct + (ct * ((-0.3*(skill+this.bot_weaponskill))+3));
 
+combo_time = time + ct;
+
 	combo = false;
 
 	if(autocvar_bot_ai_weapon_combo)
@@ -1484,13 +1485,13 @@ void havocbot_chooseweapon(entity this, .entity weaponentity)
 
 		// Choose weapons for far distance
 		if ( distance > bot_distance_far ) {
-			for(i=0; i < REGISTRY_COUNT(Weapons) && bot_weapons_far[i] != -1 ; ++i){
+			for(i=0; i < Weapons_COUNT && bot_weapons_far[i] != -1 ; ++i){
 				w = bot_weapons_far[i];
-				if ( client_hasweapon(this, REGISTRY_GET(Weapons, w), weaponentity, true, false) )
+				if ( client_hasweapon(this, Weapons_from(w), weaponentity, true, false) )
 				{
 					if ((this.(weaponentity).m_weapon.m_id == w && combo) || havocbot_chooseweapon_checkreload(this, weaponentity, w))
 						continue;
-					this.(weaponentity).m_switchweapon = REGISTRY_GET(Weapons, w);
+					this.(weaponentity).m_switchweapon = Weapons_from(w);
 					return;
 				}
 			}
@@ -1498,26 +1499,26 @@ void havocbot_chooseweapon(entity this, .entity weaponentity)
 
 		// Choose weapons for mid distance
 		if ( distance > bot_distance_close) {
-			for(i=0; i < REGISTRY_COUNT(Weapons) && bot_weapons_mid[i] != -1 ; ++i){
+			for(i=0; i < Weapons_COUNT && bot_weapons_mid[i] != -1 ; ++i){
 				w = bot_weapons_mid[i];
-				if ( client_hasweapon(this, REGISTRY_GET(Weapons, w), weaponentity, true, false) )
+				if ( client_hasweapon(this, Weapons_from(w), weaponentity, true, false) )
 				{
 					if ((this.(weaponentity).m_weapon.m_id == w && combo) || havocbot_chooseweapon_checkreload(this, weaponentity, w))
 						continue;
-					this.(weaponentity).m_switchweapon = REGISTRY_GET(Weapons, w);
+					this.(weaponentity).m_switchweapon = Weapons_from(w);
 					return;
 				}
 			}
 		}
 
 		// Choose weapons for close distance
-		for(i=0; i < REGISTRY_COUNT(Weapons) && bot_weapons_close[i] != -1 ; ++i){
+		for(i=0; i < Weapons_COUNT && bot_weapons_close[i] != -1 ; ++i){
 			w = bot_weapons_close[i];
-			if ( client_hasweapon(this, REGISTRY_GET(Weapons, w), weaponentity, true, false) )
+			if ( client_hasweapon(this, Weapons_from(w), weaponentity, true, false) )
 			{
 				if ((this.(weaponentity).m_weapon.m_id == w && combo) || havocbot_chooseweapon_checkreload(this, weaponentity, w))
 					continue;
-				this.(weaponentity).m_switchweapon = REGISTRY_GET(Weapons, w);
+				this.(weaponentity).m_switchweapon = Weapons_from(w);
 				return;
 			}
 		}
