@@ -111,6 +111,8 @@
 
     MSG_ANNCE_NOTIF(BEGIN,                      N__ALWAYS, "begin",             CH_INFO, VOL_BASEVOICE, ATTEN_NONE)
 
+    MSG_ANNCE_NOTIF(HEADSHOT,                   N__ALWAYS, "headshot",          CH_INFO, VOL_BASEVOICE, ATTEN_NONE)
+
     MSG_ANNCE_NOTIF(KILLSTREAK_03,              N_GNTLOFF, "03kills",           CH_INFO, VOL_BASEVOICE, ATTEN_NONE)
     MSG_ANNCE_NOTIF(KILLSTREAK_05,              N_GNTLOFF, "05kills",           CH_INFO, VOL_BASEVOICE, ATTEN_NONE)
     MSG_ANNCE_NOTIF(KILLSTREAK_10,              N_GNTLOFF, "10kills",           CH_INFO, VOL_BASEVOICE, ATTEN_NONE)
@@ -146,17 +148,6 @@
     MSG_ANNCE_NOTIF(NUM_GAMESTART_8,            N___NEVER, "8",                 CH_INFO, VOL_BASEVOICE, ATTEN_NONE)
     MSG_ANNCE_NOTIF(NUM_GAMESTART_9,            N___NEVER, "9",                 CH_INFO, VOL_BASEVOICE, ATTEN_NONE)
     MSG_ANNCE_NOTIF(NUM_GAMESTART_10,           N___NEVER, "10",                CH_INFO, VOL_BASEVOICE, ATTEN_NONE)
-
-    MSG_ANNCE_NOTIF(NUM_IDLE_1,                 N___NEVER, "1",                 CH_INFO, VOL_BASEVOICE, ATTEN_NONE)
-    MSG_ANNCE_NOTIF(NUM_IDLE_2,                 N___NEVER, "2",                 CH_INFO, VOL_BASEVOICE, ATTEN_NONE)
-    MSG_ANNCE_NOTIF(NUM_IDLE_3,                 N___NEVER, "3",                 CH_INFO, VOL_BASEVOICE, ATTEN_NONE)
-    MSG_ANNCE_NOTIF(NUM_IDLE_4,                 N___NEVER, "4",                 CH_INFO, VOL_BASEVOICE, ATTEN_NONE)
-    MSG_ANNCE_NOTIF(NUM_IDLE_5,                 N___NEVER, "5",                 CH_INFO, VOL_BASEVOICE, ATTEN_NONE)
-    MSG_ANNCE_NOTIF(NUM_IDLE_6,                 N___NEVER, "6",                 CH_INFO, VOL_BASEVOICE, ATTEN_NONE)
-    MSG_ANNCE_NOTIF(NUM_IDLE_7,                 N___NEVER, "7",                 CH_INFO, VOL_BASEVOICE, ATTEN_NONE)
-    MSG_ANNCE_NOTIF(NUM_IDLE_8,                 N___NEVER, "8",                 CH_INFO, VOL_BASEVOICE, ATTEN_NONE)
-    MSG_ANNCE_NOTIF(NUM_IDLE_9,                 N___NEVER, "9",                 CH_INFO, VOL_BASEVOICE, ATTEN_NONE)
-    MSG_ANNCE_NOTIF(NUM_IDLE_10,                N___NEVER, "10",                CH_INFO, VOL_BASEVOICE, ATTEN_NONE)
 
     MSG_ANNCE_NOTIF(NUM_KILL_1,                 N___NEVER, "1",                 CH_INFO, VOL_BASEVOICE, ATTEN_NONE)
     MSG_ANNCE_NOTIF(NUM_KILL_2,                 N___NEVER, "2",                 CH_INFO, VOL_BASEVOICE, ATTEN_NONE)
@@ -216,12 +207,15 @@
 #define N_CONSOLE 1
 #define N_CHATCON 2
 
+// hack to work around the limitations of sprintf
+string multiteam_info_sprintf(string input, string teamname) { return ((input != "") ? sprintf(input, teamname) : ""); }
+
 #define MULTITEAM_INFO(prefix, defaultvalue, strnum, flnum, args, hudargs, icon, normal, gentle, type) \
     NOTIF_ADD_AUTOCVAR(INFO_##prefix, defaultvalue) \
-    MSG_INFO_NOTIF_TEAM(NUM_TEAM_1, prefix##_RED, prefix, defaultvalue, strnum, flnum, args, hudargs, sprintf(icon, strtolower(STATIC_NAME_TEAM_1)), TCR(normal, type, 1), TCR(gentle, type, 1)) \
-    MSG_INFO_NOTIF_TEAM(NUM_TEAM_2, prefix##_BLUE, prefix, defaultvalue, strnum, flnum, args, hudargs, sprintf(icon, strtolower(STATIC_NAME_TEAM_2)), TCR(normal, type, 2), TCR(gentle, type, 2)) \
-    MSG_INFO_NOTIF_TEAM(NUM_TEAM_3, prefix##_YELLOW, prefix, defaultvalue, strnum, flnum, args, hudargs, sprintf(icon, strtolower(STATIC_NAME_TEAM_3)), TCR(normal, type, 3), TCR(gentle, type, 3)) \
-    MSG_INFO_NOTIF_TEAM(NUM_TEAM_4, prefix##_PINK, prefix, defaultvalue, strnum, flnum, args, hudargs, sprintf(icon, strtolower(STATIC_NAME_TEAM_4)), TCR(normal, type, 4), TCR(gentle, type, 4))
+    MSG_INFO_NOTIF_TEAM(NUM_TEAM_1, prefix##_RED, prefix, defaultvalue, strnum, flnum, args, hudargs, multiteam_info_sprintf(icon, strtolower(STATIC_NAME_TEAM_1)), TCR(normal, type, 1), TCR(gentle, type, 1)) \
+    MSG_INFO_NOTIF_TEAM(NUM_TEAM_2, prefix##_BLUE, prefix, defaultvalue, strnum, flnum, args, hudargs, multiteam_info_sprintf(icon, strtolower(STATIC_NAME_TEAM_2)), TCR(normal, type, 2), TCR(gentle, type, 2)) \
+    MSG_INFO_NOTIF_TEAM(NUM_TEAM_3, prefix##_YELLOW, prefix, defaultvalue, strnum, flnum, args, hudargs, multiteam_info_sprintf(icon, strtolower(STATIC_NAME_TEAM_3)), TCR(normal, type, 3), TCR(gentle, type, 3)) \
+    MSG_INFO_NOTIF_TEAM(NUM_TEAM_4, prefix##_PINK, prefix, defaultvalue, strnum, flnum, args, hudargs, multiteam_info_sprintf(icon, strtolower(STATIC_NAME_TEAM_4)), TCR(normal, type, 4), TCR(gentle, type, 4))
 
 // MSG_INFO_NOTIFICATIONS
     MSG_INFO_NOTIF(CHAT_NOSPECTATORS,                       N_CHATCON,  0, 0, "", "",       "",     _("^F4NOTE: ^BGSpectator chat is not sent to players during the match"), "")
@@ -290,7 +284,7 @@
     MSG_INFO_NOTIF(DEATH_MURDER_VH_WAKI_ROCKET,             N_CONSOLE,  3, 2, "spree_inf s1 s2 s3loc spree_end", "s2 s1",               "notify_death",         _("^BG%s%s^K1 couldn't find shelter from ^BG%s^K1's Racer%s%s"), "")
     MSG_INFO_NOTIF(DEATH_MURDER_VOID,                       N_CONSOLE,  3, 2, "spree_inf s1 s2 s3loc spree_end", "s2 s1",               "notify_void",          _("^BG%s%s^K1 was thrown into a world of hurt by ^BG%s^K1%s%s"), "")
 
-    MSG_INFO_NOTIF(DEATH_SELF_AUTOTEAMCHANGE,               N_CONSOLE,  2, 1, "s1 s2loc death_team", "",        "",                     _("^BG%s^K1 was moved into the %s%s"), "")
+    MSG_INFO_NOTIF(DEATH_SELF_AUTOTEAMCHANGE,               N_CONSOLE,  2, 1, "s1 death_team s2loc", "",        "",                     _("^BG%s^K1 was moved into the %s%s"), "")
     MSG_INFO_NOTIF(DEATH_SELF_BETRAYAL,                     N_CONSOLE,  2, 1, "s1 s2loc spree_lost", "s1",      "notify_teamkill_red",  _("^BG%s^K1 became enemies with the Lord of Teamplay%s%s"), "")
     MSG_INFO_NOTIF(DEATH_SELF_CAMP,                         N_CONSOLE,  2, 1, "s1 s2loc spree_lost", "s1",      "notify_camping",       _("^BG%s^K1 thought they found a nice camping ground%s%s"), "")
     MSG_INFO_NOTIF(DEATH_SELF_CHEAT,                        N_CONSOLE,  2, 1, "s1 s2loc spree_lost", "s1",      "notify_selfkill",      _("^BG%s^K1 unfairly eliminated themself%s%s"), "")
@@ -319,7 +313,7 @@
     MSG_INFO_NOTIF(DEATH_SELF_SLIME,                        N_CONSOLE,  2, 1, "s1 s2loc spree_lost", "s1",      "notify_slime",         _("^BG%s^K1 was slimed%s%s"), "")
     MSG_INFO_NOTIF(DEATH_SELF_SUICIDE,                      N_CONSOLE,  2, 1, "s1 s2loc spree_lost", "s1",      "notify_selfkill",      _("^BG%s^K1 couldn't take it anymore%s%s"), "")
     MSG_INFO_NOTIF(DEATH_SELF_SWAMP,                        N_CONSOLE,  2, 1, "s1 s2loc spree_lost", "s1",      "notify_slime",         _("^BG%s^K1 is now preserved for centuries to come%s%s"), "")
-    MSG_INFO_NOTIF(DEATH_SELF_TEAMCHANGE,                   N_CONSOLE,  2, 1, "s1 s2loc death_team", "",        "",                     _("^BG%s^K1 switched to the %s%s"), "")
+    MSG_INFO_NOTIF(DEATH_SELF_TEAMCHANGE,                   N_CONSOLE,  2, 1, "s1 death_team s2loc", "",        "",                     _("^BG%s^K1 switched to the %s%s"), "")
     MSG_INFO_NOTIF(DEATH_SELF_TOUCHEXPLODE,                 N_CONSOLE,  2, 1, "s1 s2loc spree_lost", "s1",      "notify_death",         _("^BG%s^K1 died in an accident%s%s"), "")
     MSG_INFO_NOTIF(DEATH_SELF_TURRET,                       N_CONSOLE,  2, 1, "s1 s2loc spree_lost", "s1",      "notify_death",         _("^BG%s^K1 ran into a turret%s%s"), "")
     MSG_INFO_NOTIF(DEATH_SELF_TURRET_EWHEEL,                N_CONSOLE,  2, 1, "s1 s2loc spree_lost", "s1",      "notify_death",         _("^BG%s^K1 was blasted away by an eWheel turret%s%s"), "")
@@ -342,7 +336,7 @@
     MSG_INFO_NOTIF(DEATH_SELF_VH_SPID_ROCKET,               N_CONSOLE,  2, 1, "s1 s2loc spree_lost", "s1",      "notify_death",         _("^BG%s^K1 was blasted to bits by a Spiderbot rocket%s%s"), "")
     MSG_INFO_NOTIF(DEATH_SELF_VH_WAKI_DEATH,                N_CONSOLE,  2, 1, "s1 s2loc spree_lost", "s1",      "notify_death",         _("^BG%s^K1 got caught in the blast of a Racer explosion%s%s"), "")
     MSG_INFO_NOTIF(DEATH_SELF_VH_WAKI_ROCKET,               N_CONSOLE,  2, 1, "s1 s2loc spree_lost", "s1",      "notify_death",         _("^BG%s^K1 couldn't find shelter from a Racer rocket%s%s"), "")
-    MSG_INFO_NOTIF(DEATH_SELF_VOID,                         N_CONSOLE,  3, 1, "s1 s2 s2loc spree_lost", "s1",   "notify_void",            "^BG%s^K1 %s^K1%s%s", "")
+    MSG_INFO_NOTIF(DEATH_SELF_VOID,                         N_CONSOLE,  3, 1, "s1 s2 s3loc spree_lost", "s1",   "notify_void",            "^BG%s^K1 %s^K1%s%s", "")
 
     MULTITEAM_INFO(DEATH_TEAMKILL,                          N_CONSOLE,  3, 1, "s1 s2 s3loc spree_end", "s2 s1",     "notify_teamkill_%s",   _("^BG%s^K1 was betrayed by ^BG%s^K1%s%s"), "", NAME)
 
@@ -352,7 +346,7 @@
     MSG_INFO_NOTIF(FREEZETAG_REVIVED,                       N_CONSOLE,  2, 0, "s1 s2", "",      "",     _("^BG%s^K3 was revived by ^BG%s"), "")
     MSG_INFO_NOTIF(FREEZETAG_REVIVED_FALL,                  N_CONSOLE,  1, 0, "s1", "",         "",     _("^BG%s^K3 was revived by falling"), "")
     MSG_INFO_NOTIF(FREEZETAG_REVIVED_NADE,                  N_CONSOLE,  1, 0, "s1", "",         "",     _("^BG%s^K3 was revived by their Nade explosion"), "")
-    MSG_INFO_NOTIF(FREEZETAG_AUTO_REVIVED,                  N_CONSOLE,  1, 1, "s1 f1", "",      "",     _("^BG%s^K3 was automatically revived after %s second(s)"), "")
+    MSG_INFO_NOTIF(FREEZETAG_AUTO_REVIVED,                  N_CONSOLE,  1, 1, "s1 f1", "",      "",     _("^BG%s^K3 was automatically revived after %s seconds"), "")
     MSG_INFO_NOTIF(FREEZETAG_SELF,                          N_CONSOLE,  1, 0, "s1", "",         "",     _("^BG%s^K1 froze themself"), "")
 
     MULTITEAM_INFO(ROUND_TEAM_WIN,                          N_CONSOLE,  0, 0, "", "",           "",     _("^TC^TT^BG team wins the round"), "", NAME)
@@ -409,10 +403,11 @@
     MSG_INFO_NOTIF(POWERUP_STRENGTH,                        N_CONSOLE,  1, 0, "s1", "s1",       "strength",     _("^BG%s^K1 picked up Strength"), "")
 
     MSG_INFO_NOTIF(QUIT_DISCONNECT,                         N_CHATCON,  1, 0, "s1", "",         "",             _("^BG%s^F3 disconnected"), "")
-    MSG_INFO_NOTIF(QUIT_KICK_IDLING,                        N_CHATCON,  1, 0, "s1", "",         "",             _("^BG%s^F3 was kicked for idling"), "")
+    MSG_INFO_NOTIF(QUIT_KICK_IDLING,                        N_CHATCON,  1, 1, "s1 f1", "",      "",             _("^BG%s^F3 was kicked after idling for %s seconds"), "")
+    MSG_INFO_NOTIF(MOVETOSPEC_IDLING,                       N_CHATCON,  1, 1, "s1 f1", "",      "",             _("^BG%s^F3 was moved to^BG spectators^F3 after idling for %s seconds"), "")
     MSG_INFO_NOTIF(QUIT_KICK_SPECTATING,                    N_CONSOLE,  0, 0, "", "",           "",             _("^F2You were kicked from the server because you are a spectator and spectators aren't allowed at the moment."), "")
     MSG_INFO_NOTIF(QUIT_KICK_TEAMKILL,                      N_CHATCON,  1, 0, "s1", "",         "",             _("^BG%s^F3 was kicked for excessive teamkilling"), "")
-    MSG_INFO_NOTIF(QUIT_SPECTATE,                           N_CHATCON,  1, 0, "s1", "",         "",             _("^BG%s^F3 is now spectating"), "")
+    MSG_INFO_NOTIF(QUIT_SPECTATE,                           N_CHATCON,  1, 0, "s1", "",         "",             _("^BG%s^F3 is now^BG spectating"), "")
 
     MSG_INFO_NOTIF(RACE_ABANDONED,                          N_CONSOLE,  1, 0, "s1", "",                                                                     "",                         _("^BG%s^BG has abandoned the race"), "")
     MSG_INFO_NOTIF(RACE_FAIL_RANKED,                        N_CONSOLE,  1, 3, "s1 race_col f1ord race_col f3race_time race_diff", "s1 f3race_time",         "race_newfail",             _("^BG%s^BG couldn't break their %s%s^BG place record of %s%s %s"), "")
@@ -438,8 +433,6 @@
     MSG_INFO_NOTIF(VERSION_BETA,                            N_CONSOLE,  2, 0, "s1 s2", "",      "",                     _("^F4NOTE: ^BGThe server is running ^F1Xonotic %s (beta)^BG, you have ^F2Xonotic %s"), "")
     MSG_INFO_NOTIF(VERSION_OLD,                             N_CHATCON,  2, 0, "s1 s2", "",      "",                     _("^F4NOTE: ^BGThe server is running ^F1Xonotic %s^BG, you have ^F2Xonotic %s"), "")
     MSG_INFO_NOTIF(VERSION_OUTDATED,                        N_CHATCON,  2, 0, "s1 s2", "",      "",                     _("^F4NOTE: ^F1Xonotic %s^BG is out, and you still have ^F2Xonotic %s^BG - get the update from ^F3http://www.xonotic.org/^BG!"), "")
-
-    MSG_INFO_NOTIF(WATERMARK,                               N_CONSOLE,  1, 0, "s1", "",         "",                     _("^F3SVQC Build information: ^F4%s"), "")
 
     MSG_INFO_NOTIF(WEAPON_ACCORDEON_MURDER,                 N_CONSOLE,  3, 2, "spree_inf s1 s2 s3loc spree_end", "s2 s1",       "weapontuba",               _("^BG%s%s^K1 died of ^BG%s^K1's great playing on the @!#%%'n Accordeon%s%s"), "")
     MSG_INFO_NOTIF(WEAPON_ACCORDEON_SUICIDE,                N_CONSOLE,  2, 1, "s1 s2loc spree_lost", "s1",                      "weapontuba",               _("^BG%s^K1 hurt their own ears with the @!#%%'n Accordeon%s%s"), "")
@@ -654,6 +647,7 @@
     MSG_CENTER_NOTIF(DEATH_TEAMKILL_FRAGGED,            N_ENABLE,    1, 0, "s1",             CPID_Null,              "0 0",  _("^K1You were fragged by ^BG%s^K1, a team mate"), _("^K1You were scored against by ^BG%s^K1, a team mate"))
 
     MSG_CENTER_NOTIF(DISCONNECT_IDLING,                 N_ENABLE,    0, 1, "",               CPID_IDLING,            "1 f1", _("^K1Stop idling!\n^BGDisconnecting in ^COUNT..."), "")
+    MSG_CENTER_NOTIF(MOVETOSPEC_IDLING,                 N_ENABLE,    0, 1, "",               CPID_IDLING,            "1 f1", _("^K1Stop idling!\n^BGMoving to spectators in ^COUNT..."), "")
 
     MSG_CENTER_NOTIF(DOOR_LOCKED_NEED,                  N_ENABLE,    1, 0, "s1",             CPID_Null,              "0 0",  _("^BGYou need %s^BG!"), "")
     MSG_CENTER_NOTIF(DOOR_LOCKED_ALSONEED,              N_ENABLE,    1, 0, "s1",             CPID_Null,              "0 0",  _("^BGYou also need %s^BG!"), "")
@@ -664,7 +658,7 @@
     MSG_CENTER_NOTIF(FREEZETAG_REVIVE,                  N_ENABLE,    1, 0, "s1",             CPID_Null,              "0 0",  _("^K3You revived ^BG%s"), "")
     MSG_CENTER_NOTIF(FREEZETAG_REVIVE_SELF,             N_ENABLE,    0, 0, "",               CPID_Null,              "0 0",  _("^K3You revived yourself"), "")
     MSG_CENTER_NOTIF(FREEZETAG_REVIVED,                 N_ENABLE,    1, 0, "s1",             CPID_Null,              "0 0",  _("^K3You were revived by ^BG%s"), "")
-    MSG_CENTER_NOTIF(FREEZETAG_AUTO_REVIVED,            N_ENABLE,    0, 1, "f1",             CPID_Null,              "0 0",  _("^K3You were automatically revived after %s second(s)"), "")
+    MSG_CENTER_NOTIF(FREEZETAG_AUTO_REVIVED,            N_ENABLE,    0, 1, "f1",             CPID_Null,              "0 0",  _("^BGYou were automatically revived after %s seconds"), "")
 
     MSG_CENTER_NOTIF(GENERATOR_UNDERATTACK,             N_ENABLE,    0, 0, "",               CPID_Null,              "0 0",  _("^BGThe generator is under attack!"), "")
 

@@ -253,12 +253,12 @@ void ServerList_Update_favoriteButton(entity btn, entity me)
 	entity e = me.favoriteButton;
 	if(IsFavorite(me.ipAddressBox.text))
 	{
-		e.setText(e, _("Remove favorite"));
+		e.setText(e, ZCTX(_("SERVER^Remove favorite")));
 		setZonedTooltip(e, _("Remove the currently highlighted server from bookmarks"), string_null);
 	}
 	else
 	{
-		e.setText(e, _("Favorite"));
+		e.setText(e, ZCTX(_("SERVER^Favorite")));
 		setZonedTooltip(e, _("Bookmark the currently highlighted server so that it's faster to find in the future"), string_null);
 	}
 }
@@ -340,6 +340,10 @@ void XonoticServerList_refreshServerList(entity me, int mode)
 		// show empty button
 		if(!me.filterShowEmpty)
 			sethostcachemasknumber(++m, SLIST_FIELD_NUMHUMANS, 1, SLIST_TEST_GREATEREQUAL);
+
+		// show laggy button
+		if(!me.filterShowLaggy && autocvar_menu_slist_maxping > 0)
+			sethostcachemasknumber(++m, SLIST_FIELD_PING, autocvar_menu_slist_maxping, SLIST_TEST_LESSEQUAL);
 
 		// gametype filtering
 		if(typestr != "")
@@ -528,10 +532,10 @@ void XonoticServerList_draw(entity me)
 	}
 	else { me.nItems = gethostcachevalue(SLIST_HOSTCACHEVIEWCOUNT); }
 
-	me.connectButton.disabled = (me.lockedSelectedItem || (me.nItems == 0 && me.ipAddressBox.text == ""));
+	me.connectButton.disabled = (me.ipAddressBox.text == "");
 	//me.disconnectButton.disabled = (!(gamestatus & (GAME_ISSERVER | GAME_CONNECTED)));
-	me.infoButton.disabled = (me.lockedSelectedItem || me.nItems == 0 || !owned);
-	me.favoriteButton.disabled = (me.lockedSelectedItem || (me.nItems == 0 && me.ipAddressBox.text == ""));
+	me.infoButton.disabled = !owned;
+	me.favoriteButton.disabled = (me.ipAddressBox.text == "");
 
 	bool found = false;
 	if(me.lockedSelectedItem)
@@ -623,7 +627,7 @@ void ServerList_TypeSort_Click(entity btn, entity me)
 		// the type was found
 		// choose the next one
 		flag = true;
-		s = MapInfo_Type_ToString(Gametypes_from(it.m_id + 1));
+		s = MapInfo_Type_ToString(REGISTRY_GET(Gametypes, it.m_id + 1));
 		if (s == "") s = MapInfo_Type_ToString(first);
 		break;
 	});
@@ -673,6 +677,15 @@ void ServerList_ShowEmpty_Click(entity box, entity me)
 void ServerList_ShowFull_Click(entity box, entity me)
 {
 	box.setChecked(box, me.filterShowFull = !me.filterShowFull);
+	me.refreshServerList(me, REFRESHSERVERLIST_REFILTER);
+
+	me.ipAddressBox.setText(me.ipAddressBox, "");
+	me.ipAddressBox.cursorPos = 0;
+	me.ipAddressBoxFocused = -1;
+}
+void ServerList_ShowLaggy_Click(entity box, entity me)
+{
+	box.setChecked(box, me.filterShowLaggy = !me.filterShowLaggy);
 	me.refreshServerList(me, REFRESHSERVERLIST_REFILTER);
 
 	me.ipAddressBox.setText(me.ipAddressBox, "");
@@ -745,10 +758,8 @@ void XonoticServerList_resizeNotify(entity me, vector relOrigin, vector relSize,
 }
 void ServerList_Connect_Click(entity btn, entity me)
 {
-	if (me.lockedSelectedItem)
-		return;
-	string sv = (me.ipAddressBox.text != "") ? me.ipAddressBox.text : me.selectedServer;
-	localcmd(sprintf("connect %s\n", sv));
+	if (me.ipAddressBox.text != "")
+		localcmd(sprintf("connect %s\n", me.ipAddressBox.text));
 }
 void ServerList_Favorite_Click(entity btn, entity this)
 {
