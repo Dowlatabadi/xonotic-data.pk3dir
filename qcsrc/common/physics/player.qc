@@ -312,7 +312,7 @@ void PM_AirAccelerate(entity this, float dt, vector wishdir, float wishspeed)
 	this.velocity += accelspeed * acceldir;
 }
 
-
+.float last_jump_time;
 /*
 =============
 PlayerJump
@@ -413,6 +413,20 @@ bool PlayerJump(entity this)
 			LOG_TRACE(ftos(this.jumppadcount), "x jumppad combo");
 		this.jumppadcount = 0;
 #endif
+	}
+
+	// bones_was_here: CPM double jumps
+	if (STAT(DOUBLEJUMP, this) == 2)
+	{
+		if (this.last_jump_time > time - 0.4)
+		{
+			if (IS_ONGROUND(this))
+				this.velocity_z += 100;	// ramp, teleport, head bang
+			else
+				this.velocity_z = 100;	// step up
+		}
+
+		this.last_jump_time = time;
 	}
 
 	this.velocity_z += mjumpheight;
