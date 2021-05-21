@@ -312,6 +312,9 @@ void PM_AirAccelerate(entity this, float dt, vector wishdir, float wishspeed)
 	this.velocity += accelspeed * acceldir;
 }
 
+#ifdef CSQC
+float csqcplayer_moveframe;
+#endif
 .float last_jump_time;
 /*
 =============
@@ -415,10 +418,25 @@ bool PlayerJump(entity this)
 #endif
 	}
 
-	// bones_was_here: CPM double jumps
+	// bones_was_here: CPM double jumps, now with dodgy prediction hack
 	if (STAT(DOUBLEJUMP, this) == 2)
 	{
+#ifdef CSQC
+		static float last_csqcplayer_moveframe = -1;
+		static bool djump = false;
+//		print(sprintf("moveframe: %d    last_moveframe: %d    ", csqcplayer_moveframe, last_csqcplayer_moveframe));
+
+		if (last_csqcplayer_moveframe < csqcplayer_moveframe)
+		{
+			last_csqcplayer_moveframe = csqcplayer_moveframe;
+			djump = this.last_jump_time > time - 0.4;
+			this.last_jump_time = time;
+		}
+
+		if (djump)
+#else
 		if (this.last_jump_time > time - 0.4)
+#endif
 		{
 			if (IS_ONGROUND(this))
 				this.velocity_z += 100;	// ramp, teleport, head bang
@@ -426,10 +444,13 @@ bool PlayerJump(entity this)
 				this.velocity_z = 100;	// step up
 		}
 
+#ifdef SVQC
 		this.last_jump_time = time;
+#endif
 	}
 
 	this.velocity_z += mjumpheight;
+//	LOG_INFOF("velocity_z: %f\n", this.velocity_z);
 
 	UNSET_ONGROUND(this);
 	UNSET_ONSLICK(this);
@@ -840,7 +861,6 @@ void CSQC_ClientMovement_PlayerMove_Frame(entity this)
 	if(IS_REAL_CLIENT(this))
 		PM_UpdateButtons(this, CS(this));
 #endif
-
 	sys_phys_update(this, PHYS_INPUT_TIMELENGTH);
 
 #ifdef SVQC
