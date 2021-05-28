@@ -10,6 +10,7 @@
 #include <common/mutators/mutator/buffs/buffs.qh>
 #include <common/mutators/mutator/buffs/sv_buffs.qh>
 #include <common/notifications/all.qh>
+#include <common/resources/resources.qh>
 #include <common/util.qh>
 #include <common/weapons/_all.qh>
 #include <common/wepent.qh>
@@ -445,7 +446,7 @@ void GiveRandomWeapons(entity receiver, int num_weapons, string weapon_names,
 	}
 }
 
-bool Item_GiveAmmoTo(entity item, entity player, int res_type, float ammomax)
+bool Item_GiveAmmoTo(entity item, entity player, Resource res_type, float ammomax)
 {
 	float amount = GetResource(item, res_type);
 	if (amount == 0)
@@ -1399,7 +1400,7 @@ void GiveRot(entity e, float v0, float v1, .float rotfield, float rottime, .floa
 	else if(v0 > v1)
 		e.(regenfield) = max(e.(regenfield), time + regentime);
 }
-bool GiveResourceValue(entity e, int res_type, int op, int val)
+bool GiveResourceValue(entity e, Resource res_type, int op, int val)
 {
 	int v0 = GetResource(e, res_type);
 	float new_val = 0;
