@@ -51,7 +51,7 @@ REGISTER_RESOURCE(PLASMA, NEW(AmmoResource)) {
 #endif
 }
 REGISTER_RESOURCE(FUEL, NEW(AmmoResource)) {
-	this.netname = "fueld";
+	this.netname = "fuel";
 #ifdef GAMEQC
 	this.m_field = ammo_fuel;
 #endif
