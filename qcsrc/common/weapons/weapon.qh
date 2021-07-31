@@ -232,6 +232,8 @@ string GetAmmoPicture(Resource ammotype);
 string GetAmmoName(Resource ammotype);
 
 #ifdef CSQC
+Resource GetAmmoTypeFromNum(int i);
+
 int GetAmmoStat(Resource ammotype);
 #endif
 

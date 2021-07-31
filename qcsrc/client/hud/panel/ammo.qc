@@ -218,13 +218,16 @@ void HUD_Ammo()
 	else
 	{
 		row = column = 0;
-		FOREACH(Resources, it.instanceOfAmmoResource && !it.m_hidden,
+		// disabling new-style loop for now to restore original order of ammo types
+		//FOREACH(Resources, it.instanceOfAmmoResource && !it.m_hidden,
+		for(int j = 0; j < AMMO_COUNT; ++j)
 		{
+			Resource ammotype = GetAmmoTypeFromNum(j);
 			DrawAmmoItem(
 				pos + vec2(column * (ammo_size.x + offset.x), row * (ammo_size.y + offset.y)),
 				ammo_size,
-				it,
-				(wep.ammo_type == it),
+				ammotype,
+				(wep.ammo_type == ammotype),
 				infinite_ammo
 			);
 
@@ -234,7 +237,7 @@ void HUD_Ammo()
 				row = 0;
 				column = column + 1;
 			}
-		});
+		};
 	}
 
 	if (draw_nades)
