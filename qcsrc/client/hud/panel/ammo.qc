@@ -237,7 +237,7 @@ void HUD_Ammo()
 				row = 0;
 				column = column + 1;
 			}
-		};
+		}
 	}
 
 	if (draw_nades)
