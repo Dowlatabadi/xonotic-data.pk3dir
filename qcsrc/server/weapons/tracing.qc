@@ -431,11 +431,12 @@ void fireBullet_antilag(entity this, .entity weaponentity, vector start, vector 
 				headshot = true;
 			}
 			bool gooddamage = accuracy_isgooddamage(this, hit);
+			//start, end and trace_endpos seem completely unreliable to use for this, rebuild new vectors for use
 			vector targetLocation = vec3(floor(hit.origin.x), floor(hit.origin.y), floor(hit.origin.z));
 			vector myLocation = vec3(floor(this.origin.x), floor(this.origin.y), floor(this.origin.z));
 			float dist = vlen(WarpZone_UnTransformOrigin(WarpZone_trace_transform, targetLocation) - myLocation);
-			float damagefalloffmultiplier = 1;
-			float forcefalloffmultiplier = 1;
+			float damagefalloffmultiplier = 1; //in case this function is used without a weapon having the required dmgfalloff cvars,
+			float forcefalloffmultiplier = 1; //do not initate to 0, otherwise all damage is lost unless ExponentialFalloff is visited with proper cvar values
 			// come up with a proper check for entities trying to use this function without having these datafields? 
 			// unneeded if every weapon which could use this field has common fields from common.qh?
 			if(1){
