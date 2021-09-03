@@ -18,6 +18,11 @@ void W_Rifle_FireBullet(Weapon thiswep, .entity weaponentity, float pSpread, flo
 		w_shotorg = actor.origin + actor.view_ofs + ((w_shotorg - actor.origin - actor.view_ofs) * v_forward) * v_forward;
 	}
 
+	actor.(weaponentity).damagefalloff_mindist = 		WEP_CVAR(rifle, damagefalloff_mindist);
+	actor.(weaponentity).damagefalloff_maxdist = 		WEP_CVAR(rifle, damagefalloff_maxdist);
+	actor.(weaponentity).damagefalloff_halflife = 		WEP_CVAR(rifle, damagefalloff_halflife);
+	actor.(weaponentity).damagefalloff_forcehalflife = 	WEP_CVAR(rifle, damagefalloff_forcehalflife);
+
 	for(i = 0; i < pShots; ++i)
 		fireBullet(actor, weaponentity, w_shotorg, w_shotdir, pSpread, pSolidPenetration, pDamage, pHeadshotDamage, pForce, deathtype, (pTracer ? EFFECT_RIFLE : EFFECT_RIFLE_WEAK));
 

@@ -25,6 +25,11 @@ void W_Shotgun_Attack(Weapon thiswep, entity actor, .entity weaponentity, float 
 	if(lag && bullets > 0)
 		antilag_takeback_all(actor, lag);
 
+	actor.(weaponentity).damagefalloff_mindist = 		WEP_CVAR_PRI(shotgun, damagefalloff_mindist);
+	actor.(weaponentity).damagefalloff_maxdist = 		WEP_CVAR_PRI(shotgun, damagefalloff_maxdist);
+	actor.(weaponentity).damagefalloff_halflife = 		WEP_CVAR_PRI(shotgun, damagefalloff_halflife);
+	actor.(weaponentity).damagefalloff_forcehalflife = 	WEP_CVAR_PRI(shotgun, damagefalloff_forcehalflife);
+	
 	for(int sc = 0;sc < bullets;sc = sc + 1)
 		fireBullet_antilag(actor, weaponentity, w_shotorg, w_shotdir, spread, solidpenetration, damage, 0, force, thiswep.m_id, bullet_trail_effect, false);
 

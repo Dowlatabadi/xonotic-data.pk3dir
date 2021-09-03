@@ -5,11 +5,18 @@
 void W_MachineGun_Attack(Weapon thiswep, int deathtype, entity actor, .entity weaponentity)
 {
 	W_SetupShot(actor, weaponentity, true, 0, SND_UZI_FIRE, CH_WEAPON_A, ((actor.(weaponentity).misc_bulletcounter == 1) ? WEP_CVAR(machinegun, first_damage) : WEP_CVAR(machinegun, sustained_damage)), deathtype);
+	
+	actor.(weaponentity).damagefalloff_mindist = 		WEP_CVAR(machinegun, damagefalloff_mindist);
+	actor.(weaponentity).damagefalloff_maxdist = 		WEP_CVAR(machinegun, damagefalloff_maxdist);
+	actor.(weaponentity).damagefalloff_halflife = 		WEP_CVAR(machinegun, damagefalloff_halflife);
+	actor.(weaponentity).damagefalloff_forcehalflife = 	WEP_CVAR(machinegun, damagefalloff_forcehalflife);
+
 	if(!autocvar_g_norecoil)
 	{
 		actor.punchangle_x = random() - 0.5;
 		actor.punchangle_y = random() - 0.5;
 	}
+	
 	// this attack_finished just enforces a cooldown at the end of a burst
 	ATTACK_FINISHED(actor, weaponentity) = time + WEP_CVAR(machinegun, first_refire) * W_WeaponRateFactor(actor);
 
@@ -86,6 +93,11 @@ void W_MachineGun_Attack_Auto(Weapon thiswep, entity actor, .entity weaponentity
 		actor.punchangle_y = random() - 0.5;
 	}
 
+	actor.(weaponentity).damagefalloff_mindist = 		WEP_CVAR(machinegun, damagefalloff_mindist);
+	actor.(weaponentity).damagefalloff_maxdist = 		WEP_CVAR(machinegun, damagefalloff_maxdist);
+	actor.(weaponentity).damagefalloff_halflife = 		WEP_CVAR(machinegun, damagefalloff_halflife);
+	actor.(weaponentity).damagefalloff_forcehalflife = 	WEP_CVAR(machinegun, damagefalloff_forcehalflife);
+
 	machinegun_spread = bound(WEP_CVAR(machinegun, spread_min), WEP_CVAR(machinegun, spread_min) + (WEP_CVAR(machinegun, spread_add) * actor.(weaponentity).misc_bulletcounter), WEP_CVAR(machinegun, spread_max));
 	fireBullet(actor, weaponentity, w_shotorg, w_shotdir, machinegun_spread, WEP_CVAR(machinegun, solidpenetration), WEP_CVAR(machinegun, sustained_damage), 0, WEP_CVAR(machinegun, sustained_force), thiswep.m_id, EFFECT_BULLET);
 
@@ -112,6 +124,11 @@ void W_MachineGun_Attack_Burst(Weapon thiswep, entity actor, .entity weaponentit
 		actor.punchangle_y = random() - 0.5;
 	}
 
+	actor.(weaponentity).damagefalloff_mindist = 		WEP_CVAR(machinegun, damagefalloff_mindist);
+	actor.(weaponentity).damagefalloff_maxdist = 		WEP_CVAR(machinegun, damagefalloff_maxdist);
+	actor.(weaponentity).damagefalloff_halflife = 		WEP_CVAR(machinegun, damagefalloff_halflife);
+	actor.(weaponentity).damagefalloff_forcehalflife = 	WEP_CVAR(machinegun, damagefalloff_forcehalflife);
+	
 	fireBullet(actor, weaponentity, w_shotorg, w_shotdir, WEP_CVAR(machinegun, burst_spread), WEP_CVAR(machinegun, solidpenetration), WEP_CVAR(machinegun, sustained_damage), 0, WEP_CVAR(machinegun, sustained_force), thiswep.m_id, EFFECT_BULLET);
 
 	W_MuzzleFlash(thiswep, actor, weaponentity, w_shotorg, w_shotdir);
