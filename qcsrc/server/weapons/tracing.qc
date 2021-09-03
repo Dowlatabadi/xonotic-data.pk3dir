@@ -431,7 +431,26 @@ void fireBullet_antilag(entity this, .entity weaponentity, vector start, vector 
 				headshot = true;
 			}
 			bool gooddamage = accuracy_isgooddamage(this, hit);
-			Damage(hit, this, this, damage * damage_fraction, dtype, weaponentity, start, force * dir * damage_fraction);
+			vector targetLocation = vec3(floor(hit.origin.x), floor(hit.origin.y), floor(hit.origin.z));
+			vector myLocation = vec3(floor(this.origin.x), floor(this.origin.y), floor(this.origin.z));
+			float dist = vlen(WarpZone_UnTransformOrigin(WarpZone_trace_transform, targetLocation) - myLocation);
+			float damagefalloffmultiplier = 1;
+			float forcefalloffmultiplier = 1;
+			// come up with a proper check for entities trying to use this function without having these datafields? 
+			// unneeded if every weapon which could use this field has common fields from common.qh?
+			if(1){
+				damagefalloffmultiplier = ExponentialFalloff(this.(weaponentity).damagefalloff_mindist, this.(weaponentity).damagefalloff_maxdist, this.(weaponentity).damagefalloff_halflife, dist);
+				forcefalloffmultiplier = ExponentialFalloff(this.(weaponentity).damagefalloff_mindist, this.(weaponentity).damagefalloff_maxdist, this.(weaponentity).damagefalloff_forcehalflife, dist);
+				//LOG_INFOF("dist: %f\n", dist);
+				//LOG_INFOF("damagefalloffmultiplier: %f\n", damagefalloffmultiplier);
+				//LOG_INFOF("forcefalloffmultiplier: %f\n", forcefalloffmultiplier);
+				//LOG_INFOF("damagefalloffmultiplier: %f\n", damagefalloffmultiplier);
+				//LOG_INFOF("mindist: %f\n", this.(weaponentity).damagefalloff_mindist);
+				//LOG_INFOF("maxdist: %f\n", this.(weaponentity).damagefalloff_maxdist);
+				//LOG_INFOF("halflife: %f\n", this.(weaponentity).damagefalloff_halflife);
+				//LOG_INFOF("forcehalflife: %f\n", this.(weaponentity).damagefalloff_forcehalflife);
+			}
+			Damage(hit, this, this, damage * damage_fraction * damagefalloffmultiplier, dtype, weaponentity, start, force * dir * damage_fraction * forcefalloffmultiplier);
 			// calculate hits for ballistic weapons
 			if(gooddamage)
 			{
