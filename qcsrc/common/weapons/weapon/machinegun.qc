@@ -3,17 +3,9 @@
 #ifdef SVQC
 
 .float machinegun_spread_accumulation;
-
 .float oldTime;
 
-//initiate spread like this so it can be used inversedly, accurate with more firing, like Hyperion weapons from Borderlands
-.float lowerEndOfSpreadSpectrum; .float higherEndOfSpreadSpectrum; .float spreadSpectrumDistance; .bool inversedSpread;
-	if(WEP_CVAR(machinegun, spread_max) > WEP_CVAR(machinegun, spread_min)){
-		lowerEndOfSpreadSpectrum = WEP_CVAR(machinegun, spread_min); higherEndOfSpreadSpectrum = WEP_CVAR(machinegun, spread_max); inversedSpread = false;
-	} else {
-		lowerEndOfSpreadSpectrum = WEP_CVAR(machinegun, spread_max); higherEndOfSpreadSpectrum = WEP_CVAR(machinegun, spread_min); inversedSpread = true;
-	}
-	spreadSpectrumDistance = higherEndOfSpreadSpectrum - lowerEndOfSpreadSpectrum;
+float lowerEndOfSpreadSpectrum; float higherEndOfSpreadSpectrum; float spreadSpectrumDistance; bool inversedSpread;
 
 void W_MachineGun_Attack(Weapon thiswep, int deathtype, entity actor, .entity weaponentity)
 {
@@ -76,6 +68,15 @@ void W_MachineGun_Attack_Auto(Weapon thiswep, entity actor, .entity weaponentity
 {
 	float machinegun_spread;
 
+	//initiate spread like this so it can be used invertedly, accurate with more firing, like Hyperion weapons from Borderlands
+	if(WEP_CVAR(machinegun, spread_max) > WEP_CVAR(machinegun, spread_min)){
+		lowerEndOfSpreadSpectrum = WEP_CVAR(machinegun, spread_min); higherEndOfSpreadSpectrum = WEP_CVAR(machinegun, spread_max); inversedSpread = false;
+	} else {
+		lowerEndOfSpreadSpectrum = WEP_CVAR(machinegun, spread_max); higherEndOfSpreadSpectrum = WEP_CVAR(machinegun, spread_min); inversedSpread = true;
+	}
+	spreadSpectrumDistance = higherEndOfSpreadSpectrum - lowerEndOfSpreadSpectrum;
+
+
 	if(!(fire & 1) || !weapon_prepareattack_check(thiswep, actor, weaponentity, false, -1))
 	{
 		w_ready(thiswep, actor, weaponentity, fire);
@@ -98,55 +99,55 @@ void W_MachineGun_Attack_Auto(Weapon thiswep, entity actor, .entity weaponentity
 		actor.punchangle_x = random() - 0.5;
 		actor.punchangle_y = random() - 0.5;
 	}
-	
+
 	// Step by step calculations for machinegun_spread_accumulation with optional debug printing
-	
+	// done before inversed spread support was added but still should give a fairly good idea
+
 	// check current time
 	//print("\n Current time: ");
 	//print(sprintf("%f ", time));
-	
+
 	// seconds passed since the last shot
 	// oldTime is given value at the end of the calculations
 	//float seconds = (time - actor.(weaponentity).oldTime);
 	//print("\n seconds between last time and this time: ");
 	//print(sprintf("%f ", seconds));
-	
+
 	// use seconds passed since last shot to calculate how much spread should have decayed since then
 	//float spreadReduction = seconds * WEP_CVAR(machinegun, spread_decay);
 	//print("\n reduced spread: ");
 	//print(sprintf("%f ", spreadReduction));
-	
+
 	// reduce spread by the calculated amount
 	//actor.(weaponentity).machinegun_spread_accumulation = actor.(weaponentity).machinegun_spread_accumulation - spreadReduction;
 	//print("\n current spread: ");
 	//print(sprintf("%f ", actor.(weaponentity).machinegun_spread_accumulation));
-	
+
 	// if spread is reduced to the negatives make it 0 instead
 	// the following if block is replaced by max(accumulation, 0);
 	//if(actor.(weaponentity).machinegun_spread_accumulation < 0){
 	//	print("\n spread was <0, was reset to 0 before firing");
 	//	actor.(weaponentity).machinegun_spread_accumulation = 0;
 	//}
-	
+
 	// store the time of the last shot
 	//actor.(weaponentity).oldTime = time;
 	//print("\n Old time: ");
 	//print(sprintf("%f ", actor.(weaponentity).oldTime));
+
+	actor.(weaponentity).machinegun_spread_accumulation = max(actor.(weaponentity).machinegun_spread_accumulation - ((time - actor.(weaponentity).oldTime) * WEP_CVAR(machinegun, spread_decay)), 0);
+	actor.(weaponentity).oldTime = time;
 	
-	if(inversedSpread){
-		// TODO
-	} else {
-		actor.(weaponentity).machinegun_spread_accumulation = max(actor.(weaponentity).machinegun_spread_accumulation - ((time - actor.(weaponentity).oldTime) * WEP_CVAR(machinegun, spread_decay)), 0);
-		actor.(weaponentity).oldTime = time;
-		machinegun_spread = bound(0, WEP_CVAR(machinegun, spread_min) + actor.(weaponentity).machinegun_spread_accumulation, WEP_CVAR(machinegun, spread_max));
+	if(WEP_CVAR(machinegun, spread_decay) < 0){
+		actor.(weaponentity).machinegun_spread_accumulation = bound(0, (WEP_CVAR(machinegun, spread_add) * actor.(weaponentity).misc_bulletcounter), spreadSpectrumDistance);
 	}
 
 	// function for reducing mg's damage with no spread and adding damage with heated up barrel or vice versa depending on the values of exposed cvars
 	float coldDamageMultiplierApplicationPercent = 1; float heatDamageMultiplierApplicationPercent = 1;
 
-	if(spreadSpectrumDistance > 0){ //avoid division by 0
-		coldDamageMultiplierApplicationPercent = (spreadSpectrumDistance - machinegun_spread)/spreadSpectrumDistance;
-		heatDamageMultiplierApplicationPercent = 						   machinegun_spread /spreadSpectrumDistance;
+	if(spreadSpectrumDistance > 0){ //avoid division by 0, can never be <0 either how it is set when defined
+		coldDamageMultiplierApplicationPercent = (spreadSpectrumDistance - actor.(weaponentity).machinegun_spread_accumulation)/spreadSpectrumDistance;
+		heatDamageMultiplierApplicationPercent = 						   actor.(weaponentity).machinegun_spread_accumulation /spreadSpectrumDistance;
 		// these formulas seem to give numbers which are used as the distance from one end to the other
 		// cold = lower end, heat = higher end, spreadSpectrumDistance = higherEndOfSpreadSpectrum - lowerEndOfSpreadSpectrum = 30 for these examples
 		//
@@ -166,15 +167,24 @@ void W_MachineGun_Attack_Auto(Weapon thiswep, entity actor, .entity weaponentity
 		// min 5 , spread buildup 100% , max 35
 		//  0 / 30 = 0   apply none of the multiplier
 	}
-	float heat = (coldDamageMultiplierApplicationPercent*WEP_CVAR(machinegun, spread_cold_damagemultiplier)) * (coldDamageMultiplierApplicationPercent*WEP_CVAR(machinegun, spread_cold_damagemultiplier));
+	// example where low end has halved damage and high end has tripled damage with 50% spread accumulation: heat = (0.5 * 0.5) + (0.5 * 3) = 0.25 + 1.5 = 1.75 damage multiplier
+	// example where low end has halved damage and high end has tripled damage with 90% spread accumulation: heat = (0.1 * 0.5) + (0.9 * 3) = 0.05 + 2.7 = 2.75 damage multiplier
+	float heat = (coldDamageMultiplierApplicationPercent*2*WEP_CVAR(machinegun, spread_cold_damagemultiplier)) + (heatDamageMultiplierApplicationPercent*2*WEP_CVAR(machinegun, spread_heat_damagemultiplier));
+	if(spreadSpectrumDistance > 0)heat = heat/4; // avoid damage quadrupling from ((1*2*1)+(1*2*1)) = 4
 	
+	if(inversedSpread){
+		machinegun_spread = bound(WEP_CVAR(machinegun, spread_max), WEP_CVAR(machinegun, spread_min) - actor.(weaponentity).machinegun_spread_accumulation, WEP_CVAR(machinegun, spread_min));
+	} else {
+		machinegun_spread = bound(WEP_CVAR(machinegun, spread_min), WEP_CVAR(machinegun, spread_min) + actor.(weaponentity).machinegun_spread_accumulation, WEP_CVAR(machinegun, spread_max));
+	}
+
 	fireBullet(actor, weaponentity, w_shotorg, w_shotdir, machinegun_spread, WEP_CVAR(machinegun, solidpenetration), WEP_CVAR(machinegun, sustained_damage) * heat, 
 			   0, WEP_CVAR(machinegun, sustained_force), thiswep.m_id, EFFECT_BULLET);
 
 	actor.(weaponentity).misc_bulletcounter = actor.(weaponentity).misc_bulletcounter + 1;
 	actor.(weaponentity).machinegun_spread_accumulation = actor.(weaponentity).machinegun_spread_accumulation + WEP_CVAR(machinegun, spread_add);
-	if(actor.(weaponentity).machinegun_spread_accumulation > WEP_CVAR(machinegun, spread_max)){
-		actor.(weaponentity).machinegun_spread_accumulation = WEP_CVAR(machinegun, spread_max);
+	if(actor.(weaponentity).machinegun_spread_accumulation > spreadSpectrumDistance){
+		actor.(weaponentity).machinegun_spread_accumulation = spreadSpectrumDistance;
 	}
 
 	W_MuzzleFlash(thiswep, actor, weaponentity, w_shotorg, w_shotdir);
@@ -190,7 +200,7 @@ void W_MachineGun_Attack_Auto(Weapon thiswep, entity actor, .entity weaponentity
 }
 
 void W_MachineGun_Attack_Burst(Weapon thiswep, entity actor, .entity weaponentity, int fire)
-{	
+{
 	W_SetupShot(actor, weaponentity, true, 0, SND_UZI_FIRE, CH_WEAPON_A, WEP_CVAR(machinegun, sustained_damage), thiswep.m_id);
 	if(!autocvar_g_norecoil)
 	{
@@ -210,8 +220,8 @@ void W_MachineGun_Attack_Burst(Weapon thiswep, entity actor, .entity weaponentit
 
 	actor.(weaponentity).misc_bulletcounter = actor.(weaponentity).misc_bulletcounter + 1;
 	actor.(weaponentity).machinegun_spread_accumulation = actor.(weaponentity).machinegun_spread_accumulation + (WEP_CVAR(machinegun, spread_add) * 0.5);
-	if(actor.(weaponentity).machinegun_spread_accumulation > WEP_CVAR(machinegun, spread_max)){
-		actor.(weaponentity).machinegun_spread_accumulation = WEP_CVAR(machinegun, spread_max);
+	if(actor.(weaponentity).machinegun_spread_accumulation > spreadSpectrumDistance){
+		actor.(weaponentity).machinegun_spread_accumulation = spreadSpectrumDistance;
 	}
 	if(actor.(weaponentity).misc_bulletcounter == 0)
 	{
@@ -254,13 +264,15 @@ METHOD(MachineGun, wr_think, void(entity thiswep, entity actor, .entity weaponen
         if(fire & 2)
         if(weapon_prepareattack(thiswep, actor, weaponentity, true, 0))
         {
-            actor.(weaponentity).machinegun_spread_accumulation = max(actor.(weaponentity).machinegun_spread_accumulation - ((time - actor.(weaponentity).oldTime) * WEP_CVAR(machinegun, spread_decay)), 0);
-            actor.(weaponentity).oldTime = time;
-            if(actor.(weaponentity).machinegun_spread_accumulation > 0){
-                w_ready(thiswep, actor, weaponentity, fire);
-                return;
+            if(WEP_CVAR(machinegun, spread_decay) >= 0){
+                actor.(weaponentity).machinegun_spread_accumulation = max(actor.(weaponentity).machinegun_spread_accumulation - ((time - actor.(weaponentity).oldTime) * WEP_CVAR(machinegun, spread_decay)), 0);
+                actor.(weaponentity).oldTime = time;
+                if(actor.(weaponentity).machinegun_spread_accumulation > 0){
+                    w_ready(thiswep, actor, weaponentity, fire);
+                    return;
+                }
             }
-            
+
             if(!thiswep.wr_checkammo2(thiswep, actor, weaponentity))
             if(!(actor.items & IT_UNLIMITED_AMMO))
             {
