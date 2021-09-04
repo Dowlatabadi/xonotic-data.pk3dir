@@ -169,8 +169,8 @@ void W_MachineGun_Attack_Auto(Weapon thiswep, entity actor, .entity weaponentity
 	}
 	// example where low end has halved damage and high end has tripled damage with 50% spread accumulation: heat = (0.5 * 0.5) + (0.5 * 3) = 0.25 + 1.5 = 1.75 damage multiplier
 	// example where low end has halved damage and high end has tripled damage with 90% spread accumulation: heat = (0.1 * 0.5) + (0.9 * 3) = 0.05 + 2.7 = 2.75 damage multiplier
-	float heat = (coldDamageMultiplierApplicationPercent*2*WEP_CVAR(machinegun, spread_cold_damagemultiplier)) + (heatDamageMultiplierApplicationPercent*2*WEP_CVAR(machinegun, spread_heat_damagemultiplier));
-	if(spreadSpectrumDistance > 0)heat = heat/4; // avoid damage quadrupling from ((1*2*1)+(1*2*1)) = 4
+	float heat = (coldDamageMultiplierApplicationPercent*WEP_CVAR(machinegun, spread_cold_damagemultiplier)) + (heatDamageMultiplierApplicationPercent*WEP_CVAR(machinegun, spread_heat_damagemultiplier));
+	if(spreadSpectrumDistance == 0)heat = heat/2; // avoid damage doubling from ((1*1)+(1*1)) = 2 , also averages the 2 multipliers when spreadSpectrumDistance == 0
 	
 	if(inversedSpread){
 		machinegun_spread = bound(WEP_CVAR(machinegun, spread_max), WEP_CVAR(machinegun, spread_min) - actor.(weaponentity).machinegun_spread_accumulation, WEP_CVAR(machinegun, spread_min));
