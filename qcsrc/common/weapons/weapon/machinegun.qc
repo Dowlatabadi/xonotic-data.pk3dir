@@ -126,7 +126,7 @@ void W_MachineGun_Attack_Auto(Weapon thiswep, entity actor, .entity weaponentity
 
 	actor.(weaponentity).machinegun_spread_accumulation = max(actor.(weaponentity).machinegun_spread_accumulation - ((time - actor.(weaponentity).oldTime) * WEP_CVAR(machinegun, spread_decay)), 0);
 	actor.(weaponentity).oldTime = time;
-	if(WEP_CVAR(machinegun, spread_decay) == -666){
+	if(WEP_CVAR(machinegun, spread_decay) < 0){
 		machinegun_spread = bound(WEP_CVAR(machinegun, spread_min), WEP_CVAR(machinegun, spread_min) + (WEP_CVAR(machinegun, spread_add) * actor.(weaponentity).misc_bulletcounter), WEP_CVAR(machinegun, spread_max));
 	] else {
 		machinegun_spread = bound(WEP_CVAR(machinegun, spread_min), WEP_CVAR(machinegun, spread_min) + actor.(weaponentity).machinegun_spread_accumulation, WEP_CVAR(machinegun, spread_max));
@@ -216,13 +216,15 @@ METHOD(MachineGun, wr_think, void(entity thiswep, entity actor, .entity weaponen
         if(fire & 2)
         if(weapon_prepareattack(thiswep, actor, weaponentity, true, 0))
         {
-            actor.(weaponentity).machinegun_spread_accumulation = max(actor.(weaponentity).machinegun_spread_accumulation - ((time - actor.(weaponentity).oldTime) * WEP_CVAR(machinegun, spread_decay)), 0);
-            actor.(weaponentity).oldTime = time;
-            if(actor.(weaponentity).machinegun_spread_accumulation > 0){
-                w_ready(thiswep, actor, weaponentity, fire);
-                return;
-            }
-            
+            if(WEP_CVAR(machinegun, spread_decay) >= 0){
+				actor.(weaponentity).machinegun_spread_accumulation = max(actor.(weaponentity).machinegun_spread_accumulation - ((time - actor.(weaponentity).oldTime) * WEP_CVAR(machinegun, spread_decay)), 0);
+            	actor.(weaponentity).oldTime = time;
+            	if(actor.(weaponentity).machinegun_spread_accumulation > 0){
+            	    w_ready(thiswep, actor, weaponentity, fire);
+            	   return;
+            	}
+			}
+
             if(!thiswep.wr_checkammo2(thiswep, actor, weaponentity))
             if(!(actor.items & IT_UNLIMITED_AMMO))
             {
