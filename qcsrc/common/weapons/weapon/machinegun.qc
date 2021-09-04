@@ -6,6 +6,15 @@
 
 .float oldTime;
 
+//initiate spread like this so it can be used inversedly, accurate with more firing, like Hyperion weapons from Borderlands
+.float lowerEndOfSpreadSpectrum; .float higherEndOfSpreadSpectrum; .float spreadSpectrumDistance; .bool inversedSpread;
+	if(WEP_CVAR(machinegun, spread_max) > WEP_CVAR(machinegun, spread_min)){
+		lowerEndOfSpreadSpectrum = WEP_CVAR(machinegun, spread_min); higherEndOfSpreadSpectrum = WEP_CVAR(machinegun, spread_max); inversedSpread = false;
+	} else {
+		lowerEndOfSpreadSpectrum = WEP_CVAR(machinegun, spread_max); higherEndOfSpreadSpectrum = WEP_CVAR(machinegun, spread_min); inversedSpread = true;
+	}
+	spreadSpectrumDistance = higherEndOfSpreadSpectrum - lowerEndOfSpreadSpectrum;
+
 void W_MachineGun_Attack(Weapon thiswep, int deathtype, entity actor, .entity weaponentity)
 {
 	W_SetupShot(actor, weaponentity, true, 0, SND_UZI_FIRE, CH_WEAPON_A, ((actor.(weaponentity).misc_bulletcounter == 1) ? WEP_CVAR(machinegun, first_damage) : WEP_CVAR(machinegun, sustained_damage)), deathtype);
@@ -124,11 +133,43 @@ void W_MachineGun_Attack_Auto(Weapon thiswep, entity actor, .entity weaponentity
 	//print("\n Old time: ");
 	//print(sprintf("%f ", actor.(weaponentity).oldTime));
 	
-	actor.(weaponentity).machinegun_spread_accumulation = max(actor.(weaponentity).machinegun_spread_accumulation - ((time - actor.(weaponentity).oldTime) * WEP_CVAR(machinegun, spread_decay)), 0);
-	actor.(weaponentity).oldTime = time;
+	if(inversedSpread){
+		// TODO
+	} else {
+		actor.(weaponentity).machinegun_spread_accumulation = max(actor.(weaponentity).machinegun_spread_accumulation - ((time - actor.(weaponentity).oldTime) * WEP_CVAR(machinegun, spread_decay)), 0);
+		actor.(weaponentity).oldTime = time;
+		machinegun_spread = bound(0, WEP_CVAR(machinegun, spread_min) + actor.(weaponentity).machinegun_spread_accumulation, WEP_CVAR(machinegun, spread_max));
+	}
 
-	machinegun_spread = bound(WEP_CVAR(machinegun, spread_min), WEP_CVAR(machinegun, spread_min) + actor.(weaponentity).machinegun_spread_accumulation, WEP_CVAR(machinegun, spread_max));
-	fireBullet(actor, weaponentity, w_shotorg, w_shotdir, machinegun_spread, WEP_CVAR(machinegun, solidpenetration), WEP_CVAR(machinegun, sustained_damage), 0, WEP_CVAR(machinegun, sustained_force), thiswep.m_id, EFFECT_BULLET);
+	// function for reducing mg's damage with no spread and adding damage with heated up barrel or vice versa depending on the values of exposed cvars
+	float coldDamageMultiplierApplicationPercent = 1; float heatDamageMultiplierApplicationPercent = 1;
+
+	if(spreadSpectrumDistance > 0){ //avoid division by 0
+		coldDamageMultiplierApplicationPercent = (spreadSpectrumDistance - machinegun_spread)/spreadSpectrumDistance;
+		heatDamageMultiplierApplicationPercent = 						   machinegun_spread /spreadSpectrumDistance;
+		// these formulas seem to give numbers which are used as the distance from one end to the other
+		// cold = lower end, heat = higher end, spreadSpectrumDistance = higherEndOfSpreadSpectrum - lowerEndOfSpreadSpectrum = 30 for these examples
+		//
+		// examples for cold barrel / coldDamageMultiplierApplicationPercent:
+		// min 5 , spread buildup 100% , max 35
+		// (30 - 30) / 30 = 0   apply none of the multiplier
+		// min 5 , spread buildup  50% , max 35
+		// (30 - 15) / 30 = 0.5 apply half of the multiplier
+		// min 5 , spread buildup   0% , max 35
+		// (30 -  0) / 30 = 1   apply all of the multiplier
+		//
+		// examples for warm barrel / heatDamageMultiplierApplicationPercent:
+		// min 5 , spread buildup   0% , max 35
+		// 30 / 30 = 1   apply all  of the multiplier
+		// min 5 , spread buildup  50% , max 35
+		// 15 / 30 = 0.5 apply half of the multiplier
+		// min 5 , spread buildup 100% , max 35
+		//  0 / 30 = 0   apply none of the multiplier
+	}
+	float heat = (coldDamageMultiplierApplicationPercent*WEP_CVAR(machinegun, spread_cold_damagemultiplier)) * (coldDamageMultiplierApplicationPercent*WEP_CVAR(machinegun, spread_cold_damagemultiplier));
+	
+	fireBullet(actor, weaponentity, w_shotorg, w_shotdir, machinegun_spread, WEP_CVAR(machinegun, solidpenetration), WEP_CVAR(machinegun, sustained_damage) * heat, 
+			   0, WEP_CVAR(machinegun, sustained_force), thiswep.m_id, EFFECT_BULLET);
 
 	actor.(weaponentity).misc_bulletcounter = actor.(weaponentity).misc_bulletcounter + 1;
 	actor.(weaponentity).machinegun_spread_accumulation = actor.(weaponentity).machinegun_spread_accumulation + WEP_CVAR(machinegun, spread_add);
