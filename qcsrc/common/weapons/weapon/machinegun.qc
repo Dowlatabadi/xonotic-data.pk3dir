@@ -138,8 +138,8 @@ void W_MachineGun_Attack_Auto(Weapon thiswep, entity actor, .entity weaponentity
 
 	actor.(weaponentity).machinegun_spread_accumulation = max(actor.(weaponentity).machinegun_spread_accumulation - ((time - actor.(weaponentity).oldTime) * WEP_CVAR(machinegun, spread_decay)), 0);
 	actor.(weaponentity).oldTime = time;
-	
-	if(WEP_CVAR(machinegun, spread_offswitchfortimebaseddecay)){
+
+	if(WEP_CVAR(machinegun, spread_decay) = 0){
 		actor.(weaponentity).machinegun_spread_accumulation = bound(0, (WEP_CVAR(machinegun, spread_add) * actor.(weaponentity).misc_bulletcounter), spreadSpectrumDistance);
 	}
 
@@ -172,7 +172,7 @@ void W_MachineGun_Attack_Auto(Weapon thiswep, entity actor, .entity weaponentity
 	// example where low end has halved damage and high end has tripled damage with 90% spread accumulation: heat = (0.1 * 0.5) + (0.9 * 3) = 0.05 + 2.7 = 2.75 damage multiplier
 	float heat = (coldDamageMultiplierApplicationPercent*WEP_CVAR(machinegun, spread_cold_damagemultiplier)) + (heatDamageMultiplierApplicationPercent*WEP_CVAR(machinegun, spread_heat_damagemultiplier));
 	if(spreadSpectrumDistance == 0) heat = heat/2; // avoid damage doubling from ((1*1)+(1*1)) = 2 , also averages the 2 multipliers when spreadSpectrumDistance == 0
-	
+
 	if(inversedSpread){
 		machinegun_spread = bound(WEP_CVAR(machinegun, spread_max), WEP_CVAR(machinegun, spread_min) - actor.(weaponentity).machinegun_spread_accumulation, WEP_CVAR(machinegun, spread_min));
 	} else {
@@ -265,7 +265,7 @@ METHOD(MachineGun, wr_think, void(entity thiswep, entity actor, .entity weaponen
         if(fire & 2)
         if(weapon_prepareattack(thiswep, actor, weaponentity, true, 0))
         {
-            if(!WEP_CVAR(machinegun, spread_offswitchfortimebaseddecay)){
+            if(WEP_CVAR(machinegun, spread_decay) = 0){
                 actor.(weaponentity).machinegun_spread_accumulation = max(actor.(weaponentity).machinegun_spread_accumulation - ((time - actor.(weaponentity).oldTime) * WEP_CVAR(machinegun, spread_decay)), 0);
                 actor.(weaponentity).oldTime = time;
                 if(actor.(weaponentity).machinegun_spread_accumulation > 0){
