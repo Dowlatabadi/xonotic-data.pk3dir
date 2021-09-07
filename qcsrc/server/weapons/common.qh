@@ -17,16 +17,6 @@ bool WarpZone_Projectile_Touch_ImpactFilter_Callback(entity this, entity toucher
 
 .float misc_bulletcounter;
 
-// Give dmg/force falloff cvar value fields which can be used
-// to pass values to fireBullet function without having
-// to change the function parameters and rework every single
-// thing which uses the function and maintain full backwards
-// compatibility. Used for shotgun, machinegun and rifle at creation.
-.float damagefalloff_mindist;
-.float damagefalloff_maxdist;
-.float damagefalloff_halflife;
-.float damagefalloff_forcehalflife;
-
 .int projectiledeathtype;
 
 .float fade_time;
