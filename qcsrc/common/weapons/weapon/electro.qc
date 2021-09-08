@@ -312,8 +312,8 @@ void W_Electro_Orb_Stick(entity this, entity to)
 	newproj.weaponentity_fld = this.weaponentity_fld;
 
 	settouch(newproj, func_null);
-	if(WEP_CVAR_SEC(electro, stick_newlifetime) >= 0){
-		newproj.death_time = time + WEP_CVAR_SEC(electro, stick_newlifetime);
+	if(WEP_CVAR_SEC(electro, stick_lifetime) >= 0){
+		newproj.death_time = time + WEP_CVAR_SEC(electro, stick_lifetime);
 	}else{
 		newproj.death_time = this.death_time;
 	}
