@@ -231,7 +231,7 @@ string GetAmmoName(Resource ammotype)
 	}
 }
 
-entity GetAmmoItem(int ammotype)
+entity GetAmmoItem(Resource ammotype)
 {
 	switch (ammotype)
 	{
@@ -242,7 +242,7 @@ entity GetAmmoItem(int ammotype)
 		case RES_PLASMA:  return ITEM_Plasma;
 		case RES_FUEL:    return ITEM_JetpackFuel;
 	}
-	LOG_WARNF("Invalid ammo type %d ", ammotype);
+	LOG_WARNF("Invalid ammo type %d ", ammotype.m_id);
 	return NULL;
 	// WEAPONTODO: use this generic func to reduce duplication ?
 	// GetAmmoPicture  GetAmmoName  notif_arg_item_wepammo  ammo_pickupevalfunc ?

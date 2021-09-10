@@ -227,7 +227,7 @@ string GetAmmoPicture(Resource ammotype);
 
 string GetAmmoName(Resource ammotype);
 
-entity GetAmmoItem(int ammotype);
+entity GetAmmoItem(Resource ammotype);
 
 #ifdef CSQC
 Resource GetAmmoTypeFromNum(int i);
