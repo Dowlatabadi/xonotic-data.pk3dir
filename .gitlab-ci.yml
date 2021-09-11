@@ -11,19 +11,6 @@ before_script:
   - cd gmqcc && make -j $(nproc) && export QCC="$PWD/gmqcc"
   - cd ..
 
-report_cloc:
-  before_script:
-    - ln -s $PWD data/xonotic-data.pk3dir # is this needed?
-    - apt-get update
-    - apt-get -y install cloc sqlite3
-  rules:
-    - changes:
-      - qcsrc/**/*
-  stage: test
-  script:
-    - cloc --force-lang-def=qcsrc/tools/cloc.txt --sql 1 --sql-project xonotic qcsrc | sqlite3 code.db
-    - sqlite3 code.db 'select file,nCode from t where nCode > 1000 order by nBlank+nComment+nCode desc'
-
 test_compilation_units:
   rules:
     - changes:
@@ -45,7 +32,7 @@ test_sv_game:
     - wget -O data/maps/stormkeep.waypoints https://gitlab.com/xonotic/xonotic-maps.pk3dir/raw/master/maps/stormkeep.waypoints
     - wget -O data/maps/stormkeep.waypoints.cache https://gitlab.com/xonotic/xonotic-maps.pk3dir/raw/master/maps/stormkeep.waypoints.cache
     - make
-    - EXPECT=dd4be6a62023ac672e483fa7bfd27190
+    - EXPECT=d1b8209ef263b8fbb59dbb205049af52
     - HASH=$(${ENGINE} -noconfig -nohome +timestamps 1 +exec serverbench.cfg
       | tee /dev/stderr
       | sed -e 's,^\[[^]]*\] ,,'
