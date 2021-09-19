@@ -434,11 +434,11 @@ void fireBullet_falloff(entity this, .entity weaponentity, vector start, vector 
 			}
 			bool gooddamage = accuracy_isgooddamage(this, hit);
 			
-			// start, end and trace_endpos seem completely unreliable to use for falloff calculations, build new vectors for use
-			// only used to measure distance between shooter and target entities
-			vector targetLocation = vec3(floor(hit.origin.x), floor(hit.origin.y), floor(hit.origin.z));
-			vector myLocation = vec3(floor(this.origin.x), floor(this.origin.y), floor(this.origin.z));
-			float dist = vlen(WarpZone_UnTransformOrigin(WarpZone_trace_transform, targetLocation) - myLocation);
+			// start, end and trace_endpos seem completely unreliable to use for falloff calculations, using entity.origins
+			// dist is only used to measure distance between shooter and target entities and do math based on the distance
+			// target's location = hit.origin
+			// shooter's location = this.origin
+			float dist = vlen(WarpZone_UnTransformOrigin(WarpZone_trace_transform, hit.origin) - this.origin);
 			//float damagefalloffmultiplier = ExponentialFalloff(falloff_mindist, falloff_maxdist, falloff_halflife, dist);
 			//float forcefalloffmultiplier = ExponentialFalloff(falloff_mindist, falloff_maxdist, falloff_forcehalflife, dist);
 			//Damage(hit, this, this, damage * damage_fraction * damagefalloffmultiplier, dtype, weaponentity, start, force * dir * damage_fraction * forcefalloffmultiplier);
